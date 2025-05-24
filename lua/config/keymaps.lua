@@ -114,3 +114,7 @@ map("n", ",e", "<C-w>l", { desc = "Go to Right Window" })
 -- use Alt + (h/l) to go foward and back buffers
 map("n", "<A-h>", "<cmd>bprevious<cr>", { desc = "Previous Buffer" })
 map("n", "<A-l>", "<cmd>bnext<cr>", { desc = "Next Buffer" })
+
+vim.keymap.set("n", "ge", function()
+  vim.diagnostic.open_float()
+end)

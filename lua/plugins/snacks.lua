@@ -1,5 +1,8 @@
 return {
   "folke/snacks.nvim",
+  vim.keymap.set("n", "<leader>db", function()
+    require("snacks").dashboard()
+  end, { desc = "Open Snacks Dashboard" }),
   opts = {
     picker = {
       win = {
