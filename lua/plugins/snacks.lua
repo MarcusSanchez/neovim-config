@@ -1,8 +1,13 @@
+local map = vim.keymap.set
+local snacks = require("snacks")
+
 return {
   "folke/snacks.nvim",
-  vim.keymap.set("n", "<leader>db", function()
-    require("snacks").dashboard()
+
+  map("n", "<leader>db", function()
+    snacks.dashboard()
   end, { desc = "Open Snacks Dashboard" }),
+
   opts = {
     picker = {
       win = {
