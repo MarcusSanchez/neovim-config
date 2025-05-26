@@ -124,11 +124,18 @@ map("n", "E", "W", opts)
 map("n", "B", "E", opts)
 
 --------------------------------------------------------------------------------
--- Redo
+-- Redo, Folding, custom comment functionality
 --------------------------------------------------------------------------------
 
 -- Shift+U to redo
 map("n", "<S-U>", "<C-R>", opts)
+
+-- ,d to fold under cursor
+map("n", ",d", "za", { desc = "Toggle Fold Under Cursor" })
+
+-- del("n", "<C-/>")
+-- map("n", "<C-/>", "gc<Esc><Down>", { desc = "Comment Line" })
+-- map("v", "<C-/>", "gc<Esc><Down>", { desc = "Comment Selection" })
 
 --------------------------------------------------------------------------------
 -- LSP & Diagnostics
