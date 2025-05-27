@@ -124,7 +124,7 @@ map("n", "E", "W", opts)
 map("n", "B", "E", opts)
 
 --------------------------------------------------------------------------------
--- Redo, Folding, custom comment functionality
+-- Miscellaneous Utility Keymaps
 --------------------------------------------------------------------------------
 
 -- Shift+U to redo
@@ -132,6 +132,9 @@ map("n", "<S-U>", "<C-R>", opts)
 
 -- ,d to fold under cursor
 map("n", ",d", "za", { desc = "Toggle Fold Under Cursor" })
+
+-- ,r to rename symbol under cursor
+map("n", ",r", "<leader>cr", { remap = true, desc = "Rename Symbol Under Cursor" })
 
 -- del("n", "<C-/>")
 -- map("n", "<C-/>", "gc<Esc><Down>", { desc = "Comment Line" })
