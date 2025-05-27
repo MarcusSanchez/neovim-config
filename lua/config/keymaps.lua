@@ -153,6 +153,9 @@ map("n", "ge", function()
   vim.diagnostic.open_float()
 end)
 
+-- make ,g open code actions
+map("n", ",g", "<leader>ca", { remap = true, desc = "Code Actions" })
+
 --------------------------------------------------------------------------------
 -- Multicursor
 --------------------------------------------------------------------------------
