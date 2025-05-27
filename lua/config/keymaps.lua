@@ -74,8 +74,8 @@ map("v", "<S-A-k>", ":<C-u>execute \"'<,'>move '>+\" . v:count1<cr>gv=gv", { des
 -- let ,q close current buffer
 map("n", ",q", "<leader>bd", { remap = true, desc = "Close current buffer" })
 
--- let ,f write the file
-map("n", ",f", ":w<CR>", opts)
+-- let ,f format the current buffer
+map("n", ",f", ":w<CR>", { desc = "(Format + Save) current buffer" })
 
 -- use ,a to open snacks explorer
 map("n", ",a", "<leader>e", { remap = true, desc = "Open snacks explorer (root dir)" })
