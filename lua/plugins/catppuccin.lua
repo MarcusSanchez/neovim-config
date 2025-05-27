@@ -18,6 +18,13 @@ return {
         telescope = true,
         -- add more integrations as needed
       },
+      highlight_overrides = {
+        all = function(colors)
+          return {
+            ["@function.builtin"] = { fg = colors.blue },
+          }
+        end,
+      },
     })
     vim.cmd.colorscheme("catppuccin-mocha") -- Use the full name for the flavor
   end,

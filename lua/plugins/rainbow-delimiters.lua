@@ -4,6 +4,11 @@ return {
   config = function()
     -- Basic setup using Lua (recommended)
     require("rainbow-delimiters.setup").setup({
+      blacklist = {
+        "html",
+        "jsx",
+        "tsx",
+      },
       strategy = {
         [""] = "rainbow-delimiters.strategy.global",
         vim = "rainbow-delimiters.strategy.local",
@@ -21,7 +26,6 @@ return {
         "RainbowDelimiterRed",
         "RainbowDelimiterBlue",
         "RainbowDelimiterOrange",
-        "RainbowDelimiterGreen",
         "RainbowDelimiterViolet",
         "RainbowDelimiterCyan",
       },
