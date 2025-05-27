@@ -3,12 +3,15 @@ return {
   name = "catppuccin",
   lazy = false, -- Load during startup, not lazily
   priority = 1000, -- Load before other plugins
+  semantic_tokens = true,
   config = function()
     require("catppuccin").setup({
       flavour = "mocha",
       transparent_background = true,
       integrations = {
         cmp = true,
+        -- native_lsp = { enabled = true },
+        semantic_tokens = true,
         gitsigns = true,
         nvimtree = true,
         treesitter = true,
