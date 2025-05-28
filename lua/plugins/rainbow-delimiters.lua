@@ -1,8 +1,7 @@
 return {
   "HiPhish/rainbow-delimiters.nvim",
-  event = "VeryLazy", -- or another appropriate event
+  event = "VeryLazy",
   config = function()
-    -- Basic setup using Lua (recommended)
     require("rainbow-delimiters.setup").setup({
       blacklist = {
         "html",
@@ -23,11 +22,11 @@ return {
       },
       highlight = {
         "RainbowDelimiterYellow",
+        "RainbowDelimiterViolet",
         "RainbowDelimiterRed",
         "RainbowDelimiterBlue",
-        "RainbowDelimiterOrange",
-        "RainbowDelimiterViolet",
         "RainbowDelimiterCyan",
+        "RainbowDelimiterOrange",
       },
     })
   end,
