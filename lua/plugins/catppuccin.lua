@@ -36,11 +36,12 @@ return {
             ["@punctuation.delimiter"] = { fg = colors.subtext1 },
             ["@punctuation.special"] = { fg = cherry_blossom },
             DiagnosticUnderlineError = { fg = colors.red, style = { "bold", "italic", "undercurl" } },
-            DiagnosticUnderlineWarn = { style = { "underline" } },
+            DiagnosticUnderlineWarn = { style = { "undercurl" } },
+            DiagnosticUnderlineHint = { style = {} },
 
             -- golang
             ["@lsp.typemod.variable.defaultLibrary.go"] = { fg = colors.peach },
-            ["@lsp.typemod.variable.readonly.go"] = { fg = colors.peach }, -- sometimes used for constants
+            ["@lsp.typemod.variable.readonly.go"] = { fg = colors.peach },
             ["@lsp.type.namespace.go"] = { fg = colors.subtext1, style = { "italic" } },
             ["@lsp.type.parameter.go"] = { fg = fall },
             ["@lsp.typemod.variable.member.go"] = { fg = colors.red },

@@ -17,9 +17,6 @@ vim.api.nvim_create_autocmd("LspAttach", {
       signs = {
         severity = { min = vim.diagnostic.severity.ERROR },
       },
-      underline = {
-        severity = { min = vim.diagnostic.severity.WARN },
-      },
     })
   end,
 })
