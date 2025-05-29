@@ -5,3 +5,4 @@
 -- Disable all snacks animations globally
 vim.g.snacks_animate = false
 vim.g.ai_cmp = false
+vim.opt.whichwrap:append("h,l")

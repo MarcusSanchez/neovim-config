@@ -136,6 +136,9 @@ map("n", ",d", "za", { desc = "Toggle Fold Under Cursor" })
 -- ,r to rename symbol under cursor
 map("n", ",r", "<leader>cr", { remap = true, desc = "Rename Symbol Under Cursor" })
 
+-- <leader>hc to show ts captures under cursor
+map("n", "<leader>hc", ":TSHighlightCapturesUnderCursor<CR>", { desc = "Show Treesitter Captures Under Cursor" })
+
 -- del("n", "<C-/>")
 -- map("n", "<C-/>", "gc<Esc><Down>", { desc = "Comment Line" })
 -- map("v", "<C-/>", "gc<Esc><Down>", { desc = "Comment Selection" })
