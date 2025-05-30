@@ -25,7 +25,7 @@ return {
             ["@function.builtin"] = { fg = colors.blue },
             ["@field"] = { fg = colors.red },
             ["@property"] = { fg = colors.red },
-            ["@namespace"] = { fg = colors.text, style = { "italic" } },
+            ["@namespace"] = { fg = colors.subtext1, style = { "italic" } },
             ["@variable"] = { fg = colors.subtext1 },
             ["@variable.member"] = { fg = colors.red },
             ["@parameter"] = { fg = fall },
