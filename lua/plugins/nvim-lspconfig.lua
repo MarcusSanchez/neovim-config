@@ -2,6 +2,7 @@ return {
   "neovim/nvim-lspconfig",
   opts = {
     servers = {
+
       gopls = {
         settings = {
           gopls = {
@@ -11,6 +12,12 @@ return {
             },
             usePlaceholders = false,
           },
+        },
+      },
+
+      tailwindcss = {
+        filetypes_include = {
+          "tailwind.config.js",
         },
       },
     },

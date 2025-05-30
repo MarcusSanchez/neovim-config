@@ -56,10 +56,15 @@ return {
             ["@tag.attribute.tsx"] = { fg = fall },
             ["@tag.tsx"] = { fg = colors.yellow },
             ["@tag.delimiter"] = { link = "@punctuation.bracket" },
+            ["@lsp.type.interface.typescript"] = { fg = colors.yellow },
+            ["@keyword.operator.typescript"] = { fg = colors.mauve },
 
             -- gleam
             ["@label.gleam"] = { fg = fall },
             ["@constructor.gleam"] = { fg = colors.yellow },
+
+            -- protobuf
+            ["@lsp.type.variable.proto"] = { fg = colors.red },
           }
         end,
       },
