@@ -3,11 +3,6 @@ return {
   event = "VeryLazy",
   config = function()
     require("rainbow-delimiters.setup").setup({
-      blacklist = {
-        "html",
-        "jsx",
-        "tsx",
-      },
       strategy = {
         [""] = "rainbow-delimiters.strategy.global",
         vim = "rainbow-delimiters.strategy.local",
@@ -15,6 +10,7 @@ return {
       query = {
         [""] = "rainbow-delimiters",
         lua = "rainbow-blocks",
+        tsx = "rainbow-parens",
       },
       priority = {
         [""] = 110,
