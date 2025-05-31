@@ -11,7 +11,7 @@ local opts = { noremap = true, silent = true }
 --------------------------------------------------------------------------------
 
 -- Jump to start/end of line with Shift+H/L in normal and visual mode
-map({ "n", "v" }, "<S-h>", "^", opts)
+map({ "n", "v" }, "<S-h>", "_", opts)
 map({ "n", "v" }, "<S-l>", "$", opts)
 
 -- Jump half page up/down with Shift+J/K
