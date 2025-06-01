@@ -20,6 +20,11 @@ return {
           "tailwind.config.js",
         },
       },
+
+      zls = {
+        enable_build_on_save = true,
+        build_on_save_args = { "install" },
+      },
     },
   },
 }
