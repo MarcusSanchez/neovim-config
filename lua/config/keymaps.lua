@@ -43,10 +43,7 @@ map("n", "<Tab>", "i<tab>", opts)
 --------------------------------------------------------------------------------
 
 -- 'jj' to exit insert mode
-map("i", "jj", "<Esc>`^", opts)
-
--- Prevent cursor movement when exiting insert mode
-map("i", "<Esc>", "<Esc>`^", opts)
+map("i", "jj", "<Esc>", opts)
 
 --------------------------------------------------------------------------------
 -- Line Manipulation
@@ -113,16 +110,54 @@ map("v", "s", [["_di]], opts)
 -- Word Motions Customization
 --------------------------------------------------------------------------------
 
--- Skip over non-alphanumeric characters with w/e, make b go to end of word
-map("n", "w", ":set noincsearch<CR>?\\w\\+<CR>:set incsearch<CR>:noh<CR>", opts)
-map("n", "e", ":set noincsearch<CR>/\\w\\+<CR>:set incsearch<CR>:noh<CR>", opts)
-map("v", "w", "b", opts)
-map("v", "e", "w", opts)
-map("n", "b", "e", opts)
-map("v", "b", "e", opts)
-map("n", "W", "B", opts)
-map("n", "E", "W", opts)
-map("n", "B", "E", opts)
+-- Normal mode mappings
+vim.keymap.set("n", "w", function()
+  vim.o.incsearch = false
+  vim.fn.search("\\w\\+", "b")
+  vim.o.incsearch = true
+  vim.cmd.nohlsearch()
+end, opts)
+
+vim.keymap.set("n", "e", function()
+  vim.o.incsearch = false
+  vim.fn.search("\\w\\+")
+  vim.o.incsearch = true
+  vim.cmd.nohlsearch()
+end, opts)
+
+vim.keymap.set("n", "b", function()
+  vim.o.incsearch = false
+  vim.fn.search("\\w\\+\\>", "e")
+  vim.o.incsearch = true
+  vim.cmd.nohlsearch()
+end, opts)
+
+-- Visual mode mappings
+vim.keymap.set("v", "w", function()
+  vim.o.incsearch = false
+  vim.fn.search("\\w\\+", "b")
+  vim.o.incsearch = true
+  vim.cmd.nohlsearch()
+end, opts)
+
+vim.keymap.set("v", "e", function()
+  vim.o.incsearch = false
+  vim.fn.search("\\w\\+")
+  vim.o.incsearch = true
+  vim.cmd.nohlsearch()
+end, opts)
+
+vim.keymap.set("v", "b", function()
+  vim.o.incsearch = false
+  vim.fn.search("\\w\\+\\>", "e")
+  vim.o.incsearch = true
+  vim.cmd.nohlsearch()
+end, opts)
+
+-- Uppercase WORD movements
+vim.keymap.set("n", "W", "B", opts)
+vim.keymap.set("n", "E", "W", opts)
+vim.keymap.set("n", "B", "E", opts)
 
 --------------------------------------------------------------------------------
 -- Miscellaneous Utility Keymaps
@@ -141,8 +176,8 @@ map("n", ",r", "<leader>cr", { remap = true, desc = "Rename Symbol Under Cursor"
 map("n", "<leader>hc", ":TSHighlightCapturesUnderCursor<CR>", { desc = "Show Treesitter Captures Under Cursor" })
 
 -- del("n", "<C-/>")
--- map("n", "<C-/>", "gc<Esc><Down>", { desc = "Comment Line" })
--- map("v", "<C-/>", "gc<Esc><Down>", { desc = "Comment Selection" })
+-- map("n", "<C-/>", "gcc<Esc><Down>", { desc = "Comment Line" })
+-- map("v", "<C-/>", "gcc<Esc><Down>", { desc = "Comment Selection" })
 
 --------------------------------------------------------------------------------
 -- LSP & Diagnostics

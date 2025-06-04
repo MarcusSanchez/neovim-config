@@ -35,9 +35,9 @@ return {
             ["@type"] = { fg = colors.yellow },
             ["@punctuation.delimiter"] = { fg = colors.subtext1 },
             ["@punctuation.special"] = { fg = cherry_blossom },
-            DiagnosticUnderlineError = { fg = colors.red, style = { "bold", "italic", "undercurl" } },
+            DiagnosticUnderlineError = { style = { "undercurl" } },
             DiagnosticUnderlineWarn = { style = { "undercurl" } },
-            DiagnosticUnderlineHint = { style = {} },
+            DiagnosticUnderlineHint = { style = { "undercurl" } },
 
             -- golang
             ["@lsp.typemod.variable.defaultLibrary.go"] = { fg = colors.peach },
