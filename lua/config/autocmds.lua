@@ -21,6 +21,6 @@ vim.api.nvim_create_autocmd("LspAttach", {
 vim.api.nvim_create_autocmd("BufWritePost", {
   pattern = "*.zig",
   callback = function()
-    vim.cmd("LspRestart")
+    vim.cmd("LspRestart zls")
   end,
 })
