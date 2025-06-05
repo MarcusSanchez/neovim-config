@@ -1,4 +1,4 @@
-local zls = (jit.os == "Macos") and {} or { cmd = { "C:\\Users\\thatm\\zls\\zig-out\\bin\\zls.exe" } }
+local zls = (jit.os == "OSX") and {} or { cmd = { "C:\\Users\\thatm\\zls\\zig-out\\bin\\zls.exe" } }
 
 return {
   "neovim/nvim-lspconfig",

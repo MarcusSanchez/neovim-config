@@ -2,7 +2,7 @@ return {
   "sphamba/smear-cursor.nvim",
   event = "VeryLazy",
   enabled = function()
-    return jit.os == "Macos"
+    return jit.os == "OSX"
   end,
   cond = vim.g.neovide == nil,
   opts = {
