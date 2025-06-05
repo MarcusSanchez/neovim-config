@@ -22,6 +22,7 @@ return {
           local cherry_blossom = "#ff6ca9"
 
           return {
+            ["@keyword"] = { fg = colors.mauve, style = { "italic" } },
             ["@function.builtin"] = { fg = colors.blue },
             ["@field"] = { fg = colors.red },
             ["@property"] = { fg = colors.red },
@@ -47,6 +48,8 @@ return {
             ["@lsp.typemod.variable.member.go"] = { fg = colors.red },
             ["@lsp.typemod.variable.declaration.go"] = { fg = colors.red },
             ["@variable.member.go"] = { fg = colors.red },
+            ["@lsp.mod.format.go"] = { fg = colors.pink },
+            ["@lsp.typemod.string.format.go"] = { fg = colors.pink },
 
             -- JS/TS/JSX/TSX
             ["@keyword.operator.tsx"] = { fg = colors.mauve },
@@ -58,6 +61,7 @@ return {
             ["@tag.delimiter"] = { link = "@punctuation.bracket" },
             ["@lsp.type.interface.typescript"] = { fg = colors.yellow },
             ["@keyword.operator.typescript"] = { fg = colors.mauve },
+            ["@string.special.url.tsx"] = { fg = colors.green, style = { "underline" } },
 
             -- gleam
             ["@label.gleam"] = { fg = fall },
@@ -65,6 +69,9 @@ return {
 
             -- protobuf
             ["@lsp.type.variable.proto"] = { fg = colors.red },
+
+            -- zig
+            ["@keyword.import.zig"] = { fg = colors.blue },
           }
         end,
       },

@@ -17,3 +17,21 @@ vim.api.nvim_create_autocmd("LspAttach", {
     })
   end,
 })
+
+vim.api.nvim_create_autocmd("LspAttach", {
+  pattern = { "*.proto" },
+  callback = function(args)
+    vim.diagnostic.config({
+      virtual_text = {
+        severity = {
+          min = vim.diagnostic.severity.ERROR,
+        },
+      },
+      underline = {
+        severity = {
+          min = vim.diagnostic.severity.ERROR,
+        },
+      },
+    })
+  end,
+})
