@@ -1,8 +1,9 @@
+local zls = (jit.os == "Macos") and {} or { cmd = { "C:\\Users\\thatm\\zls\\zig-out\\bin\\zls.exe" } }
+
 return {
   "neovim/nvim-lspconfig",
   opts = {
     servers = {
-
       gopls = {
         settings = {
           gopls = {
@@ -14,12 +15,13 @@ return {
           },
         },
       },
-
       tailwindcss = {
         filetypes_include = {
           "tailwind.config.js",
         },
       },
+
+      zls = zls,
     },
   },
 }
