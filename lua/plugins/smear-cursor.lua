@@ -1,9 +1,10 @@
 return {
   "sphamba/smear-cursor.nvim",
   event = "VeryLazy",
-  enabled = function()
-    return jit.os == "OSX"
-  end,
+  enabled = false,
+  -- enabled = function()
+  --   return jit.os == "OSX"
+  -- end,
   cond = vim.g.neovide == nil,
   opts = {
     hide_target_hack = true,
