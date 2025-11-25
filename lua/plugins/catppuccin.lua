@@ -64,7 +64,7 @@ return {
             ["@string.special.url.tsx"] = { fg = colors.green, style = { "underline" } },
 
             -- gleam
-            ["@label.gleam"] = { fg = fall },
+            ["@label.gleam"] = { fg = colors.red },
             ["@constructor.gleam"] = { fg = colors.yellow },
 
             -- protobuf
