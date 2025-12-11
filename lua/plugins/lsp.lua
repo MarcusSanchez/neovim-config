@@ -1,14 +1,20 @@
 return {
   {
     "neovim/nvim-lspconfig",
-    init = function()
-      local keys = require("lazyvim.plugins.lsp.keymaps").get()
-      -- disable a keymap
-      keys[#keys + 1] = { "K", false }
-    end,
-
     opts = {
       inlay_hints = { enabled = false },
+      servers = {
+        ["*"] = {
+          keys = {
+            { "gd", "<cmd>lua vim.lsp.buf.definition()<CR>", has = "definition" },
+            { "K", false }, -- disable this keymap globally
+          },
+        },
+        -- You can specify other servers like below:
+        -- lua_ls = {
+        --  keys = { ... },
+        -- },
+      },
     },
   },
 }
