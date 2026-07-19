@@ -3,7 +3,6 @@ return {
   name = "catppuccin",
   lazy = false,
   priority = 1000,
-  semantic_tokens = true,
   config = function()
     require("catppuccin").setup({
       flavour = "mocha",

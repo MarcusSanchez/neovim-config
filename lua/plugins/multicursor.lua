@@ -6,7 +6,7 @@ return {
     { "<C-k>", mode = { "n", "x" }, desc = "Add cursor below" },
     { "<leader><up>", mode = { "n", "x" }, desc = "Skip cursor above" },
     { "<leader><down>", mode = { "n", "x" }, desc = "Skip cursor below" },
-    { "<M-j>", mode = { "n", "x" }, desc = "Add cursor by matching word" },
+    { "<M-S-l>", mode = { "n", "x" }, desc = "Add cursor by matching word" },
     { "<leader>s", mode = { "n", "x" }, desc = "Skip cursor by matching word" },
     { "<leader>N", mode = { "n", "x" }, desc = "Add cursor by matching selection" },
     { "<leader>S", mode = { "n", "x" }, desc = "Skip cursor by matching selection" },

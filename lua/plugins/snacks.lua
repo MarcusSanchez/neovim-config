@@ -1,13 +1,14 @@
-local map = vim.keymap.set
-local snacks = require("snacks")
-
 return {
   "folke/snacks.nvim",
-
-  map("n", "<leader>db", function()
-    snacks.dashboard()
-  end, { desc = "Open Snacks Dashboard" }),
-
+  keys = {
+    {
+      "<leader>db",
+      function()
+        Snacks.dashboard()
+      end,
+      desc = "Open Snacks Dashboard",
+    },
+  },
   opts = {
     picker = {
       win = {

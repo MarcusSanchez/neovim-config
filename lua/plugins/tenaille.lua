@@ -1,4 +1,5 @@
 return {
   "doums/tenaille.nvim",
-  config = true,
+  -- mappings are defined in config/keymaps.lua
+  opts = { default_mapping = false },
 }
