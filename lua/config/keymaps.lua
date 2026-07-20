@@ -80,16 +80,17 @@ map("i", "jj", "<Esc>", opts)
 map("n", "<S-N>", "J", opts)
 
 -- Normal mode - move lines up and down (reversed)
-map("n", "<S-A-j>", "<cmd>execute 'move .-' . (v:count1 + 1)<cr>==", { desc = "Move Up (reversed)" })
-map("n", "<S-A-k>", "<cmd>execute 'move .+' . v:count1<cr>==", { desc = "Move Down (reversed)" })
+-- silent! keeps the move a no-op (instead of E16) at the buffer edges
+map("n", "<S-A-j>", "<cmd>execute 'silent! move .-' . (v:count1 + 1)<cr>==", { desc = "Move Up (reversed)" })
+map("n", "<S-A-k>", "<cmd>execute 'silent! move .+' . v:count1<cr>==", { desc = "Move Down (reversed)" })
 
 -- Insert mode - move lines up and down (reversed)
-map("i", "<S-A-j>", "<esc><cmd>m .-2<cr>==gi", { desc = "Move Up (reversed)" })
-map("i", "<S-A-k>", "<esc><cmd>m .+1<cr>==gi", { desc = "Move Down (reversed)" })
+map("i", "<S-A-j>", "<esc><cmd>silent! m .-2<cr>==gi", { desc = "Move Up (reversed)" })
+map("i", "<S-A-k>", "<esc><cmd>silent! m .+1<cr>==gi", { desc = "Move Down (reversed)" })
 
 -- Visual mode - move lines up and down (reversed)
-map("x", "<S-A-j>", ":<C-u>execute \"'<,'>move '<-\" . (v:count1 + 1)<cr>gv=gv", { desc = "Move Up (reversed)" })
-map("x", "<S-A-k>", ":<C-u>execute \"'<,'>move '>+\" . v:count1<cr>gv=gv", { desc = "Move Down (reversed)" })
+map("x", "<S-A-j>", ":<C-u>execute \"silent! '<,'>move '<-\" . (v:count1 + 1)<cr>gv=gv", { desc = "Move Up (reversed)" })
+map("x", "<S-A-k>", ":<C-u>execute \"silent! '<,'>move '>+\" . v:count1<cr>gv=gv", { desc = "Move Down (reversed)" })
 
 --------------------------------------------------------------------------------
 -- Buffer & Window Management
