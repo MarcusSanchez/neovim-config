@@ -39,6 +39,16 @@ return {
             DiagnosticUnderlineWarn = { style = { "undercurl" } },
             DiagnosticUnderlineHint = { style = { "undercurl" } },
 
+            -- snacks picker / explorer
+            -- transparent_background only covers Normal, not NormalFloat, so the
+            -- picker windows end up sitting on an opaque mantle slab. Every
+            -- SnacksPicker* group links down to these four, so overriding the
+            -- roots covers the input, list, preview and box windows too.
+            SnacksPicker = { fg = colors.text, bg = "NONE" },
+            SnacksPickerBorder = { fg = colors.blue, bg = "NONE" },
+            SnacksPickerTitle = { fg = colors.subtext0, bg = "NONE" },
+            SnacksPickerFooter = { fg = colors.subtext0, bg = "NONE" },
+
             -- golang
             ["@lsp.typemod.variable.defaultLibrary.go"] = { fg = colors.peach },
             ["@lsp.typemod.variable.readonly.go"] = { fg = colors.peach },
