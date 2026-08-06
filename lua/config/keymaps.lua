@@ -4,27 +4,35 @@
 --
 -- NOTE: visual-mode maps use "x" (visual only), not "v" (visual + select),
 -- so that typing over a snippet placeholder in select mode still inserts text.
+--
+-- NOTE: every mapping carries a `desc` so it shows up in which-key and in the
+-- <leader>sk keymap picker, which is the searchable cheat sheet for this config.
 
 local map = vim.keymap.set
 local del = vim.keymap.del
-local opts = { noremap = true, silent = true }
+
+-- Shared map options plus a description.
+local function opts(desc)
+  return { noremap = true, silent = true, desc = desc }
+end
 
 --------------------------------------------------------------------------------
 -- Navigation
 --------------------------------------------------------------------------------
 
 -- Jump to start/end of line with Shift+H/L
-map({ "n", "x" }, "<S-h>", "_", opts)
-map({ "n", "x" }, "<S-l>", "$", opts)
+map({ "n", "x" }, "<S-h>", "_", opts("Go to First Non-Blank Character"))
+map({ "n", "x" }, "<S-l>", "$", opts("Go to End of Line"))
 
 -- Jump half page up/down with Shift+J/K
-map({ "n", "x" }, "<S-J>", "<C-U>", opts)
-map({ "n", "x" }, "<S-K>", "<C-D>", opts)
+-- (up/down follow the j/k swap below: Shift+J goes up, Shift+K goes down)
+map({ "n", "x" }, "<S-J>", "<C-U>", opts("Scroll Half Page Up"))
+map({ "n", "x" }, "<S-K>", "<C-D>", opts("Scroll Half Page Down"))
 
 -- Swap j and k in normal, visual, and operator-pending mode
 -- (operator-pending covers dj/dk, cj/ck, etc. — no separate swaps needed)
-map({ "n", "x", "o" }, "j", "k", opts)
-map({ "n", "x", "o" }, "k", "j", opts)
+map({ "n", "x", "o" }, "j", "k", opts("Up (j/k swapped)"))
+map({ "n", "x", "o" }, "k", "j", opts("Down (j/k swapped)"))
 
 --------------------------------------------------------------------------------
 -- Indentation & Tabs
@@ -56,41 +64,41 @@ end
 
 map("x", "<Tab>", function()
   shift_selection(">")
-end, opts)
+end, opts("Indent Selection (keep selection)"))
 map("x", "<S-Tab>", function()
   shift_selection("<")
-end, opts)
-map("n", "<S-Tab>", "<<", opts)
+end, opts("Dedent Selection (keep selection)"))
+map("n", "<S-Tab>", "<<", opts("Dedent Line"))
 
 -- <Tab> in normal mode to insert a tab
-map("n", "<Tab>", "i<tab>", opts)
+map("n", "<Tab>", "i<tab>", opts("Insert Tab"))
 
 --------------------------------------------------------------------------------
 -- Insert Mode Enhancements
 --------------------------------------------------------------------------------
 
 -- 'jj' to exit insert mode
-map("i", "jj", "<Esc>", opts)
+map("i", "jj", "<Esc>", opts("Exit Insert Mode"))
 
 --------------------------------------------------------------------------------
 -- Line Manipulation
 --------------------------------------------------------------------------------
 
 -- Shift+N collapses content (joins lines)
-map("n", "<S-N>", "J", opts)
+map("n", "<S-N>", "J", opts("Join Lines"))
 
 -- Normal mode - move lines up and down (reversed)
 -- silent! keeps the move a no-op (instead of E16) at the buffer edges
-map("n", "<S-A-j>", "<cmd>execute 'silent! move .-' . (v:count1 + 1)<cr>==", { desc = "Move Up (reversed)" })
-map("n", "<S-A-k>", "<cmd>execute 'silent! move .+' . v:count1<cr>==", { desc = "Move Down (reversed)" })
+map("n", "<S-A-j>", "<cmd>execute 'silent! move .-' . (v:count1 + 1)<cr>==", { desc = "Move Line Up (reversed)" })
+map("n", "<S-A-k>", "<cmd>execute 'silent! move .+' . v:count1<cr>==", { desc = "Move Line Down (reversed)" })
 
 -- Insert mode - move lines up and down (reversed)
-map("i", "<S-A-j>", "<esc><cmd>silent! m .-2<cr>==gi", { desc = "Move Up (reversed)" })
-map("i", "<S-A-k>", "<esc><cmd>silent! m .+1<cr>==gi", { desc = "Move Down (reversed)" })
+map("i", "<S-A-j>", "<esc><cmd>silent! m .-2<cr>==gi", { desc = "Move Line Up (reversed)" })
+map("i", "<S-A-k>", "<esc><cmd>silent! m .+1<cr>==gi", { desc = "Move Line Down (reversed)" })
 
 -- Visual mode - move lines up and down (reversed)
-map("x", "<S-A-j>", ":<C-u>execute \"silent! '<,'>move '<-\" . (v:count1 + 1)<cr>gv=gv", { desc = "Move Up (reversed)" })
-map("x", "<S-A-k>", ":<C-u>execute \"silent! '<,'>move '>+\" . v:count1<cr>gv=gv", { desc = "Move Down (reversed)" })
+map("x", "<S-A-j>", ":<C-u>execute \"silent! '<,'>move '<-\" . (v:count1 + 1)<cr>gv=gv", { desc = "Move Lines Up (reversed)" })
+map("x", "<S-A-k>", ":<C-u>execute \"silent! '<,'>move '>+\" . v:count1<cr>gv=gv", { desc = "Move Lines Down (reversed)" })
 
 --------------------------------------------------------------------------------
 -- Pickers
@@ -107,10 +115,10 @@ map("n", "<S-Space>", "<leader><space>", { remap = true, desc = "Find Files (Roo
 --------------------------------------------------------------------------------
 
 -- let ,q close current buffer
-map("n", ",q", "<leader>bd", { remap = true, desc = "Close current buffer" })
+map("n", ",q", "<leader>bd", { remap = true, desc = "Close Current Buffer" })
 
 -- let ,f format the current buffer
-map("n", ",f", ":w<CR>", { desc = "(Format + Save) current buffer" })
+map("n", ",f", ":w<CR>", { desc = "Format + Save Current Buffer" })
 
 -- Returns the open explorer picker on this tab, or nil when it's closed.
 local function get_explorer()
@@ -131,7 +139,7 @@ map("n", ",a", function()
   else
     explorer:focus()
   end
-end, { desc = "Toggle/Focus Explorer (root dir)" })
+end, { desc = "Toggle/Focus Explorer (Root Dir)" })
 
 -- ,c closes the explorer (no-op when it's already closed)
 map("n", ",c", function()
@@ -156,19 +164,19 @@ map("n", "<A-l>", "<cmd>bnext<cr>", { desc = "Next Buffer" })
 --------------------------------------------------------------------------------
 
 -- Backspace and Delete without yanking to clipboard
-map({ "n", "x" }, "<BS>", [["_dh]], opts)
-map({ "n", "x" }, "<Del>", [["_<Del>]], opts)
+map({ "n", "x" }, "<BS>", [["_dh]], opts("Backspace (No Yank)"))
+map({ "n", "x" }, "<Del>", [["_<Del>]], opts("Delete Character (No Yank)"))
 
 -- Prevent 'd', 'D' from yanking
-map({ "n", "x" }, "d", [["_d]], opts)
-map("n", "D", [["_D]], opts)
+map({ "n", "x" }, "d", [["_d]], opts("Delete (No Yank)"))
+map("n", "D", [["_D]], opts("Delete to End of Line (No Yank)"))
 
 -- Prevent 'p' and 'P' in visual mode from yanking
-map("x", "p", [["_dP]], opts)
-map("x", "P", [["_dP]], opts)
+map("x", "p", [["_dP]], opts("Paste Over Selection (No Yank)"))
+map("x", "P", [["_dP]], opts("Paste Over Selection (No Yank)"))
 
 -- s in visual mode substitutes the selection without yanking
-map("x", "s", [["_di]], opts)
+map("x", "s", [["_di]], opts("Substitute Selection (No Yank)"))
 
 --------------------------------------------------------------------------------
 -- Word Motions Customization
@@ -178,27 +186,27 @@ map("x", "s", [["_di]], opts)
 -- vim.fn.search() doesn't touch the search register, 'incsearch', or
 -- 'hlsearch', so no option juggling is needed.
 local word_motions = {
-  w = { [[\w\+]], "b" }, -- previous word start
-  e = { [[\w\+]], "" }, -- next word start
-  b = { [[\w\+\>]], "e" }, -- next word end
+  w = { [[\w\+]], "b", "Previous Word Start (skip punctuation)" },
+  e = { [[\w\+]], "", "Next Word Start (skip punctuation)" },
+  b = { [[\w\+\>]], "e", "Next Word End (skip punctuation)" },
 }
 for lhs, motion in pairs(word_motions) do
   map({ "n", "x" }, lhs, function()
     vim.fn.search(motion[1], motion[2])
-  end, opts)
+  end, opts(motion[3]))
 end
 
 -- Uppercase WORD movements
-map({ "n", "x" }, "W", "B", opts)
-map({ "n", "x" }, "E", "W", opts)
-map({ "n", "x" }, "B", "E", opts)
+map({ "n", "x" }, "W", "B", opts("Previous WORD Start"))
+map({ "n", "x" }, "E", "W", opts("Next WORD Start"))
+map({ "n", "x" }, "B", "E", opts("Next WORD End"))
 
 --------------------------------------------------------------------------------
 -- Miscellaneous Utility Keymaps
 --------------------------------------------------------------------------------
 
 -- Shift+U to redo
-map("n", "<S-U>", "<C-R>", opts)
+map("n", "<S-U>", "<C-R>", opts("Redo"))
 
 -- ,d to fold under cursor
 map("n", ",d", "za", { desc = "Toggle Fold Under Cursor" })
@@ -223,7 +231,7 @@ vim.api.nvim_create_autocmd("LspAttach", {
 -- make ge open the diagnostic window in a float
 map("n", "ge", function()
   vim.diagnostic.open_float()
-end)
+end, { desc = "Show Diagnostics (Float)" })
 
 -- make ,g open code actions
 map("n", ",g", "<leader>ca", { remap = true, desc = "Code Actions" })
@@ -240,10 +248,10 @@ pcall(del, "n", "<A-j>")
 local mc = require("multicursor-nvim")
 map({ "n", "x" }, "<C-j>", function()
   mc.lineAddCursor(-1, { skipEmpty = false })
-end)
+end, { desc = "Add Cursor Above" })
 map({ "n", "x" }, "<C-k>", function()
   mc.lineAddCursor(1, { skipEmpty = false })
-end)
+end, { desc = "Add Cursor Below" })
 
 --------------------------------------------------------------------------------
 -- Text Wrapping (tenaille.nvim)
@@ -263,5 +271,5 @@ local delimiters = {
 for lhs, pair in pairs(delimiters) do
   map("x", lhs, function()
     wrap(pair)
-  end)
+  end, { desc = "Wrap Selection in " .. pair[1] .. pair[2] })
 end
