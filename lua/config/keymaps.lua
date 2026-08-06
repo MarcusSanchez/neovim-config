@@ -93,6 +93,16 @@ map("x", "<S-A-j>", ":<C-u>execute \"silent! '<,'>move '<-\" . (v:count1 + 1)<cr
 map("x", "<S-A-k>", ":<C-u>execute \"silent! '<,'>move '>+\" . v:count1<cr>gv=gv", { desc = "Move Down (reversed)" })
 
 --------------------------------------------------------------------------------
+-- Pickers
+--------------------------------------------------------------------------------
+
+-- Shift+Space opens the same file picker as <leader><leader> (space space).
+-- A bare double-tap of Shift can't be mapped: Neovim has no keycode for a
+-- standalone modifier press, so the terminal never delivers one. <S-Space>
+-- needs the kitty keyboard protocol, which Ghostty (and Neovide) support.
+map("n", "<S-Space>", "<leader><space>", { remap = true, desc = "Find Files (Root Dir)" })
+
+--------------------------------------------------------------------------------
 -- Buffer & Window Management
 --------------------------------------------------------------------------------
 
@@ -102,8 +112,34 @@ map("n", ",q", "<leader>bd", { remap = true, desc = "Close current buffer" })
 -- let ,f format the current buffer
 map("n", ",f", ":w<CR>", { desc = "(Format + Save) current buffer" })
 
--- use ,a to open snacks explorer
-map("n", ",a", "<leader>e", { remap = true, desc = "Open snacks explorer (root dir)" })
+-- Returns the open explorer picker on this tab, or nil when it's closed.
+local function get_explorer()
+  local explorer = Snacks.picker.get({ source = "explorer" })[1]
+  if explorer and not explorer.closed then
+    return explorer
+  end
+end
+
+-- ,a opens the snacks explorer; if it's already open it focuses it, and if it's
+-- already focused it closes it.
+map("n", ",a", function()
+  local explorer = get_explorer()
+  if not explorer then
+    Snacks.explorer({ cwd = LazyVim.root() })
+  elseif explorer:is_focused() then
+    explorer:close()
+  else
+    explorer:focus()
+  end
+end, { desc = "Toggle/Focus Explorer (root dir)" })
+
+-- ,c closes the explorer (no-op when it's already closed)
+map("n", ",c", function()
+  local explorer = get_explorer()
+  if explorer then
+    explorer:close()
+  end
+end, { desc = "Close Explorer" })
 
 -- use ,w and ,e to cycle windows
 map("n", ",w", "<C-w>h", { desc = "Go to Left Window" })
