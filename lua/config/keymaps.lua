@@ -120,34 +120,38 @@ map("n", ",q", "<leader>bd", { remap = true, desc = "Close Current Buffer" })
 -- let ,f format the current buffer
 map("n", ",f", ":w<CR>", { desc = "Format + Save Current Buffer" })
 
--- Returns the open explorer picker on this tab, or nil when it's closed.
-local function get_explorer()
-  local explorer = Snacks.picker.get({ source = "explorer" })[1]
-  if explorer and not explorer.closed then
-    return explorer
-  end
-end
+-- (file browsing lives in oil.nvim now: `-` for parent dir, <leader>e for
+-- project root. ,a became "Harpoon Add File" — see lua/plugins/harpoon.lua.
+-- The old snacks-explorer maps are kept below for easy revert.)
 
--- ,a opens the snacks explorer; if it's already open it focuses it, and if it's
--- already focused it closes it.
-map("n", ",a", function()
-  local explorer = get_explorer()
-  if not explorer then
-    Snacks.explorer({ cwd = LazyVim.root() })
-  elseif explorer:is_focused() then
-    explorer:close()
-  else
-    explorer:focus()
-  end
-end, { desc = "Toggle/Focus Explorer (Root Dir)" })
-
--- ,c closes the explorer (no-op when it's already closed)
-map("n", ",c", function()
-  local explorer = get_explorer()
-  if explorer then
-    explorer:close()
-  end
-end, { desc = "Close Explorer" })
+-- -- Returns the open explorer picker on this tab, or nil when it's closed.
+-- local function get_explorer()
+--   local explorer = Snacks.picker.get({ source = "explorer" })[1]
+--   if explorer and not explorer.closed then
+--     return explorer
+--   end
+-- end
+--
+-- -- ,a opens the snacks explorer; if it's already open it focuses it, and if it's
+-- -- already focused it closes it.
+-- map("n", ",a", function()
+--   local explorer = get_explorer()
+--   if not explorer then
+--     Snacks.explorer({ cwd = LazyVim.root() })
+--   elseif explorer:is_focused() then
+--     explorer:close()
+--   else
+--     explorer:focus()
+--   end
+-- end, { desc = "Toggle/Focus Explorer (Root Dir)" })
+--
+-- -- ,c closes the explorer (no-op when it's already closed)
+-- map("n", ",c", function()
+--   local explorer = get_explorer()
+--   if explorer then
+--     explorer:close()
+--   end
+-- end, { desc = "Close Explorer" })
 
 -- use ,w and ,e to cycle windows
 map("n", ",w", "<C-w>h", { desc = "Go to Left Window" })
