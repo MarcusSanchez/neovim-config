@@ -110,6 +110,11 @@ map("x", "<S-A-k>", ":<C-u>execute \"silent! '<,'>move '>+\" . v:count1<cr>gv=gv
 -- needs the kitty keyboard protocol, which Ghostty (and Neovide) support.
 map("n", "<S-Space>", "<leader><space>", { remap = true, desc = "Find Files (Root Dir)" })
 
+-- gS searches document symbols, g/ greps the project (same pickers as
+-- <leader>ss and <leader>/)
+map("n", "gS", "<leader>ss", { remap = true, desc = "Search Symbols" })
+map("n", "g/", "<leader>/", { remap = true, desc = "Grep (Root Dir)" })
+
 --------------------------------------------------------------------------------
 -- Buffer & Window Management
 --------------------------------------------------------------------------------
