@@ -54,8 +54,10 @@ return {
       layerSet({ "n", "x" }, "<left>", mc.prevCursor, { desc = "Previous Cursor" })
       layerSet({ "n", "x" }, "<right>", mc.nextCursor, { desc = "Next Cursor" })
 
-      -- Delete the main cursor.
+      -- Delete the main cursor. <M-S-h> mirrors <M-S-l>: l grabs the next
+      -- occurrence, h lets go of the one you just grabbed.
       layerSet({ "n", "x" }, "<leader>x", mc.deleteCursor, { desc = "Delete Main Cursor" })
+      layerSet({ "n", "x" }, "<M-S-h>", mc.deleteCursor, { desc = "Undo Last Cursor" })
 
       -- Enable and clear cursors using escape.
       layerSet("n", "<esc>", function()
