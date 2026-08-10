@@ -13,18 +13,31 @@ return {
     keymaps = {
       ["q"] = "actions.close",
     },
+    -- centered floating window instead of taking over the current window
+    float = {
+      padding = 2,
+      max_width = 90,
+      max_height = 30,
+      border = "rounded",
+    },
     view_options = {
       show_hidden = true,
     },
   },
   keys = {
-    { "-", "<cmd>Oil<cr>", desc = "Open Parent Directory (Oil)" },
+    {
+      "-",
+      function()
+        require("oil").open_float()
+      end,
+      desc = "Open Parent Directory (Oil Float)",
+    },
     {
       "<leader>e",
       function()
-        require("oil").open(LazyVim.root())
+        require("oil").open_float(LazyVim.root())
       end,
-      desc = "Open Project Root (Oil)",
+      desc = "Open Project Root (Oil Float)",
     },
   },
 }
