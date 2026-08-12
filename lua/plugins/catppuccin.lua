@@ -22,6 +22,11 @@ return {
 
           return {
             ["@keyword"] = { fg = colors.mauve, style = { "italic" } },
+            -- true/false and nil/null/undefined read as keywords rather than
+            -- constants, matching the GoLand scheme these overrides track;
+            -- catppuccin would otherwise leave both on peach
+            ["@boolean"] = { fg = colors.mauve, style = { "italic" } },
+            ["@constant.builtin"] = { fg = colors.mauve, style = { "italic" } },
             ["@function.builtin"] = { fg = colors.blue },
             ["@field"] = { fg = colors.red },
             ["@property"] = { fg = colors.red },
@@ -30,10 +35,10 @@ return {
             ["@variable.member"] = { fg = colors.red },
             ["@parameter"] = { fg = fall },
             ["@variable.parameter"] = { fg = fall },
-            ["@number"] = { fg = colors.sapphire },
+            ["@number"] = { fg = colors.sky },
             ["@operator"] = { fg = cherry_blossom },
             ["@type"] = { fg = colors.yellow },
-            ["@punctuation.delimiter"] = { fg = colors.subtext1 },
+            ["@punctuation.delimiter"] = { fg = colors.overlay2 },
             ["@punctuation.special"] = { fg = cherry_blossom },
             DiagnosticUnderlineError = { style = { "undercurl" } },
             DiagnosticUnderlineWarn = { style = { "undercurl" } },
