@@ -12,6 +12,10 @@ return {
     -- merged with oil's default buffer-local maps (<C-c> also closes)
     keymaps = {
       ["q"] = "actions.close",
+      ["<Esc>"] = { "actions.close", mode = "n" },
+      -- inverse of <CR>: go up to the parent directory. <S-CR> needs the kitty
+      -- keyboard protocol, which Ghostty (and Neovide) support.
+      ["<S-CR>"] = "actions.parent",
     },
     -- centered floating window instead of taking over the current window
     float = {
@@ -33,7 +37,7 @@ return {
       desc = "Open Parent Directory (Oil Float)",
     },
     {
-      "<leader>e",
+      ",a",
       function()
         require("oil").open_float(LazyVim.root())
       end,
