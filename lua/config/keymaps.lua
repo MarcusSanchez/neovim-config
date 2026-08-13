@@ -126,7 +126,7 @@ map("n", ",q", "<leader>bd", { remap = true, desc = "Close Current Buffer" })
 map("n", ",f", ":w<CR>", { desc = "Format + Save Current Buffer" })
 
 -- (file browsing lives in oil.nvim now: `-` for parent dir, <leader>e for
--- project root. ,a became "Harpoon Add File" — see lua/plugins/harpoon.lua.
+-- project root. Harpoon lives under the ,h prefix — see lua/plugins/harpoon.lua.
 -- The old snacks-explorer maps are kept below for easy revert.)
 
 -- -- Returns the open explorer picker on this tab, or nil when it's closed.

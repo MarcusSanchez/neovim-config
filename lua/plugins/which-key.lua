@@ -6,6 +6,7 @@ return {
   opts = {
     spec = {
       { ",", group = "custom", mode = "n" },
+      { ",h", group = "harpoon", mode = "n" },
       { "<leader>h", group = "highlights", mode = "n" },
     },
   },

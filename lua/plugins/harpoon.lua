@@ -1,3 +1,33 @@
+-- Harpoon bindings: ,ha adds, ,hl opens the quick menu, and bare ,1–,9
+-- jump straight to that slot.
+local keys = {
+  {
+    ",ha",
+    function()
+      require("harpoon"):list():add()
+    end,
+    desc = "Harpoon Add File",
+  },
+  {
+    ",hl",
+    function()
+      local harpoon = require("harpoon")
+      harpoon.ui:toggle_quick_menu(harpoon:list())
+    end,
+    desc = "Harpoon Quick Menu",
+  },
+}
+
+for i = 1, 9 do
+  table.insert(keys, {
+    "," .. i,
+    function()
+      require("harpoon"):list():select(i)
+    end,
+    desc = "Harpoon File " .. i,
+  })
+end
+
 return {
   "ThePrimeagen/harpoon",
   branch = "harpoon2",
@@ -7,49 +37,5 @@ return {
     -- (dot-call) doesn't work here
     require("harpoon"):setup()
   end,
-  keys = {
-    {
-      ",a",
-      function()
-        require("harpoon"):list():add()
-      end,
-      desc = "Harpoon Add File",
-    },
-    {
-      "<C-e>",
-      function()
-        local harpoon = require("harpoon")
-        harpoon.ui:toggle_quick_menu(harpoon:list())
-      end,
-      desc = "Harpoon Quick Menu",
-    },
-    {
-      "<A-1>",
-      function()
-        require("harpoon"):list():select(1)
-      end,
-      desc = "Harpoon File 1",
-    },
-    {
-      "<A-2>",
-      function()
-        require("harpoon"):list():select(2)
-      end,
-      desc = "Harpoon File 2",
-    },
-    {
-      "<A-3>",
-      function()
-        require("harpoon"):list():select(3)
-      end,
-      desc = "Harpoon File 3",
-    },
-    {
-      "<A-4>",
-      function()
-        require("harpoon"):list():select(4)
-      end,
-      desc = "Harpoon File 4",
-    },
-  },
+  keys = keys,
 }
