@@ -6,7 +6,7 @@ return {
   opts = {
     spec = {
       { ",", group = "custom", mode = "n" },
-      { ",h", group = "harpoon", mode = "n" },
+      -- { ",h", group = "harpoon", mode = "n" }, -- benched with harpoon.lua
       { "<leader>h", group = "highlights", mode = "n" },
     },
   },

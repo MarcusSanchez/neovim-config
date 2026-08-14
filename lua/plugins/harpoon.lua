@@ -1,41 +1,46 @@
--- Harpoon bindings: ,ha adds, ,hl opens the quick menu, and bare ,1–,9
--- jump straight to that slot.
-local keys = {
-  {
-    ",ha",
-    function()
-      require("harpoon"):list():add()
-    end,
-    desc = "Harpoon Add File",
-  },
-  {
-    ",hl",
-    function()
-      local harpoon = require("harpoon")
-      harpoon.ui:toggle_quick_menu(harpoon:list())
-    end,
-    desc = "Harpoon Quick Menu",
-  },
-}
+-- Harpoon is BENCHED (2026-08-13) — bufferline tabs are back for quick
+-- buffer jumps. Uncomment everything below to bring it back (,ha adds,
+-- ,hl opens the quick menu, bare ,1–,9 jump to slots) and restore the
+-- ",h" group line in which-key.lua.
 
-for i = 1, 9 do
-  table.insert(keys, {
-    "," .. i,
-    function()
-      require("harpoon"):list():select(i)
-    end,
-    desc = "Harpoon File " .. i,
-  })
-end
+-- local keys = {
+--   {
+--     ",ha",
+--     function()
+--       require("harpoon"):list():add()
+--     end,
+--     desc = "Harpoon Add File",
+--   },
+--   {
+--     ",hl",
+--     function()
+--       local harpoon = require("harpoon")
+--       harpoon.ui:toggle_quick_menu(harpoon:list())
+--     end,
+--     desc = "Harpoon Quick Menu",
+--   },
+-- }
+--
+-- for i = 1, 9 do
+--   table.insert(keys, {
+--     "," .. i,
+--     function()
+--       require("harpoon"):list():select(i)
+--     end,
+--     desc = "Harpoon File " .. i,
+--   })
+-- end
+--
+-- return {
+--   "ThePrimeagen/harpoon",
+--   branch = "harpoon2",
+--   dependencies = { "nvim-lua/plenary.nvim" },
+--   config = function()
+--     -- harpoon2's setup is a method, so lazy.nvim's default `opts` handling
+--     -- (dot-call) doesn't work here
+--     require("harpoon"):setup()
+--   end,
+--   keys = keys,
+-- }
 
-return {
-  "ThePrimeagen/harpoon",
-  branch = "harpoon2",
-  dependencies = { "nvim-lua/plenary.nvim" },
-  config = function()
-    -- harpoon2's setup is a method, so lazy.nvim's default `opts` handling
-    -- (dot-call) doesn't work here
-    require("harpoon"):setup()
-  end,
-  keys = keys,
-}
+return {}
