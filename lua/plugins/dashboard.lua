@@ -1,17 +1,13 @@
--- The dashboard banner: cus in larry3d (swapped from the isometric slice
--- 2026-08-13; every line is right-stripped — trailing whitespace widens the
--- block and shifts snacks' centering).
+-- The dashboard banner: the Costco one-liner (the cus experiments — the
+-- isometric slice, then larry3d — live in git history if the mood returns;
+-- keep any future ascii header right-stripped, trailing whitespace shifts
+-- snacks' centering).
 return {
   "folke/snacks.nvim",
   opts = {
     dashboard = {
       preset = {
-        header = [==[
-  ___   __  __    ____
- /'___\/\ \/\ \  /',__\
-/\ \__/\ \ \_\ \/\__, `\
-\ \____\\ \____/\/\____/
- \/____/ \/___/  \/___/]==],
+        header = "Welcome to Costco. I love you.",
       },
       sections = {
         { section = "header", padding = 3 },
