@@ -42,7 +42,6 @@ return {
 
     local cap_left = "\u{e0b6}" --
     local cap_right = "\u{e0b4}" --
-    local pill = { left = cap_left, right = cap_right }
 
     return {
       options = {
@@ -54,7 +53,8 @@ return {
       },
       sections = {
         lualine_a = {
-          { "mode", icon = "\u{e62b}", separator = pill, padding = { left = 1, right = 2 } },
+          -- outer (screen-side) edge stays straight; only the inner edge is rounded
+          { "mode", icon = "\u{e62b}", separator = { right = cap_right }, padding = { left = 1, right = 2 } },
         },
         lualine_b = { "progress", { "location", separator = { right = cap_right } } },
         lualine_c = {
@@ -95,7 +95,8 @@ return {
             function()
               return "\u{f0256} " .. vim.fn.fnamemodify(vim.fn.getcwd(), ":t")
             end,
-            separator = pill,
+            -- outer (screen-side) edge stays straight; only the inner edge is rounded
+            separator = { left = cap_left },
             color = { fg = palette.base, bg = palette.flamingo },
           },
         },
