@@ -1,24 +1,17 @@
--- The dashboard is back (2026-08-13) — the oil/harpoon-era empty-buffer
--- launch is retired, and the isometric banner returns (sliced down from
--- the original MARCUS to just cus; the full six letters live in git
--- history at 56926ff~1).
+-- The dashboard banner: cus in larry3d (swapped from the isometric slice
+-- 2026-08-13; every line is right-stripped — trailing whitespace widens the
+-- block and shifts snacks' centering).
 return {
   "folke/snacks.nvim",
   opts = {
     dashboard = {
       preset = {
-        header = [[
-      ___         ___         ___
-     /  /\       /__/\       /  /\
-    /  /:/       \  \:\     /  /:/_
-   /  /:/         \  \:\   /  /:/ /\
-  /  /:/  ___ ___  \  \:\ /  /:/ /::\
- /__/:/  /  //__/\  \__\:/__/:/ /:/\:\
- \  \:\ /  /:\  \:\ /  /:\  \:\/:/~/:/
-  \  \:\  /:/ \  \:\  /:/ \  \::/ /:/
-   \  \:\/:/   \  \:\/:/   \__\/ /:/
-    \  \::/     \  \::/      /__/:/
-     \__\/       \__\/       \__\/      ]],
+        header = [==[
+  ___   __  __    ____
+ /'___\/\ \/\ \  /',__\
+/\ \__/\ \ \_\ \/\__, `\
+\ \____\\ \____/\/\____/
+ \/____/ \/___/  \/___/]==],
       },
       sections = {
         { section = "header", padding = 3 },
