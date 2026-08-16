@@ -54,6 +54,18 @@ return {
       linters_by_ft = {
         go = { "golangcilint" },
       },
+      linters = {
+        -- Run from the buffer's module root instead of nvim's cwd. Launched
+        -- from a monorepo root (no go.mod there), golangci-lint's typecheck
+        -- otherwise fails to resolve ANY import and floods the buffer with
+        -- "could not import ..." errors. A function linter is re-evaluated
+        -- per lint run, so cwd follows whichever buffer is being linted.
+        golangcilint = function()
+          local base = vim.deepcopy(require("lint.linters.golangcilint"))
+          base.cwd = vim.fs.root(0, { "go.work", "go.mod" }) or vim.fn.getcwd()
+          return base
+        end,
+      },
     },
   },
 }
