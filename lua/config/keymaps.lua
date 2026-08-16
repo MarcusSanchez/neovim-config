@@ -110,9 +110,44 @@ map("x", "<S-A-k>", ":<C-u>execute \"silent! '<,'>move '>+\" . v:count1<cr>gv=gv
 -- needs the kitty keyboard protocol, which Ghostty (and Neovide) support.
 map("n", "<S-Space>", "<leader><space>", { remap = true, desc = "Find Files (Root Dir)" })
 
--- gS searches document symbols, g/ greps the project (same pickers as
--- <leader>ss and <leader>/)
-map("n", "gS", "<leader>ss", { remap = true, desc = "Search Symbols" })
+-- gS searches workspace symbols (like <leader>sS, but skipping generated
+-- files), g/ greps the project (same picker as <leader>/)
+local generated_files = {
+  "%.pb%.go$",
+  "%.connect%.go$",
+  "%.gen%.go$",
+  "_gen%.go$",
+  "_generated%.go$",
+  "/gen/",
+  "/node_modules/",
+  "/ent/",
+  "_test%.go$",
+  "%.test%.[jt]sx?$",
+  "%.spec%.[jt]sx?$",
+}
+-- handwritten islands inside otherwise-generated trees
+local handwritten_files = {
+  "/ent/schema/",
+}
+map("n", "gS", function()
+  Snacks.picker.lsp_workspace_symbols({
+    transform = function(item)
+      if not item.file then
+        return
+      end
+      for _, pat in ipairs(handwritten_files) do
+        if item.file:match(pat) then
+          return
+        end
+      end
+      for _, pat in ipairs(generated_files) do
+        if item.file:match(pat) then
+          return false
+        end
+      end
+    end,
+  })
+end, { desc = "Search Workspace Symbols" })
 map("n", "g/", "<leader>/", { remap = true, desc = "Grep (Root Dir)" })
 
 --------------------------------------------------------------------------------
@@ -221,6 +256,9 @@ map("n", ",d", "za", { desc = "Toggle Fold Under Cursor" })
 
 -- ,r to rename symbol under cursor
 map("n", ",r", "<leader>cr", { remap = true, desc = "Rename Symbol Under Cursor" })
+
+-- ,r in visual mode renames too: drop to normal mode, then reuse the map above
+map("x", ",r", "<Esc>,r", { remap = true, desc = "Rename Symbol Under Cursor" })
 
 -- <leader>hc to inspect treesitter captures / highlights under cursor
 map("n", "<leader>hc", "<cmd>Inspect<CR>", { desc = "Inspect Highlights Under Cursor" })
