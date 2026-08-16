@@ -63,6 +63,14 @@ return {
         golangcilint = function()
           local base = vim.deepcopy(require("lint.linters.golangcilint"))
           base.cwd = vim.fs.root(0, { "go.work", "go.mod" }) or vim.fn.getcwd()
+          -- The stock args lint a single FILE when `go env GOMOD` — which the
+          -- linter runs from nvim's cwd, once, at require time — finds no
+          -- module. Single-file typecheck then reports sibling-file symbols
+          -- as undefined/unused. cwd is pinned to the module root above, so
+          -- always lint the buffer's whole package directory instead.
+          base.args[#base.args] = function()
+            return vim.fn.fnamemodify(vim.api.nvim_buf_get_name(0), ":h")
+          end
           return base
         end,
       },
