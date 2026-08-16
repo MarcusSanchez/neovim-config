@@ -40,6 +40,7 @@ return {
             ["@type"] = { fg = colors.yellow },
             ["@punctuation.delimiter"] = { fg = colors.overlay2 },
             ["@punctuation.special"] = { fg = cherry_blossom },
+            ["@lsp.type.enumMember"] = { fg = colors.peach },
             DiagnosticUnderlineError = { style = { "undercurl" } },
             DiagnosticUnderlineWarn = { style = { "undercurl" } },
             DiagnosticUnderlineHint = { style = { "undercurl" } },
@@ -83,6 +84,9 @@ return {
 
             -- protobuf
             ["@lsp.type.variable.proto"] = { fg = colors.red },
+
+            -- rust
+            ["@lsp.type.macro.rust"] = { fg = colors.blue },
 
             -- zig
             ["@keyword.import.zig"] = { fg = colors.blue },
