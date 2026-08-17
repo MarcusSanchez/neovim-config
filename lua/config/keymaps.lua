@@ -130,10 +130,17 @@ local handwritten_files = {
   "/ent/schema/",
 }
 map("n", "gS", function()
+  -- gopls also reports symbols from dependency sources (module cache in
+  -- ~/go/pkg/mod, stdlib in GOROOT); only keep files under the project root
+  local root = vim.fs.normalize(LazyVim.root()) .. "/"
   Snacks.picker.lsp_workspace_symbols({
     transform = function(item)
       if not item.file then
         return
+      end
+      local file = vim.fs.normalize(item.file)
+      if file:sub(1, 1) == "/" and file:sub(1, #root) ~= root then
+        return false
       end
       for _, pat in ipairs(handwritten_files) do
         if item.file:match(pat) then
