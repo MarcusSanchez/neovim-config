@@ -36,6 +36,31 @@ vim.api.nvim_create_autocmd("LspAttach", {
   end,
 })
 
+-- when :q closes the last real window, take the snacks explorer sidebar down
+-- with it (instead of leaving it behind as the last window keeping nvim open)
+vim.api.nvim_create_autocmd("QuitPre", {
+  callback = function()
+    local explorer = package.loaded["snacks"] and Snacks.picker.get({ source = "explorer" })[1]
+    if not explorer or explorer.closed then
+      return
+    end
+    -- count non-floating windows that don't belong to a snacks picker; when
+    -- the window being :q'd is the only one, the explorer goes too
+    local real = 0
+    for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+      if vim.api.nvim_win_get_config(win).relative == "" then
+        local ft = vim.bo[vim.api.nvim_win_get_buf(win)].filetype
+        if not ft:find("^snacks_") then
+          real = real + 1
+        end
+      end
+    end
+    if real <= 1 then
+      explorer:close()
+    end
+  end,
+})
+
 vim.api.nvim_create_autocmd("FileType", {
   pattern = "go",
   callback = function()
