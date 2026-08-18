@@ -36,6 +36,24 @@ vim.api.nvim_create_autocmd("LspAttach", {
   end,
 })
 
+-- shadowed variables in Go are already painted a distinct color via the
+-- @lsp.typemod.variable.shadowing.go semantic token (catppuccin.lua), so the
+-- `shadow` analyzer's info diagnostic (blue squiggle + sign) is redundant —
+-- drop it before it renders
+local function is_shadow(d)
+  return d.source == "shadow"
+    or d.code == "shadow"
+    or (d.message and d.message:find("shadows declaration", 1, true) ~= nil)
+end
+
+local orig_diagnostic_set = vim.diagnostic.set
+---@diagnostic disable-next-line: duplicate-set-field
+vim.diagnostic.set = function(ns, bufnr, diagnostics, opts)
+  return orig_diagnostic_set(ns, bufnr, vim.tbl_filter(function(d)
+    return not is_shadow(d)
+  end, diagnostics), opts)
+end
+
 -- when :q closes the last real window, take the snacks explorer sidebar down
 -- with it (instead of leaving it behind as the last window keeping nvim open)
 vim.api.nvim_create_autocmd("QuitPre", {

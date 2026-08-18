@@ -57,6 +57,9 @@ return {
 
             -- golang
             ["@lsp.typemod.variable.defaultLibrary.go"] = { fg = colors.peach },
+            -- shadowed variables get a color instead of the info squiggle
+            -- (the shadow diagnostic itself is dropped in autocmds.lua)
+            ["@lsp.typemod.variable.shadowing.go"] = { fg = "#DEBABA" },
             ["@lsp.typemod.variable.readonly.go"] = { fg = colors.peach },
             ["@lsp.type.namespace.go"] = { fg = colors.subtext1, style = { "italic" } },
             ["@lsp.type.parameter.go"] = { fg = fall },
