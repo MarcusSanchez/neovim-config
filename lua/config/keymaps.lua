@@ -116,6 +116,7 @@ local generated_files = {
   "%.pb%.go$",
   "%.connect%.go$",
   "%.gen%.go$",
+  "%.d%.ts$",
   "_gen%.go$",
   "_generated%.go$",
   "/gen/",
