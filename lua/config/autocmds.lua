@@ -54,8 +54,9 @@ vim.diagnostic.set = function(ns, bufnr, diagnostics, opts)
   end, diagnostics), opts)
 end
 
--- when :q closes the last real window, take the snacks explorer sidebar down
--- with it (instead of leaving it behind as the last window keeping nvim open)
+-- when :q closes the last real window, quit nvim entirely instead of leaving
+-- the snacks explorer sidebar behind (closing just the explorer here isn't
+-- enough — snacks re-seats it on an empty scratch buffer)
 vim.api.nvim_create_autocmd("QuitPre", {
   callback = function()
     local explorer = package.loaded["snacks"] and Snacks.picker.get({ source = "explorer" })[1]
@@ -63,7 +64,7 @@ vim.api.nvim_create_autocmd("QuitPre", {
       return
     end
     -- count non-floating windows that don't belong to a snacks picker; when
-    -- the window being :q'd is the only one, the explorer goes too
+    -- the window being :q'd is the only one, upgrade the :q to :qa
     local real = 0
     for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
       if vim.api.nvim_win_get_config(win).relative == "" then
@@ -74,7 +75,11 @@ vim.api.nvim_create_autocmd("QuitPre", {
       end
     end
     if real <= 1 then
-      explorer:close()
+      -- scheduled so the original :q finishes first; if it aborts on a
+      -- modified buffer, qall raises the same E37 rather than force-quitting
+      vim.schedule(function()
+        vim.cmd("qall")
+      end)
     end
   end,
 })
