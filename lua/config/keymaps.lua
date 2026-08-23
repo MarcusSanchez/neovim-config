@@ -110,7 +110,7 @@ map("x", "<S-A-k>", ":<C-u>execute \"silent! '<,'>move '>+\" . v:count1<cr>gv=gv
 -- needs the kitty keyboard protocol, which Ghostty (and Neovide) support.
 map("n", "<S-Space>", "<leader><space>", { remap = true, desc = "Find Files (Root Dir)" })
 
--- gS searches workspace symbols (like <leader>sS, but skipping generated
+-- gs searches workspace symbols (like <leader>sS, but skipping generated
 -- files), g/ greps the project (same picker as <leader>/)
 local generated_files = {
   "%.pb%.go$",
@@ -141,7 +141,7 @@ local generated_files = {
 local handwritten_files = {
   "/ent/schema/",
 }
-map("n", "gS", function()
+map("n", "gs", function()
   -- gopls also reports symbols from dependency sources (module cache in
   -- ~/go/pkg/mod, stdlib in GOROOT); only keep files under the project root
   local root = vim.fs.normalize(LazyVim.root()) .. "/"
