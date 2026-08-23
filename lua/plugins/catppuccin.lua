@@ -45,6 +45,16 @@ return {
             DiagnosticUnderlineWarn = { style = { "undercurl" } },
             DiagnosticUnderlineHint = { style = { "undercurl" } },
 
+            -- treesitter-context: shade the pinned scope line's background so
+            -- it reads as a distinct bar, no underline/separator needed (the
+            -- separator-row experiment is commented in nvim-treesitter-context.lua)
+            -- hand-tuned hex: just a whisker above mocha base (#1e1e2e), the
+            -- faintest shade that still separates the bar from the background
+            TreesitterContext = { bg = "#232334" },
+            TreesitterContextLineNumber = { bg = "#232334" },
+            TreesitterContextBottom = { style = {} },
+            TreesitterContextLineNumberBottom = { style = {} },
+
             -- snacks picker / explorer
             -- transparent_background only covers Normal, not NormalFloat, so the
             -- picker windows end up sitting on an opaque mantle slab. Every
