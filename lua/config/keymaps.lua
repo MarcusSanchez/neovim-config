@@ -97,8 +97,18 @@ map("i", "<S-A-j>", "<esc><cmd>silent! m .-2<cr>==gi", { desc = "Move Line Up (r
 map("i", "<S-A-k>", "<esc><cmd>silent! m .+1<cr>==gi", { desc = "Move Line Down (reversed)" })
 
 -- Visual mode - move lines up and down (reversed)
-map("x", "<S-A-j>", ":<C-u>execute \"silent! '<,'>move '<-\" . (v:count1 + 1)<cr>gv=gv", { desc = "Move Lines Up (reversed)" })
-map("x", "<S-A-k>", ":<C-u>execute \"silent! '<,'>move '>+\" . v:count1<cr>gv=gv", { desc = "Move Lines Down (reversed)" })
+map(
+  "x",
+  "<S-A-j>",
+  ":<C-u>execute \"silent! '<,'>move '<-\" . (v:count1 + 1)<cr>gv=gv",
+  { desc = "Move Lines Up (reversed)" }
+)
+map(
+  "x",
+  "<S-A-k>",
+  ":<C-u>execute \"silent! '<,'>move '>+\" . v:count1<cr>gv=gv",
+  { desc = "Move Lines Down (reversed)" }
+)
 
 --------------------------------------------------------------------------------
 -- Pickers
@@ -110,41 +120,14 @@ map("x", "<S-A-k>", ":<C-u>execute \"silent! '<,'>move '>+\" . v:count1<cr>gv=gv
 -- needs the kitty keyboard protocol, which Ghostty (and Neovide) support.
 map("n", "<S-Space>", "<leader><space>", { remap = true, desc = "Find Files (Root Dir)" })
 
--- gs searches workspace symbols (like <leader>sS, but skipping generated
--- files), g/ greps the project (same picker as <leader>/)
-local generated_files = {
-  "%.pb%.go$",
-  "%.connect%.go$",
-  "%.gen%.go$",
-  "%.d%.ts$",
-  "_gen%.go$",
-  "_generated%.go$",
-  "/gen/",
-  "/node_modules/",
-  "/ent/",
-  -- build output
-  "/%.next/",
-  "/%.nuxt/",
-  "/%.output/",
-  "/%.svelte%-kit/",
-  "/%.turbo/",
-  "/dist/",
-  "/build/",
-  "/target/",
-  "/vendor/",
-  "/coverage/",
-  "_test%.go$",
-  "%.test%.[jt]sx?$",
-  "%.spec%.[jt]sx?$",
-}
--- handwritten islands inside otherwise-generated trees
-local handwritten_files = {
-  "/ent/schema/",
-}
+-- gs searches workspace symbols (like <leader>sS, but skipping generated and
+-- test files — the rules live in lua/util/noise.lua and gd's usages popup
+-- shares them), g/ greps the project (same picker as <leader>/)
 map("n", "gs", function()
   -- gopls also reports symbols from dependency sources (module cache in
   -- ~/go/pkg/mod, stdlib in GOROOT); only keep files under the project root
   local root = vim.fs.normalize(LazyVim.root()) .. "/"
+  local noise = require("util.noise")
   Snacks.picker.lsp_workspace_symbols({
     transform = function(item)
       if not item.file then
@@ -154,15 +137,8 @@ map("n", "gs", function()
       if file:sub(1, 1) == "/" and file:sub(1, #root) ~= root then
         return false
       end
-      for _, pat in ipairs(handwritten_files) do
-        if item.file:match(pat) then
-          return
-        end
-      end
-      for _, pat in ipairs(generated_files) do
-        if item.file:match(pat) then
-          return false
-        end
+      if noise.is_noisy_path(file) then
+        return false
       end
     end,
   })
@@ -293,9 +269,35 @@ vim.api.nvim_create_autocmd("LspAttach", {
   end,
 })
 
--- make ge open the diagnostic window in a float
+-- <Esc> also dismisses an open gk hover / signature popup (noice keeps them
+-- up until the cursor moves) and the ge diagnostics float. Keeps LazyVim's
+-- normal-mode <Esc> behaviour: clear hlsearch and stop an active snippet.
+map("n", "<Esc>", function()
+  vim.cmd("noh")
+  LazyVim.cmp.actions.snippet_stop()
+  if package.loaded["noice"] then
+    local docs = require("noice.lsp.docs")
+    for _, message in pairs(docs._messages) do
+      if message:win() then
+        docs.hide(message)
+      end
+    end
+  end
+  -- nvim parks the id of a buffer's floating preview (ge, native hover) here
+  local float = vim.b.lsp_floating_preview
+  if float and vim.api.nvim_win_is_valid(float) then
+    vim.api.nvim_win_close(float, true)
+  end
+  return "<Esc>"
+end, { expr = true, desc = "Escape, Clear hlsearch, Dismiss Popups" })
+
+-- make ge open the diagnostic window in a float, styled like the gk hover
+-- (rounded blue border, transparent body — groups in catppuccin.lua)
 map("n", "ge", function()
-  vim.diagnostic.open_float()
+  local _, win = vim.diagnostic.open_float({ border = "rounded" })
+  if win then
+    vim.wo[win].winhighlight = "Normal:CursorPopup,FloatBorder:CursorPopupBorder"
+  end
 end, { desc = "Show Diagnostics (Float)" })
 
 -- make ,g open code actions

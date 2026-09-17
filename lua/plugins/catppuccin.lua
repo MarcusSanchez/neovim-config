@@ -65,6 +65,12 @@ return {
             SnacksPickerTitle = { fg = colors.subtext0, bg = "NONE" },
             SnacksPickerFooter = { fg = colors.subtext0, bg = "NONE" },
 
+            -- cursor popups (gk hover via noice.lua, ge diagnostics via
+            -- keymaps.lua): same transparent body + blue rounded border as
+            -- the pickers
+            CursorPopup = { fg = colors.text, bg = "NONE" },
+            CursorPopupBorder = { fg = colors.blue, bg = "NONE" },
+
             -- golang
             ["@lsp.typemod.variable.defaultLibrary.go"] = { fg = colors.peach },
             -- shadowed variables get a color instead of the info squiggle
