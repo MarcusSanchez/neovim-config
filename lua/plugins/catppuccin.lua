@@ -65,8 +65,9 @@ return {
             SnacksPickerTitle = { fg = colors.subtext0, bg = "NONE" },
             SnacksPickerFooter = { fg = colors.subtext0, bg = "NONE" },
 
-            -- gk hover popup (noice.lua): same transparent body + blue rounded
-            -- border as the pickers
+            -- cursor popups (gk hover via noice.lua, ge diagnostics via
+            -- keymaps.lua): same transparent body + blue rounded border as
+            -- the pickers
             CursorPopup = { fg = colors.text, bg = "NONE" },
             CursorPopupBorder = { fg = colors.blue, bg = "NONE" },
 

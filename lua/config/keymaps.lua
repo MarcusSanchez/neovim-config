@@ -270,8 +270,8 @@ vim.api.nvim_create_autocmd("LspAttach", {
 })
 
 -- <Esc> also dismisses an open gk hover / signature popup (noice keeps them
--- up until the cursor moves). Keeps LazyVim's normal-mode <Esc> behaviour:
--- clear hlsearch and stop an active snippet.
+-- up until the cursor moves) and the ge diagnostics float. Keeps LazyVim's
+-- normal-mode <Esc> behaviour: clear hlsearch and stop an active snippet.
 map("n", "<Esc>", function()
   vim.cmd("noh")
   LazyVim.cmp.actions.snippet_stop()
@@ -283,12 +283,21 @@ map("n", "<Esc>", function()
       end
     end
   end
+  -- nvim parks the id of a buffer's floating preview (ge, native hover) here
+  local float = vim.b.lsp_floating_preview
+  if float and vim.api.nvim_win_is_valid(float) then
+    vim.api.nvim_win_close(float, true)
+  end
   return "<Esc>"
-end, { expr = true, desc = "Escape, Clear hlsearch, Dismiss Hover" })
+end, { expr = true, desc = "Escape, Clear hlsearch, Dismiss Popups" })
 
--- make ge open the diagnostic window in a float
+-- make ge open the diagnostic window in a float, styled like the gk hover
+-- (rounded blue border, transparent body — groups in catppuccin.lua)
 map("n", "ge", function()
-  vim.diagnostic.open_float()
+  local _, win = vim.diagnostic.open_float({ border = "rounded" })
+  if win then
+    vim.wo[win].winhighlight = "Normal:CursorPopup,FloatBorder:CursorPopupBorder"
+  end
 end, { desc = "Show Diagnostics (Float)" })
 
 -- make ,g open code actions
