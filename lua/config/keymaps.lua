@@ -121,15 +121,15 @@ map(
 map("n", "<S-Space>", "<leader><space>", { remap = true, desc = "Find Files (Root Dir)" })
 
 -- gs searches workspace symbols (like <leader>sS, but skipping generated and
--- test files — the rules live in lua/util/noise.lua and gd's usages popup
+-- test code — the rules live in lua/util/noise.lua and gd's usages popup
 -- shares them), g/ greps the project (same picker as <leader>/)
 map("n", "gs", function()
   -- gopls also reports symbols from dependency sources (module cache in
   -- ~/go/pkg/mod, stdlib in GOROOT); only keep files under the project root
   local root = vim.fs.normalize(LazyVim.root()) .. "/"
-  local noise = require("util.noise")
+  local is_noise = require("util.noise").checker()
   Snacks.picker.lsp_workspace_symbols({
-    transform = function(item)
+    transform = function(item, ctx)
       if not item.file then
         return
       end
@@ -137,7 +137,15 @@ map("n", "gs", function()
       if file:sub(1, 1) == "/" and file:sub(1, #root) ~= root then
         return false
       end
-      if noise.is_noisy_path(file) then
+      -- servers fuzzy-match the query (rust-analyzer as a loose subsequence,
+      -- so "open" also returns OptionEnv); only keep names that actually
+      -- contain what was typed. A path query keeps its last segment.
+      local query = (ctx.filter.search or ""):match("[^:%.]*$") or ""
+      if query ~= "" and not (item.name or ""):lower():find(query:lower(), 1, true) then
+        return false
+      end
+      -- rust tests live inside the source file, so check the position too
+      if is_noise(file, item.pos and item.pos[1], item.pos and item.pos[2]) then
         return false
       end
     end,

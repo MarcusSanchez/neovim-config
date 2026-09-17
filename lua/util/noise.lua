@@ -63,17 +63,17 @@ local function rust_attr_is_test(node, src)
   return text:find("^#%[%s*test%s*%]") ~= nil or text:find("cfg%s*%(%s*test%s*%)") ~= nil
 end
 
+---@param root TSNode
 ---@param src string file contents
 ---@param row integer 1-based
 ---@param col integer 0-based
-local function rust_in_test(src, row, col)
-  local ok, parser = pcall(vim.treesitter.get_string_parser, src, "rust")
-  if not ok then
-    return false
-  end
-  local tree = parser:parse()[1]
-  local node = tree and tree:root():named_descendant_for_range(row - 1, col, row - 1, col)
+local function rust_in_test(root, src, row, col)
+  local node = root:named_descendant_for_range(row - 1, col, row - 1, col)
   while node do
+    -- landed on the attribute itself (symbol ranges can start at `#[test]`)
+    if node:type() == "attribute_item" and rust_attr_is_test(node, src) then
+      return true
+    end
     if node:type():find("_item$") then
       local prev = node:prev_named_sibling()
       while prev and prev:type() == "attribute_item" do
@@ -88,27 +88,60 @@ local function rust_in_test(src, row, col)
   return false
 end
 
---- Is the code at file:row:col test/generated noise? `lines` are the file's
---- lines when the caller already has them (saves a re-read).
+--- Returns an `is_noise(file, row?, col?, lines?)` function that caches file
+--- contents and parse trees, for callers that check many positions at once
+--- (symbol search, usage lists).
+function M.checker()
+  local lines_cache = {} ---@type table<string, string[]>
+  local root_cache = {} ---@type table<string, TSNode|false>
+  local src_cache = {} ---@type table<string, string>
+
+  local function file_lines(file, lines)
+    if lines then
+      return lines
+    end
+    if not lines_cache[file] then
+      local b = vim.fn.bufnr(file)
+      lines_cache[file] = b > 0 and vim.api.nvim_buf_is_loaded(b) and vim.api.nvim_buf_get_lines(b, 0, -1, false)
+        or vim.fn.readfile(file)
+    end
+    return lines_cache[file]
+  end
+
+  ---@param file string
+  ---@param row? integer 1-based
+  ---@param col? integer 0-based
+  ---@param lines? string[] the file's lines when the caller already has them
+  ---@return boolean
+  return function(file, row, col, lines)
+    file = vim.fs.normalize(file)
+    if M.is_noisy_path(file) then
+      return true
+    end
+    if not (row and file:match("%.rs$")) then
+      return false
+    end
+    if root_cache[file] == nil then
+      local src = table.concat(file_lines(file, lines), "\n")
+      local ok, parser = pcall(vim.treesitter.get_string_parser, src, "rust")
+      local tree = ok and parser:parse()[1]
+      root_cache[file] = tree and tree:root() or false
+      src_cache[file] = src
+    end
+    local root = root_cache[file]
+    return root and rust_in_test(root, src_cache[file], row, col or 0) or false
+  end
+end
+
+--- Is the code at file:row:col test/generated noise? One-shot form of
+--- M.checker(); pass `lines` when the caller already has the file's lines.
 ---@param file string
 ---@param row? integer 1-based
 ---@param col? integer 0-based
 ---@param lines? string[]
 ---@return boolean
 function M.is_noise(file, row, col, lines)
-  file = vim.fs.normalize(file)
-  if M.is_noisy_path(file) then
-    return true
-  end
-  if row and file:match("%.rs$") then
-    if not lines then
-      local b = vim.fn.bufnr(file)
-      lines = b > 0 and vim.api.nvim_buf_is_loaded(b) and vim.api.nvim_buf_get_lines(b, 0, -1, false)
-        or vim.fn.readfile(file)
-    end
-    return rust_in_test(table.concat(lines, "\n"), row, col or 0)
-  end
-  return false
+  return M.checker()(file, row, col, lines)
 end
 
 return M
