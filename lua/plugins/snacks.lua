@@ -36,6 +36,11 @@ return {
         },
       },
       sources = {
+        -- grep literally: typing `foo(` or `a.b` finds exactly that, no
+        -- escaping. (grep_word is already fixed-strings; <leader>sr's
+        -- grug-far keeps regex since replacements lean on it.)
+        grep = { regex = false },
+        grep_buffers = { regex = false },
         explorer = {
           -- show the explorer as a sidebar on the right
           layout = { layout = { position = "right" } },
