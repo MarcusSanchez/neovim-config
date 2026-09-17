@@ -58,40 +58,59 @@ local function definition_or_references()
       params.context = { includeDeclaration = false }
       return params
     end, function(ref_results)
-      -- count distinct locations (two clients may report the same spot), plus the
-      -- widest "file:row  code" row so the popup hugs its content
-      local seen, count, width = {}, 0, 0
+      -- distinct locations (two clients may report the same spot); test and
+      -- generated code is set aside (lua/util/noise.lua) unless that's all
+      -- there is
+      local noise = require("util.noise")
+      local seen, usages, noisy = {}, {}, {}
       local lines = {} ---@type table<string, string[]>
       for _, res in pairs(ref_results) do
         for _, loc in ipairs(res.result or {}) do
-          local row = loc.range.start.line + 1
-          local key = ("%s:%d:%d"):format(loc.uri, row, loc.range.start.character)
+          local row, col = loc.range.start.line + 1, loc.range.start.character
+          local fname = vim.fs.normalize(vim.uri_to_fname(loc.uri))
+          local key = ("%s:%d:%d"):format(fname, row, col)
           if not seen[key] then
             seen[key] = true
-            count = count + 1
-            local fname = vim.uri_to_fname(loc.uri)
             if not lines[fname] then
               local b = vim.fn.bufnr(fname)
               lines[fname] = b > 0 and vim.api.nvim_buf_is_loaded(b) and vim.api.nvim_buf_get_lines(b, 0, -1, false)
                 or vim.fn.readfile(fname)
             end
-            local text = vim.trim(lines[fname][row] or "")
-            width =
-              math.max(width, #vim.fn.fnamemodify(fname, ":t") + #tostring(row) + 3 + vim.fn.strdisplaywidth(text))
+            local usage = { file = fname, row = row, text = vim.trim(lines[fname][row] or "") }
+            local bucket = noise.is_noise(fname, row, col, lines[fname]) and noisy or usages
+            bucket[#bucket + 1] = usage
           end
         end
       end
 
-      if count == 0 then
+      if #usages + #noisy == 0 then
         return vim.notify(("No references to `%s`"):format(word), vim.log.levels.WARN, { title = "LSP" })
       end
-      local title = ("Usages of %s"):format(word)
+      local tests_only = #usages == 0
+      if tests_only then
+        usages = noisy
+      end
+      local count = #usages
+      -- the popup hugs its widest "file:row  code" row
+      local keep, width = {}, 0
+      for _, u in ipairs(usages) do
+        keep[u.file .. ":" .. u.row] = true
+        width =
+          math.max(width, #vim.fn.fnamemodify(u.file, ":t") + #tostring(u.row) + 3 + vim.fn.strdisplaywidth(u.text))
+      end
+
+      local title = ("Usages of %s%s"):format(word, tests_only and " (tests/generated only)" or "")
       Snacks.picker.lsp_references({
         title = title,
         include_declaration = false,
         -- the declaration is filtered by the request; keep a usage that
         -- happens to share the definition's line
         include_current = true,
+        transform = function(item)
+          if not keep[vim.fs.normalize(item.file) .. ":" .. item.pos[1]] then
+            return false
+          end
+        end,
         auto_confirm = count == 1,
         focus = "list",
         -- IntelliJ-style "show usages": a small popup right under the cursor
@@ -123,7 +142,8 @@ local function definition_or_references()
         end,
       })
       if count == 1 then
-        vim.notify(("Only usage of `%s`"):format(word), vim.log.levels.INFO, { title = "LSP" })
+        local where = tests_only and "Only usage of `%s` is in test/generated code" or "Only usage of `%s`"
+        vim.notify(where:format(word), vim.log.levels.INFO, { title = "LSP" })
       end
     end)
   end)
