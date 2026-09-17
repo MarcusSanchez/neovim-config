@@ -14,6 +14,19 @@ local function in_range(pos, range)
   return true
 end
 
+-- gh walks back through the tagstack: every LSP jump (gd, the usages popup,
+-- gr/gI/gy, <C-]>) pushes where it came from, and each gh pops the newest
+-- one — the stock <C-t>, minus the E73 error when the stack runs dry.
+local function go_back()
+  if vim.fn.gettagstack().curidx <= 1 then
+    return vim.notify("No jump to go back to", vim.log.levels.WARN, { title = "LSP" })
+  end
+  local ok, err = pcall(vim.cmd.pop)
+  if not ok then
+    vim.notify(tostring(err), vim.log.levels.ERROR, { title = "LSP" })
+  end
+end
+
 -- gd on a symbol's own definition (where a plain gd would just land where it
 -- already is) falls through to its references instead: a single usage jumps
 -- straight there with a notice, several open a small "usages" popup under the
@@ -163,6 +176,7 @@ return {
               has = "definition",
               desc = "Goto Definition (or References)",
             },
+            { "gh", go_back, desc = "Go Back (Pop Tagstack)" },
             { "K", false }, -- disable this keymap globally
           },
         },
