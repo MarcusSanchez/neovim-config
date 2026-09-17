@@ -49,9 +49,14 @@ end
 local orig_diagnostic_set = vim.diagnostic.set
 ---@diagnostic disable-next-line: duplicate-set-field
 vim.diagnostic.set = function(ns, bufnr, diagnostics, opts)
-  return orig_diagnostic_set(ns, bufnr, vim.tbl_filter(function(d)
-    return not is_shadow(d)
-  end, diagnostics), opts)
+  return orig_diagnostic_set(
+    ns,
+    bufnr,
+    vim.tbl_filter(function(d)
+      return not is_shadow(d)
+    end, diagnostics),
+    opts
+  )
 end
 
 -- when :q closes the last real window, quit nvim entirely instead of leaving
@@ -90,5 +95,49 @@ vim.api.nvim_create_autocmd("FileType", {
     vim.opt_local.tabstop = 4
     vim.opt_local.shiftwidth = 4
     vim.opt_local.expandtab = true
+  end,
+})
+
+-- Autosave like Zed (`autosave.after_delay = 300ms`), but only from normal
+-- mode: nothing is written while typing in insert mode; leaving insert counts
+-- as a normal-mode change, so the save lands 300ms after `jj`. Like Zed,
+-- these saves skip format-on-save — only an explicit :w / ,f formats — so
+-- cargo check / golangci-lint / eslint get pause-triggered diagnostics
+-- without the buffer being reshuffled mid-thought.
+local autosave_delay = 300
+local autosave_timers = {} ---@type table<integer, uv.uv_timer_t>
+
+local function autosave(buf)
+  autosave_timers[buf] = nil
+  if not vim.api.nvim_buf_is_valid(buf) or not vim.bo[buf].modified then
+    return
+  end
+  local name = vim.api.nvim_buf_get_name(buf)
+  if vim.bo[buf].buftype ~= "" or name == "" or not vim.bo[buf].modifiable or vim.bo[buf].readonly then
+    return
+  end
+  if vim.fn.filewritable(name) ~= 1 then
+    return -- unsaved new file, or not ours to write
+  end
+  vim.api.nvim_buf_call(buf, function()
+    local autoformat = vim.b[buf].autoformat
+    vim.b[buf].autoformat = false
+    -- silent!: a file changed on disk (E13/E211) shouldn't raise on a timer
+    pcall(vim.cmd, "silent! update")
+    vim.b[buf].autoformat = autoformat
+  end)
+end
+
+vim.api.nvim_create_autocmd("TextChanged", {
+  group = vim.api.nvim_create_augroup("autosave_after_delay", { clear = true }),
+  callback = function(ev)
+    local timer = autosave_timers[ev.buf]
+    if timer then
+      timer:stop()
+      timer:close()
+    end
+    autosave_timers[ev.buf] = vim.defer_fn(function()
+      autosave(ev.buf)
+    end, autosave_delay)
   end,
 })
