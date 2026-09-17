@@ -16,8 +16,9 @@ end
 
 -- gd on a symbol's own definition (where a plain gd would just land where it
 -- already is) falls through to its references instead: a single usage jumps
--- straight there with a notice, several open the references picker already
--- in normal mode so j/k + <cr> picks one. Anywhere else gd is the stock jump.
+-- straight there with a notice, several open a small "usages" popup under the
+-- cursor, in normal mode, so j/k + <cr> picks one. Anywhere else gd is the
+-- stock jump.
 local function definition_or_references()
   local buf = vim.api.nvim_get_current_buf()
   local win = vim.api.nvim_get_current_win()
@@ -57,14 +58,26 @@ local function definition_or_references()
       params.context = { includeDeclaration = false }
       return params
     end, function(ref_results)
-      -- count distinct locations (two clients may report the same spot)
-      local seen, count = {}, 0
+      -- count distinct locations (two clients may report the same spot), plus the
+      -- widest "file:row  code" row so the popup hugs its content
+      local seen, count, width = {}, 0, 0
+      local lines = {} ---@type table<string, string[]>
       for _, res in pairs(ref_results) do
         for _, loc in ipairs(res.result or {}) do
-          local key = ("%s:%d:%d"):format(loc.uri, loc.range.start.line, loc.range.start.character)
+          local row = loc.range.start.line + 1
+          local key = ("%s:%d:%d"):format(loc.uri, row, loc.range.start.character)
           if not seen[key] then
             seen[key] = true
             count = count + 1
+            local fname = vim.uri_to_fname(loc.uri)
+            if not lines[fname] then
+              local b = vim.fn.bufnr(fname)
+              lines[fname] = b > 0 and vim.api.nvim_buf_is_loaded(b) and vim.api.nvim_buf_get_lines(b, 0, -1, false)
+                or vim.fn.readfile(fname)
+            end
+            local text = vim.trim(lines[fname][row] or "")
+            width =
+              math.max(width, #vim.fn.fnamemodify(fname, ":t") + #tostring(row) + 3 + vim.fn.strdisplaywidth(text))
           end
         end
       end
@@ -72,13 +85,42 @@ local function definition_or_references()
       if count == 0 then
         return vim.notify(("No references to `%s`"):format(word), vim.log.levels.WARN, { title = "LSP" })
       end
+      local title = ("Usages of %s"):format(word)
       Snacks.picker.lsp_references({
+        title = title,
         include_declaration = false,
         -- the declaration is filtered by the request; keep a usage that
         -- happens to share the definition's line
         include_current = true,
         auto_confirm = count == 1,
         focus = "list",
+        -- IntelliJ-style "show usages": a small popup right under the cursor
+        -- listing file:row and the usage line, no input or preview
+        layout = {
+          hidden = { "input", "preview" },
+          layout = {
+            relative = "cursor",
+            row = 1,
+            col = 0,
+            width = math.min(math.max(width + 2, #title + 4), vim.o.columns - 4),
+            height = math.min(count, 12),
+            backdrop = false,
+            border = "rounded",
+            title = "{title}",
+            title_pos = "left",
+            box = "vertical",
+            { win = "input", height = 1, border = "bottom" },
+            { win = "list", border = "none" },
+          },
+        },
+        format = function(item)
+          return {
+            { vim.fn.fnamemodify(item.file, ":t"), "SnacksPickerFile" },
+            { ":" .. item.pos[1], "SnacksPickerRow" },
+            { "  " },
+            { vim.trim(item.line or ""), "SnacksPickerComment" },
+          }
+        end,
       })
       if count == 1 then
         vim.notify(("Only usage of `%s`"):format(word), vim.log.levels.INFO, { title = "LSP" })
