@@ -19,11 +19,11 @@ end
 -- one — the stock <C-t>, minus the E73 error when the stack runs dry.
 local function go_back()
   if vim.fn.gettagstack().curidx <= 1 then
-    return vim.notify("No jump to go back to", vim.log.levels.WARN, { title = "LSP" })
+    return vim.notify("No jump to go back to", vim.log.levels.WARN, { title = "Go Back" })
   end
   local ok, err = pcall(vim.cmd.pop)
   if not ok then
-    vim.notify(tostring(err), vim.log.levels.ERROR, { title = "LSP" })
+    vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Go Back" })
   end
 end
 
@@ -63,7 +63,7 @@ local function definition_or_references()
       return vim.lsp.buf.definition()
     end
     if #vim.lsp.get_clients({ bufnr = buf, method = "textDocument/references" }) == 0 then
-      return vim.notify("No LSP client supports references here", vim.log.levels.WARN, { title = "LSP" })
+      return vim.notify("No LSP client supports references here", vim.log.levels.WARN, { title = "Goto Definition" })
     end
 
     vim.lsp.buf_request_all(buf, "textDocument/references", function(client)
@@ -97,7 +97,7 @@ local function definition_or_references()
       end
 
       if #usages + #noisy == 0 then
-        return vim.notify(("No references to `%s`"):format(word), vim.log.levels.WARN, { title = "LSP" })
+        return vim.notify(("No references to `%s`"):format(word), vim.log.levels.WARN, { title = "Goto Definition" })
       end
       local tests_only = #usages == 0
       if tests_only then
@@ -156,7 +156,7 @@ local function definition_or_references()
       })
       if count == 1 then
         local where = tests_only and "Only usage of `%s` is in test/generated code" or "Only usage of `%s`"
-        vim.notify(where:format(word), vim.log.levels.INFO, { title = "LSP" })
+        vim.notify(where:format(word), vim.log.levels.INFO, { title = "Goto Definition" })
       end
     end)
   end)
@@ -170,12 +170,7 @@ return {
       servers = {
         ["*"] = {
           keys = {
-            {
-              "gd",
-              definition_or_references,
-              has = "definition",
-              desc = "Goto Definition (or References)",
-            },
+            { "gd", definition_or_references, has = "definition", desc = "Goto Definition (or References)" },
             { "gh", go_back, desc = "Go Back (Pop Tagstack)" },
             { "K", false }, -- disable this keymap globally
           },
