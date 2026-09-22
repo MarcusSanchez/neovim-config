@@ -4,9 +4,9 @@ return {
     -- noice maps K in its markdown (hover) buffers to "open the link under
     -- the cursor, else the builtin K" — and the builtin K is keywordprg, i.e.
     -- a man page. Wrap the mapper so K inside the hover scrolls half a page
-    -- down like everywhere else in this config, and gd follows the
-    -- "Go to [Type](file://...)" links (lua/util/popup.lua); gx still opens
-    -- links in the browser.
+    -- down like everywhere else in this config, and gd follows links
+    -- (lua/util/popup.lua): "Go to [Type](file://...)" jumps to the file,
+    -- https links open in the browser.
     vim.api.nvim_create_autocmd("User", {
       pattern = "LazyLoad",
       callback = function(ev)

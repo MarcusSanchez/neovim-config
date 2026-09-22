@@ -35,9 +35,9 @@ function M.dismiss()
 end
 
 --- The markdown link under the cursor on the current line, else the one
---- nearest to it: `[label](target)`, target like file:///path#L12 or a
---- plain path with optional #L<row>.
----@return { file: string, row: integer? }?
+--- nearest to it: `[label](target)`, target like https://..., file:///path#L12
+--- or a plain path with optional #L<row>.
+---@return { url: string?, file: string?, row: integer? }?
 local function link_at_cursor()
   local line = vim.api.nvim_get_current_line()
   local col = vim.api.nvim_win_get_cursor(0)[2] + 1
@@ -57,6 +57,9 @@ local function link_at_cursor()
   if not best then
     return
   end
+  if best:match("^https?://") then
+    return { url = best }
+  end
   local file, row = best:match("^(.-)#L(%d+)$")
   file = file or best
   file = file:gsub("^file://", "")
@@ -64,13 +67,18 @@ local function link_at_cursor()
   return { file = file, row = tonumber(row) }
 end
 
---- gd inside the gk hover: jump to the link under (or nearest) the cursor —
---- the "Go to [Type](file:///...#L12)" footers zls/rust-analyzer emit — and
---- close the hover. Pushes the tagstack so gh comes back.
+--- gd inside the gk hover: follow the link under (or nearest) the cursor.
+--- A web link opens in the browser; a file link — the "Go to
+--- [Type](file:///...#L12)" footers zls/rust-analyzer emit — closes the hover
+--- and jumps there, pushing the tagstack so gh comes back.
 function M.follow_link()
   local link = link_at_cursor()
+  if link and link.url then
+    vim.ui.open(link.url)
+    return
+  end
   if not link or vim.fn.filereadable(link.file) ~= 1 then
-    return vim.notify("No file link under the cursor", vim.log.levels.WARN, { title = "Goto Definition" })
+    return vim.notify("No link under the cursor", vim.log.levels.WARN, { title = "Goto Definition" })
   end
   -- close the hover we're standing in right now (noice hides its windows on
   -- its own schedule) so the file never opens inside the float, then the rest

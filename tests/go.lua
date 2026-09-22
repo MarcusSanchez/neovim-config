@@ -67,6 +67,18 @@ vim.schedule(function()
     check("hover gd opened the linked file", vim.fn.expand("%:t") .. ":" .. vim.fn.line("."), "main_test.go:5")
     check("hover gd closed the float", vim.api.nvim_win_is_valid(mw), false)
     key("gh"); wait(200); check("gh returns from a hover link", vim.fn.expand("%:t"), "main.go")
+    -- gd on an https link opens the browser and stays put
+    local opened
+    local ui_open = vim.ui.open
+    vim.ui.open = function(url) opened = url end
+    vim.api.nvim_buf_set_lines(mb, 0, -1, false, { "See [the docs](https://pkg.go.dev/testing) for more" })
+    mw = vim.api.nvim_open_win(mb, true, { relative = "cursor", row = 1, col = 0, width = 60, height = 1 })
+    vim.api.nvim_win_set_cursor(mw, { 1, 8 })
+    keys("gd"); wait(100)
+    check("hover gd on https opens the browser", opened, "https://pkg.go.dev/testing")
+    check("hover gd on https leaves the hover open", vim.api.nvim_win_is_valid(mw), true)
+    vim.ui.open = ui_open
+    vim.api.nvim_win_close(mw, true)
     -- autosave: normal-mode change writes after 300ms without formatting; insert change doesn't
     vim.cmd("edit! main.go")
     local before = vim.fn.readfile("main.go")
