@@ -60,7 +60,8 @@ autocmd("QuitPre", {
   end,
 })
 
--- write 300ms after the last normal-mode edit, without formatting
+-- write on leaving insert mode, and 300ms after a normal-mode edit; never
+-- formats
 require("util.autosave").setup({ delay = 300 })
 
 -- keep 'scrolloff' blank rows below the last line of the buffer

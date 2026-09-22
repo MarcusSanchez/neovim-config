@@ -56,8 +56,9 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
 
 ## Behaviour worth knowing
 
-- **Autosave**: a buffer is written 300ms after the last *normal-mode* change
-  (so right after `jj`), never mid-typing, and never formatted — `,f` formats.
+- **Autosave**: a buffer is written the moment you leave insert mode (`jj`)
+  and 300ms after a normal-mode edit, never mid-typing, and never formatted —
+  `,f` formats.
 - **Diagnostics**: only errors get virtual text. Go's `shadow` diagnostic is
   dropped; shadowed variables get a color instead.
 - **Formatting**: goimports + `golangci-lint fmt` for Go, the project's

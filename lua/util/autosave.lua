@@ -1,9 +1,9 @@
--- Autosave like Zed (`autosave.after_delay`), but only from normal mode:
--- nothing is written while typing in insert mode; leaving insert counts as a
--- normal-mode change, so the save lands `delay` ms after `jj`. Like Zed,
--- these saves skip format-on-save — only an explicit :w / ,f formats — so
--- cargo check / golangci-lint / eslint get pause-triggered diagnostics
--- without the buffer being reshuffled mid-thought.
+-- Autosave, but never mid-typing: leaving insert mode (`jj`) writes the
+-- buffer immediately, so cargo check / golangci-lint / eslint report on what
+-- was just typed; edits made in normal mode (dd, p, ...) are written `delay`
+-- ms after the last one, like Zed's autosave.after_delay. These saves skip
+-- format-on-save — only an explicit :w / ,f formats — so the buffer isn't
+-- reshuffled mid-thought.
 local M = {}
 
 local timers = {} ---@type table<integer, uv.uv_timer_t>
@@ -30,17 +30,36 @@ local function save(buf)
   end)
 end
 
----@param opts? { delay?: integer } delay in ms (default 300)
+---@param buf integer
+local function cancel(buf)
+  local timer = timers[buf]
+  if timer then
+    timer:stop()
+    timer:close()
+    timers[buf] = nil
+  end
+end
+
+---@param opts? { delay?: integer } normal-mode debounce in ms (default 300)
 function M.setup(opts)
   local delay = opts and opts.delay or 300
-  vim.api.nvim_create_autocmd("TextChanged", {
-    group = vim.api.nvim_create_augroup("autosave_after_delay", { clear = true }),
+  local group = vim.api.nvim_create_augroup("autosave", { clear = true })
+  vim.api.nvim_create_autocmd("InsertLeave", {
+    group = group,
     callback = function(ev)
-      local timer = timers[ev.buf]
-      if timer then
-        timer:stop()
-        timer:close()
-      end
+      cancel(ev.buf)
+      -- scheduled: a write from inside an autocmd callback fires no nested
+      -- autocmds, and BufWritePost is what sends didSave to the LSP (cargo
+      -- check) and runs nvim-lint
+      vim.schedule(function()
+        save(ev.buf)
+      end)
+    end,
+  })
+  vim.api.nvim_create_autocmd("TextChanged", {
+    group = group,
+    callback = function(ev)
+      cancel(ev.buf)
       timers[ev.buf] = vim.defer_fn(function()
         save(ev.buf)
       end, delay)
