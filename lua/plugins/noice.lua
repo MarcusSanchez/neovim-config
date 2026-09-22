@@ -4,7 +4,9 @@ return {
     -- noice maps K in its markdown (hover) buffers to "open the link under
     -- the cursor, else the builtin K" — and the builtin K is keywordprg, i.e.
     -- a man page. Wrap the mapper so K inside the hover scrolls half a page
-    -- down like everywhere else in this config (gx still opens links).
+    -- down like everywhere else in this config, and gd follows the
+    -- "Go to [Type](file://...)" links (lua/util/popup.lua); gx still opens
+    -- links in the browser.
     vim.api.nvim_create_autocmd("User", {
       pattern = "LazyLoad",
       callback = function(ev)
@@ -16,6 +18,9 @@ return {
         markdown.keys = function(buf)
           keys(buf)
           vim.keymap.set("n", "K", "<C-D>", { buffer = buf, silent = true, desc = "Scroll Half Page Down" })
+          vim.keymap.set("n", "gd", function()
+            require("util.popup").follow_link()
+          end, { buffer = buf, silent = true, desc = "Goto Linked Definition" })
         end
         return true -- one-shot
       end,

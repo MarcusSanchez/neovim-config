@@ -44,7 +44,7 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
 | `gd` | goto definition; on the definition itself, open its usages (one usage jumps straight there) |
 | `gh` | back to where the last jump came from (tagstack) |
 | `gs` / `g/` | workspace symbols / project grep (literal, no escaping) |
-| `gk` / `ge` | hover docs / line diagnostics, in a cursor popup; `<Esc>` dismisses |
+| `gk` / `ge` | hover docs / line diagnostics, in a cursor popup; `<Esc>` dismisses; `gd` inside the hover follows a `[Type](file://…)` link |
 | `,a` / `,c` | toggle-focus / close the explorer sidebar |
 | `,q` `,f` `,r` `,g` `,d` `,j` `,u` | close buffer, format+save, rename, code action, fold, split/join, undotree |
 | `,w` `,e` `<leader>j` `<leader>k` | window left / right / up / down |

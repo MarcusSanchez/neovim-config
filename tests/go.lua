@@ -56,6 +56,17 @@ vim.schedule(function()
     -- K inside a noice markdown buffer scrolls
     local mb = vim.api.nvim_create_buf(false, true); require("noice.text.markdown").keys(mb)
     check("K in hover buffer", vim.api.nvim_buf_call(mb, function() return vim.fn.maparg("K", "n", false, true).rhs end), "<C-D>")
+    -- gd in the hover follows the nearest [label](file://...#L<n>) link
+    local target = vim.fn.fnamemodify("main_test.go", ":p")
+    vim.api.nvim_buf_set_lines(mb, 0, -1, false, { "func multi()", "", "Go to [Foo](file://" .. target .. "#L5) | [Bar](file://" .. target .. "#L2)" })
+    -- an untagged float, like noice's hover window
+    local mw = vim.api.nvim_open_win(mb, true, { relative = "cursor", row = 1, col = 0, width = 60, height = 3 })
+    vim.api.nvim_win_set_cursor(mw, { 3, 8 }) -- inside [Foo]
+    check("hover gd mapped", vim.fn.maparg("gd", "n", false, true).desc, "Goto Linked Definition")
+    keys("gd"); wait(200)
+    check("hover gd opened the linked file", vim.fn.expand("%:t") .. ":" .. vim.fn.line("."), "main_test.go:5")
+    check("hover gd closed the float", vim.api.nvim_win_is_valid(mw), false)
+    key("gh"); wait(200); check("gh returns from a hover link", vim.fn.expand("%:t"), "main.go")
     -- autosave: normal-mode change writes after 300ms without formatting; insert change doesn't
     vim.cmd("edit! main.go")
     local before = vim.fn.readfile("main.go")
