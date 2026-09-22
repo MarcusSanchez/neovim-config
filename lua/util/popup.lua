@@ -35,11 +35,13 @@ function M.dismiss()
 end
 
 --- Normal-mode <Esc>: LazyVim's clear-hlsearch + snippet-stop, plus dismiss.
---- Expression mapping — returns the key to feed.
+--- Expression mapping — returns the key to feed. Windows can't be closed
+--- while an expression mapping evaluates (E565 textlock), so the dismissal
+--- is deferred until the key has been processed.
 function M.escape()
   vim.cmd("noh")
   LazyVim.cmp.actions.snippet_stop()
-  M.dismiss()
+  vim.schedule(M.dismiss)
   return "<Esc>"
 end
 
