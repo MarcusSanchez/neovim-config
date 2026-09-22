@@ -141,3 +141,7 @@ vim.api.nvim_create_autocmd("TextChanged", {
     end, autosave_delay)
   end,
 })
+
+-- keep 'scrolloff' blank rows below the last line of the buffer (Zed's
+-- scroll_beyond_last_line)
+require("util.scroll").setup()
