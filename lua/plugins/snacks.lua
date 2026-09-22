@@ -1,12 +1,7 @@
 return {
   "folke/snacks.nvim",
   keys = {
-    -- LazyVim's default explorer keys (<leader>e/E/fe/fE) are live again —
-    -- the oil-era `= false` disables are kept below for the next experiment.
-    -- { "<leader>e", false },
-    -- { "<leader>E", false },
-    -- { "<leader>fe", false },
-    -- { "<leader>fE", false },
+    -- (to bench the explorer again, see lua/benched/oil.lua)
     {
       "<leader>db",
       function()
@@ -16,9 +11,8 @@ return {
     },
   },
   opts = {
-    -- dashboard config lives in dashboard.lua; explorer rides as the right
-    -- sidebar below. (The oil/harpoon experiment disabled both, 2026-08-13
-    -- reverted.)
+    -- dashboard config lives in dashboard.lua; the explorer rides as the
+    -- right sidebar below
     explorer = { enabled = true },
     picker = {
       win = {
