@@ -1,3 +1,14 @@
+-- same shape as LazyVim's term_nav (plugins/util.lua): in a floating
+-- terminal the key is passed through, otherwise focus moves to that window
+local function term_nav(dir)
+  ---@param self snacks.terminal
+  return function(self)
+    return self:is_floating() and "<c-" .. dir .. ">" or vim.schedule(function()
+      vim.cmd.wincmd(dir)
+    end)
+  end
+end
+
 return {
   "folke/snacks.nvim",
   keys = {
@@ -11,21 +22,36 @@ return {
     },
   },
   opts = {
+    terminal = {
+      win = {
+        keys = {
+          -- LazyVim's term_nav, with j/k swapped: <C-j> goes up, <C-k> down
+          nav_j = { "<C-j>", term_nav("k"), desc = "Go to Upper Window", expr = true, mode = "t" },
+          nav_k = { "<C-k>", term_nav("j"), desc = "Go to Lower Window", expr = true, mode = "t" },
+        },
+      },
+    },
     -- dashboard config lives in dashboard.lua; the explorer rides as the
     -- right sidebar below
     explorer = { enabled = true },
+    -- j/k are swapped in this config (see config/keymaps.lua): every
+    -- picker list and the terminal window nav follow suit
     picker = {
       win = {
         input = {
           keys = {
             ["k"] = "list_down",
             ["j"] = "list_up",
+            ["<c-k>"] = { "list_down", mode = { "i", "n" } },
+            ["<c-j>"] = { "list_up", mode = { "i", "n" } },
           },
         },
         list = {
           keys = {
             ["k"] = "list_down",
             ["j"] = "list_up",
+            ["<c-k>"] = "list_down",
+            ["<c-j>"] = "list_up",
           },
         },
       },

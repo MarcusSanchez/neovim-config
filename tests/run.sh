@@ -3,7 +3,7 @@
 # Needs gopls and rust-analyzer on PATH (mason installs both).
 #
 #   tests/run.sh          # everything
-#   tests/run.sh go       # one suite: go | rust | scroll
+#   tests/run.sh go       # one suite: go | rust | scroll | keys
 #
 # Each suite drives a real nvim with this config against a fixture project
 # and prints PASS/FAIL lines. Fixtures are copied to a temp dir first: the
@@ -36,8 +36,9 @@ run() { # name, cwd, file to open, lua script, result log
 want=${1:-all}
 [[ $want == all || $want == go ]] && run go "$work/go" main.go "$here/go.lua" "$work/go/result.log"
 [[ $want == all || $want == rust ]] && run rust "$work/rust" src/lib.rs "$here/rust.lua" "$work/rust/result.log"
-if [[ $want == all || $want == scroll ]]; then
+if [[ $want == all || $want == scroll || $want == keys ]]; then
   seq 1 100 | sed 's/^/line /' > "$work/long.txt"
-  run scroll "$work" long.txt "$here/scroll.lua" "$work/result.log"
+  [[ $want != keys ]] && run scroll "$work" long.txt "$here/scroll.lua" "$work/result.log"
+  [[ $want != scroll ]] && run keys "$work" long.txt "$here/keys.lua" "$work/result.log"
 fi
 exit $status

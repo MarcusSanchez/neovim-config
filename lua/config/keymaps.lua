@@ -34,6 +34,19 @@ map({ "n", "x" }, "<S-K>", "<C-D>", opts("Scroll Half Page Down"))
 map({ "n", "x", "o" }, "j", "k", opts("Up (j/k swapped)"))
 map({ "n", "x", "o" }, "k", "j", opts("Down (j/k swapped)"))
 
+-- ...and everywhere else vim spells "down" as j and "up" as k:
+-- window focus (<C-w>j / <C-w><C-j>), window moves (<C-w>J), fold jumps
+-- (zj/zk). Plugin UIs get the same treatment in their specs: snacks picker
+-- <C-j>/<C-k> and terminal nav (snacks.lua), undotree J/K (undotree.lua).
+map("n", "<C-w>j", "<C-w>k", opts("Go to Upper Window (j/k swapped)"))
+map("n", "<C-w>k", "<C-w>j", opts("Go to Lower Window (j/k swapped)"))
+map("n", "<C-w><C-j>", "<C-w>k", opts("Go to Upper Window (j/k swapped)"))
+map("n", "<C-w><C-k>", "<C-w>j", opts("Go to Lower Window (j/k swapped)"))
+map("n", "<C-w>J", "<C-w>K", opts("Move Window to Top (j/k swapped)"))
+map("n", "<C-w>K", "<C-w>J", opts("Move Window to Bottom (j/k swapped)"))
+map({ "n", "x", "o" }, "zj", "zk", opts("Previous Fold Start (j/k swapped)"))
+map({ "n", "x", "o" }, "zk", "zj", opts("Next Fold Start (j/k swapped)"))
+
 --------------------------------------------------------------------------------
 -- Indentation & Tabs
 --------------------------------------------------------------------------------
@@ -248,10 +261,13 @@ map("n", ",g", "<leader>ca", { remap = true, desc = "Code Actions" })
 -- Multicursor
 --------------------------------------------------------------------------------
 
--- Remove LazyVim's default Alt+j/k line-move mappings (best-effort, in case
--- a LazyVim update changes them — a hard del would abort this whole file)
-pcall(del, "n", "<A-k>")
-pcall(del, "n", "<A-j>")
+-- Remove LazyVim's default Alt+j/k line-move mappings in every mode they're
+-- set (the reversed versions live on <S-A-j>/<S-A-k> above). Best-effort, in
+-- case a LazyVim update changes them — a hard del would abort this whole file.
+for _, mode in ipairs({ "n", "i", "v" }) do
+  pcall(del, mode, "<A-k>")
+  pcall(del, mode, "<A-j>")
+end
 
 local mc = require("multicursor-nvim")
 map({ "n", "x" }, "<C-j>", function()

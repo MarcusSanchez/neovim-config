@@ -34,8 +34,9 @@ use `x`, not `v`. Formatting is stylua (`stylua.toml`).
 
 ## Custom keys
 
-Navigation: `j`/`k` are swapped everywhere (pickers included). `S-J`/`S-K`
-half page, `S-H`/`S-L` line start/end. `w`/`e`/`b` hop alphanumeric words
+Navigation: `j`/`k` are swapped everywhere — motions, operators, picker
+lists, `<C-j>`/`<C-k>` in pickers and terminals, `<C-w>j`/`<C-w>k`, `zj`/`zk`,
+undotree's `J`/`K`. `S-J`/`S-K` half page, `S-H`/`S-L` line start/end. `w`/`e`/`b` hop alphanumeric words
 only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
 
 | key | does |
