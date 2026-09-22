@@ -88,6 +88,18 @@ local function rust_in_test(root, src, row, col)
   return false
 end
 
+--- The file's lines, from its buffer when one is loaded (unsaved edits
+--- included), else from disk.
+---@param file string
+---@return string[]
+function M.file_lines(file)
+  local b = vim.fn.bufnr(file)
+  if b > 0 and vim.api.nvim_buf_is_loaded(b) then
+    return vim.api.nvim_buf_get_lines(b, 0, -1, false)
+  end
+  return vim.fn.readfile(file)
+end
+
 --- Returns an `is_noise(file, row?, col?, lines?)` function that caches file
 --- contents and parse trees, for callers that check many positions at once
 --- (symbol search, usage lists).
@@ -101,9 +113,7 @@ function M.checker()
       return lines
     end
     if not lines_cache[file] then
-      local b = vim.fn.bufnr(file)
-      lines_cache[file] = b > 0 and vim.api.nvim_buf_is_loaded(b) and vim.api.nvim_buf_get_lines(b, 0, -1, false)
-        or vim.fn.readfile(file)
+      lines_cache[file] = M.file_lines(file)
     end
     return lines_cache[file]
   end

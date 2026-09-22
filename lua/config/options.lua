@@ -3,8 +3,8 @@
 -- Add any additional options here
 
 -- LazyVim adds "I" to shortmess, which hides nvim's stock intro screen.
--- Remove it so a bare `nvim` shows the plain vanilla greeting again
--- (the dashboard is disabled in plugins/snacks.lua).
+-- Keep it removed so the vanilla greeting shows whenever the snacks dashboard
+-- (plugins/dashboard.lua) isn't the one drawing the start screen.
 vim.opt.shortmess:remove("I")
 
 -- Disable all snacks animations globally

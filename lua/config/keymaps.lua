@@ -120,36 +120,11 @@ map(
 -- needs the kitty keyboard protocol, which Ghostty (and Neovide) support.
 map("n", "<S-Space>", "<leader><space>", { remap = true, desc = "Find Files (Root Dir)" })
 
--- gs searches workspace symbols (like <leader>sS, but skipping generated and
--- test code — the rules live in lua/util/noise.lua and gd's usages popup
--- shares them), g/ greps the project (same picker as <leader>/)
+-- gs searches workspace symbols (like <leader>sS, minus test/generated code
+-- and fuzzy over-matches — see lua/util/symbols.lua), g/ greps the project
+-- (same picker as <leader>/)
 map("n", "gs", function()
-  -- gopls also reports symbols from dependency sources (module cache in
-  -- ~/go/pkg/mod, stdlib in GOROOT); only keep files under the project root
-  local root = vim.fs.normalize(LazyVim.root()) .. "/"
-  local is_noise = require("util.noise").checker()
-  Snacks.picker.lsp_workspace_symbols({
-    transform = function(item, ctx)
-      if not item.file then
-        return
-      end
-      local file = vim.fs.normalize(item.file)
-      if file:sub(1, 1) == "/" and file:sub(1, #root) ~= root then
-        return false
-      end
-      -- servers fuzzy-match the query (rust-analyzer as a loose subsequence,
-      -- so "open" also returns OptionEnv); only keep names that actually
-      -- contain what was typed. A path query keeps its last segment.
-      local query = (ctx.filter.search or ""):match("[^:%.]*$") or ""
-      if query ~= "" and not (item.name or ""):lower():find(query:lower(), 1, true) then
-        return false
-      end
-      -- rust tests live inside the source file, so check the position too
-      if is_noise(file, item.pos and item.pos[1], item.pos and item.pos[2]) then
-        return false
-      end
-    end,
-  })
+  require("util.symbols").search()
 end, { desc = "Search Workspace Symbols" })
 map("n", "g/", "<leader>/", { remap = true, desc = "Grep (Root Dir)" })
 
@@ -163,36 +138,14 @@ map("n", ",q", "<leader>bd", { remap = true, desc = "Close Current Buffer" })
 -- let ,f format the current buffer
 map("n", ",f", ":w<CR>", { desc = "Format + Save Current Buffer" })
 
--- (the snacks explorer sidebar is back — 2026-08-13, oil/harpoon benched;
--- their specs sit commented in lua/plugins/oil.lua and harpoon.lua.)
-
--- Returns the open explorer picker on this tab, or nil when it's closed.
-local function get_explorer()
-  local explorer = Snacks.picker.get({ source = "explorer" })[1]
-  if explorer and not explorer.closed then
-    return explorer
-  end
-end
-
--- ,a opens the snacks explorer; if it's already open it focuses it, and if it's
--- already focused it closes it.
+-- snacks explorer sidebar (lua/util/explorer.lua; the oil/harpoon
+-- alternatives are benched in lua/benched/). ,a opens it, focuses it when
+-- open, closes it when focused; ,c closes it.
 map("n", ",a", function()
-  local explorer = get_explorer()
-  if not explorer then
-    Snacks.explorer({ cwd = LazyVim.root() })
-  elseif explorer:is_focused() then
-    explorer:close()
-  else
-    explorer:focus()
-  end
+  require("util.explorer").toggle()
 end, { desc = "Toggle/Focus Explorer (Root Dir)" })
-
--- ,c closes the explorer (no-op when it's already closed)
 map("n", ",c", function()
-  local explorer = get_explorer()
-  if explorer then
-    explorer:close()
-  end
+  require("util.explorer").close()
 end, { desc = "Close Explorer" })
 
 -- use ,w and ,e to cycle windows
@@ -277,35 +230,15 @@ vim.api.nvim_create_autocmd("LspAttach", {
   end,
 })
 
--- <Esc> also dismisses an open gk hover / signature popup (noice keeps them
--- up until the cursor moves) and the ge diagnostics float. Keeps LazyVim's
--- normal-mode <Esc> behaviour: clear hlsearch and stop an active snippet.
+-- <Esc> keeps LazyVim's behaviour (clear hlsearch, stop snippet) and also
+-- dismisses the gk hover / signature docs and the ge float (lua/util/popup.lua)
 map("n", "<Esc>", function()
-  vim.cmd("noh")
-  LazyVim.cmp.actions.snippet_stop()
-  if package.loaded["noice"] then
-    local docs = require("noice.lsp.docs")
-    for _, message in pairs(docs._messages) do
-      if message:win() then
-        docs.hide(message)
-      end
-    end
-  end
-  -- nvim parks the id of a buffer's floating preview (ge, native hover) here
-  local float = vim.b.lsp_floating_preview
-  if float and vim.api.nvim_win_is_valid(float) then
-    vim.api.nvim_win_close(float, true)
-  end
-  return "<Esc>"
+  return require("util.popup").escape()
 end, { expr = true, desc = "Escape, Clear hlsearch, Dismiss Popups" })
 
--- make ge open the diagnostic window in a float, styled like the gk hover
--- (rounded blue border, transparent body — groups in catppuccin.lua)
+-- ge opens the line's diagnostics in a float styled like the gk hover
 map("n", "ge", function()
-  local _, win = vim.diagnostic.open_float({ border = "rounded" })
-  if win then
-    vim.wo[win].winhighlight = "Normal:CursorPopup,FloatBorder:CursorPopupBorder"
-  end
+  require("util.popup").diagnostics()
 end, { desc = "Show Diagnostics (Float)" })
 
 -- make ,g open code actions
