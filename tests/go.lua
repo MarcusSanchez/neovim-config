@@ -41,6 +41,14 @@ vim.schedule(function()
     local float = vim.b.lsp_floating_preview
     check("ge float styled", float and vim.wo[float].winhighlight, "Normal:CursorPopup,FloatBorder:CursorPopupBorder")
     key("<Esc>"); wait(100); check("Esc closes ge float", vim.api.nvim_win_is_valid(float), false)
+    -- a second ge focuses the float; Esc from inside must close it and return
+    local src = vim.api.nvim_get_current_win()
+    key("ge"); wait(100); key("ge"); wait(100)
+    check("second ge focuses the float", vim.api.nvim_get_current_win() ~= src, true)
+    float = vim.api.nvim_get_current_win()
+    key("<Esc>"); wait(100)
+    check("Esc inside the float closes it", vim.api.nvim_win_is_valid(float), false)
+    check("back in the source window", vim.api.nvim_get_current_win(), src)
     require("lazy").load({ plugins = { "noice.nvim" } }); wait(300)
     local docs = require("noice.lsp.docs"); local msg = docs.get("hover"); local hid = false
     docs.hide = function(m) hid = m == msg end; msg.win = function() return 1 end

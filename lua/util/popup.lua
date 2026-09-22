@@ -14,7 +14,9 @@ function M.diagnostics()
 end
 
 --- Close any open hover / signature docs (noice keeps them up until the
---- cursor moves) and the buffer's floating preview (ge, native hover).
+--- cursor moves) and any LSP floating preview on this tab (ge, native
+--- hover) — wherever <Esc> is pressed, including from inside the float
+--- after a second ge focused it.
 function M.dismiss()
   if package.loaded["noice"] then
     local docs = require("noice.lsp.docs")
@@ -24,9 +26,11 @@ function M.dismiss()
       end
     end
   end
-  local float = vim.b.lsp_floating_preview
-  if float and vim.api.nvim_win_is_valid(float) then
-    vim.api.nvim_win_close(float, true)
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    -- open_floating_preview tags its window with the buffer it belongs to
+    if vim.api.nvim_win_get_config(win).relative ~= "" and vim.w[win].lsp_floating_bufnr then
+      vim.api.nvim_win_close(win, true)
+    end
   end
 end
 
