@@ -36,6 +36,8 @@ return {
         position = { row = 2, col = 0 },
         win_options = {
           winhighlight = { Normal = "CursorPopup", FloatBorder = "CursorPopupBorder" },
+          -- a single line of margin when scrolling long docs
+          scrolloff = 1,
         },
       },
     },
