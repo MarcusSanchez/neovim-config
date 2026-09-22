@@ -5,10 +5,10 @@
 -- moving back up behaves normally.
 local M = {}
 
---- Screen rows spanned by buffer lines from..to (closed folds count as one
---- row, wrapped lines as several).
-local function rows(from, to)
-  return vim.api.nvim_win_text_height(0, { start_row = from - 1, end_row = to - 1 }).all
+--- The buffer line one screen row below `line` (a closed fold is one row).
+local function next_row(line)
+  local fold_end = vim.fn.foldclosedend(line)
+  return (fold_end ~= -1 and fold_end or line) + 1
 end
 
 function M.keep_margin_past_end()
@@ -16,31 +16,18 @@ function M.keep_margin_past_end()
     return
   end
   local so = vim.wo.scrolloff >= 0 and vim.wo.scrolloff or vim.o.scrolloff
-  if so == 0 then
+  local limit = vim.api.nvim_win_get_height(0) - so
+  if so == 0 or limit < 1 then
     return
   end
-  local cur, last = vim.fn.line("."), vim.fn.line("$")
-  if cur < last and rows(cur + 1, last) >= so then
-    return -- regular scrolloff already applies
-  end
-  -- walk up from the cursor until the rows from there to the cursor fill
-  -- the window minus the margin; that line becomes the new topline
-  local budget = vim.api.nvim_win_get_height(0) - so
-  local want = cur
-  while want > 1 do
-    local prev = want - 1
-    local fold = vim.fn.foldclosed(prev)
-    if fold ~= -1 then
-      prev = fold
-    end
-    if rows(prev, cur) > budget then
-      break
-    end
-    want = prev
-  end
+  -- winline() is the cursor's real screen row, folds and wrapping included;
+  -- while it sits inside the bottom margin, scroll the view down one row at
+  -- a time. Vim's own scrolloff already handles this everywhere except the
+  -- end of the buffer, so the loop only ever runs there.
+  local cur = vim.fn.line(".")
   local view = vim.fn.winsaveview()
-  if want > view.topline then
-    view.topline = want
+  while vim.fn.winline() > limit and view.topline < cur do
+    view.topline = next_row(view.topline)
     vim.fn.winrestview(view)
   end
 end
