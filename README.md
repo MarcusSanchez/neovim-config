@@ -3,7 +3,7 @@
 A [LazyVim](https://www.lazyvim.org) config. Catppuccin Mocha on a transparent
 background, colors tracking a GoLand scheme; j/k swapped; comma as a second
 leader. Go, Rust, TypeScript, Zig, Gleam and Nix via LazyVim extras
-(`lazyvim.json`).
+(`lazyvim.json`); Protobuf via buf (`lua/plugins/proto.lua`).
 
 ## Layout
 
@@ -63,11 +63,16 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
 - **Diagnostics**: only errors get virtual text. Go's `shadow` diagnostic is
   dropped; shadowed variables get a color instead.
 - **Formatting**: goimports + `golangci-lint fmt` for Go, the project's
-  prettier for JS/TS; mason binaries lose to the project's PATH.
+  prettier for JS/TS, `buf format` for proto; mason binaries lose to the
+  project's PATH.
+- **Protobuf**: `buf lsp serve` gives compile errors, buf lint (per the
+  module's `buf.yaml`), navigation, rename and completion. Breaking-change
+  checks aren't exposed over LSP — run `buf breaking`.
 - **Root** is the directory nvim was launched from, not the LSP root.
 
 ## Tests
 
 `tests/run.sh` drives headless nvim against small Go and Rust fixtures and
 prints PASS/FAIL per behaviour (gd/gh, usages popup, gs filtering, autosave,
-popups, scrolloff). Needs gopls and rust-analyzer.
+popups, scrolloff, j/k swaps, protobuf via buf). Needs gopls, rust-analyzer
+and buf.
