@@ -8,6 +8,9 @@ vim.defer_fn(function() log("TIMEOUT"); vim.cmd("qall!") end, 60000)
 vim.schedule(function()
   local ok, err = pcall(function()
     vim.api.nvim_exec_autocmds("User", { pattern = "VeryLazy" })
+    vim.api.nvim_exec_autocmds("FileType", { buffer = 0 }) -- as LazyVim re-fires it after loading autocmds
+    check("text files: no spell squiggles", vim.wo.spell, false)
+    check("text files: still wrap", vim.wo.wrap, true)
     -- motions
     vim.api.nvim_win_set_cursor(0, { 50, 0 })
     vim.cmd("normal j"); check("j goes up", vim.fn.line("."), 49)

@@ -71,6 +71,18 @@ require("util.scroll").setup()
 -- Filetypes
 --------------------------------------------------------------------------------
 
+-- plain text is for notes and scratch: no spell-check squiggles. (LazyVim's
+-- lazyvim_wrap_spell turns spell on for text/markdown/gitcommit; wrap stays.)
+-- Those squiggles are vim's spell checker, not diagnostics — which is why
+-- ,g / ge have nothing to act on there.
+autocmd("FileType", {
+  group = augroup("text_no_spell"),
+  pattern = "text",
+  callback = function()
+    vim.opt_local.spell = false
+  end,
+})
+
 autocmd("FileType", {
   group = augroup("go_indent"),
   pattern = "go",
