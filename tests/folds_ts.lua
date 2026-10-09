@@ -22,7 +22,29 @@ vim.schedule(function()
     end
     vim.wait(5000, function() return vim.fn.foldclosed(mod) == mod end, 50)
     check("pass 2: mod tests is closed again", vim.fn.foldclosed(mod), mod)
+    -- treesitter's later fold passes reopen folds closed too early; the
+    -- restore must outlast them
+    vim.wait(3000, function() return false end)
+    check("pass 2: still closed after treesitter settles", vim.fn.foldclosed(mod), mod)
     check("pass 2: fn foobar still open", vim.fn.foldclosed(1), -1)
+    -- a picker-style preview (the real buffer in a float, no folds closed)
+    -- coming and going must not wipe the saved state
+    local state = vim.fn.stdpath("state") .. "/folds/" .. vim.api.nvim_buf_get_name(0):gsub("[/\\:]", "%%") .. ".json"
+    local src = vim.api.nvim_get_current_win()
+    local float = vim.api.nvim_open_win(0, true, { relative = "editor", row = 1, col = 1, width = 40, height = 10 })
+    vim.api.nvim_exec_autocmds("BufWinEnter", { buffer = 0 })
+    vim.cmd("normal! zR")
+    vim.api.nvim_win_close(float, true) -- BufWinLeave from the float
+    vim.wait(200, function() return false end)
+    check("preview float leaving keeps the state file", vim.fn.filereadable(state), 1)
+    -- a fresh split closed before its restore could finish must not either
+    vim.cmd("split")
+    local split = vim.api.nvim_get_current_win()
+    require("util.folds").save(0, split) -- what BufWinLeave would do right now
+    vim.api.nvim_win_close(split, true)
+    vim.api.nvim_set_current_win(src)
+    check("unready split leaving keeps the state file", vim.fn.filereadable(state), 1)
+    check("main window's fold still closed", vim.fn.foldclosed(mod), mod)
     log("OK")
   end)
   log(ok and "DONE" or ("ERROR: " .. tostring(err)))
