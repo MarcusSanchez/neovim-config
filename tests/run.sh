@@ -49,6 +49,10 @@ if [[ $want == all || $want == scroll || $want == keys || $want == folds ]]; the
     # shift everything down and change block three's content before pass 2
     { echo "new header"; echo "another"; echo "third"; sed 's/three line 5/three line 5 EDITED/' "$work/folds.txt"; } > "$work/folds.tmp" && mv "$work/folds.tmp" "$work/folds.txt"
     FOLD_PASS=2 run folds "$work" folds.txt "$here/folds.lua" "$work/result.log"
+    # same again for treesitter (async) folds, on the rust fixture
+    export FOLD_PASS=1
+    (cd "$work/rust" && nvim --headless src/lib.rs -c "luafile $here/folds_ts.lua" >/dev/null 2>&1)
+    FOLD_PASS=2 run folds-treesitter "$work/rust" src/lib.rs "$here/folds_ts.lua" "$work/rust/result.log"
     unset XDG_STATE_HOME FOLD_PASS
   fi
 fi

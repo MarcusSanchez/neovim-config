@@ -108,7 +108,30 @@ local function close_exact(start, stop)
   return false
 end
 
+--- Apply the saved folds that can be applied now. Returns the ones that
+--- couldn't be because the window has no fold structure there yet.
+---@param folds util.folds.Fold[]
+---@return util.folds.Fold[] pending
+local function apply(buf, win, folds)
+  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  local pending = {}
+  vim.api.nvim_win_call(win, function()
+    for _, fold in ipairs(folds) do
+      local at = locate(fold, lines)
+      if at then
+        if vim.fn.foldlevel(at) == 0 then
+          pending[#pending + 1] = fold
+        else
+          close_exact(at, at + fold.stop - fold.start)
+        end
+      end
+    end
+  end)
+  return pending
+end
+
 function M.load(buf, win)
+  win = win or vim.api.nvim_get_current_win()
   if not real_file(buf) then
     return
   end
@@ -120,15 +143,21 @@ function M.load(buf, win)
   if not ok or type(folds) ~= "table" then
     return
   end
-  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
-  vim.api.nvim_win_call(win or 0, function()
-    for _, fold in ipairs(folds) do
-      local at = locate(fold, lines)
-      if at then
-        close_exact(at, at + fold.stop - fold.start)
-      end
+  -- treesitter fold levels arrive asynchronously after the buffer opens
+  -- (indent folds are there at once); keep retrying briefly until the fold
+  -- structure exists where a saved fold goes, then give up quietly
+  local delay, deadline = 50, vim.uv.now() + 3000
+  local function attempt()
+    if not (vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == buf) then
+      return
     end
-  end)
+    folds = apply(buf, win, folds)
+    if #folds > 0 and vim.uv.now() < deadline then
+      vim.defer_fn(attempt, delay)
+      delay = math.min(delay * 2, 500)
+    end
+  end
+  attempt()
 end
 
 function M.setup()
