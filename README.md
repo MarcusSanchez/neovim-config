@@ -69,6 +69,9 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
 - **Protobuf**: `buf lsp serve` gives compile errors, buf lint (per the
   module's `buf.yaml`), navigation, rename and completion. Breaking-change
   checks aren't exposed over LSP — run `buf breaking`.
+- **Folds are treesitter's** everywhere (LazyVim's LSP folding is off): a
+  folded `{ }` block hides its closing brace in every language, instead of
+  gopls/typescript leaving a `}` line behind.
 - **Folds persist**: close a fold, come back to the file next week, it's
   still closed — if the same text is still there (it follows the text when
   lines shift; edited text is left unfolded rather than folded wrong).

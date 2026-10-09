@@ -96,6 +96,13 @@ vim.schedule(function()
     check("autosave skipped formatting (format flags per write)", vim.inspect(fmt), "{ false, false }")
     check("both autosaves fired BufWritePost (LSP didSave / nvim-lint)", posts, 2)
     vim.fn.writefile(before, "main.go")
+    -- folds stay treesitter's after gopls attaches, and hide the closing brace
+    check("foldexpr is treesitter's, not the LSP's", vim.wo.foldexpr, "v:lua.LazyVim.treesitter.foldexpr()")
+    vim.wait(5000, function() return vim.fn.foldlevel(9) > 0 end, 50)
+    vim.cmd("normal! 9Gzc")
+    check("zc on func main folds through its closing brace", vim.fn.foldclosed(9) .. ".." .. vim.fn.foldclosedend(9), "9..13")
+    check("the } line is inside the fold", vim.fn.getline(13), "}")
+    vim.cmd("normal! zR")
     -- explorer helpers
     local ex = require("util.explorer"); check("explorer closed -> nil", ex.get(), nil)
     check("real window count", ex.real_window_count(), 1)
