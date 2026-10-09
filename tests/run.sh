@@ -3,7 +3,7 @@
 # Needs gopls, rust-analyzer and buf on PATH (mason installs them).
 #
 #   tests/run.sh          # everything
-#   tests/run.sh go       # one suite: go | rust | proto | scroll | keys
+#   tests/run.sh go       # one suite: go | rust | proto | scroll | keys | folds
 #
 # Each suite drives a real nvim with this config against a fixture project
 # and prints PASS/FAIL lines. Fixtures are copied to a temp dir first: the
@@ -37,9 +37,17 @@ want=${1:-all}
 [[ $want == all || $want == go ]] && run go "$work/go" main.go "$here/go.lua" "$work/go/result.log"
 [[ $want == all || $want == rust ]] && run rust "$work/rust" src/lib.rs "$here/rust.lua" "$work/rust/result.log"
 [[ $want == all || $want == proto ]] && run proto "$work/proto" acme/v1/user.proto "$here/proto.lua" "$work/proto/result.log"
-if [[ $want == all || $want == scroll || $want == keys ]]; then
+if [[ $want == all || $want == scroll || $want == keys || $want == folds ]]; then
   seq 1 100 | sed 's/^/line /' > "$work/long.txt"
-  [[ $want != keys ]] && run scroll "$work" long.txt "$here/scroll.lua" "$work/result.log"
-  [[ $want != scroll ]] && run keys "$work" long.txt "$here/keys.lua" "$work/result.log"
+  [[ $want == all || $want == scroll ]] && run scroll "$work" long.txt "$here/scroll.lua" "$work/result.log"
+  [[ $want == all || $want == keys ]] && run keys "$work" long.txt "$here/keys.lua" "$work/result.log"
+  if [[ $want == all || $want == folds ]]; then
+    # two sessions: the first folds and quits, the second must find the folds
+    { echo "block one"; for i in 1 2 3 4 5 6 7 8 9; do echo "    line $i"; done; echo "block two"; for i in 1 2 3 4 5 6 7 8 9; do echo "    line $i"; done; } > "$work/folds.txt"
+    export VIEWDIR="$work/view" FOLD_PASS=1
+    (cd "$work" && nvim --headless folds.txt -c "luafile $here/folds.lua" >/dev/null 2>&1)
+    FOLD_PASS=2 run folds "$work" folds.txt "$here/folds.lua" "$work/result.log"
+    unset VIEWDIR FOLD_PASS
+  fi
 fi
 exit $status

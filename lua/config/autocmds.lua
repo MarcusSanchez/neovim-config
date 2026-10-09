@@ -67,6 +67,9 @@ require("util.autosave").setup({ delay = 300 })
 -- keep 'scrolloff' blank rows below the last line of the buffer
 require("util.scroll").setup()
 
+-- folds survive closing the file and restarting nvim
+require("util.folds").setup()
+
 --------------------------------------------------------------------------------
 -- Filetypes
 --------------------------------------------------------------------------------

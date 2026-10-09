@@ -21,6 +21,7 @@ lua/util/                feature logic, one module per feature
   explorer.lua           snacks explorer open/focus/close helpers
   autosave.lua           debounced normal-mode autosave, no formatting
   scroll.lua             'scrolloff' holds past the end of the buffer
+  folds.lua              folds persist across sessions (:mkview/:loadview, folds only)
 lua/plugins/             one lazy.nvim spec per plugin (LazyVim merges them)
 lua/benched/             shelved specs (oil, harpoon) — not imported, see its README
 queries/<lang>/context.scm   treesitter-context: pin declarations only, not loops/ifs
@@ -68,6 +69,8 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
 - **Protobuf**: `buf lsp serve` gives compile errors, buf lint (per the
   module's `buf.yaml`), navigation, rename and completion. Breaking-change
   checks aren't exposed over LSP — run `buf breaking`.
+- **Folds persist**: close a fold, come back to the file next week, it's
+  still closed (views under the state dir, folds only).
 - **Root** is the directory nvim was launched from, not the LSP root.
 
 ## Tests
