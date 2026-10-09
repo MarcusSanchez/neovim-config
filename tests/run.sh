@@ -43,11 +43,13 @@ if [[ $want == all || $want == scroll || $want == keys || $want == folds ]]; the
   [[ $want == all || $want == keys ]] && run keys "$work" long.txt "$here/keys.lua" "$work/result.log"
   if [[ $want == all || $want == folds ]]; then
     # two sessions: the first folds and quits, the second must find the folds
-    { echo "block one"; for i in 1 2 3 4 5 6 7 8 9; do echo "    line $i"; done; echo "block two"; for i in 1 2 3 4 5 6 7 8 9; do echo "    line $i"; done; } > "$work/folds.txt"
-    export VIEWDIR="$work/view" FOLD_PASS=1
+    { for b in one two three; do echo "block $b"; for i in 1 2 3 4 5 6 7 8 9; do echo "    $b line $i"; done; done; } > "$work/folds.txt"
+    export XDG_STATE_HOME="$work/state" FOLD_PASS=1
     (cd "$work" && nvim --headless folds.txt -c "luafile $here/folds.lua" >/dev/null 2>&1)
+    # shift everything down and change block three's content before pass 2
+    { echo "new header"; echo "another"; echo "third"; sed 's/three line 5/three line 5 EDITED/' "$work/folds.txt"; } > "$work/folds.tmp" && mv "$work/folds.tmp" "$work/folds.txt"
     FOLD_PASS=2 run folds "$work" folds.txt "$here/folds.lua" "$work/result.log"
-    unset VIEWDIR FOLD_PASS
+    unset XDG_STATE_HOME FOLD_PASS
   fi
 fi
 exit $status
