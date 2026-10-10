@@ -1,12 +1,15 @@
 -- Tab bar (bufferline) styles, switchable at runtime to compare:
+--   outline   the active tab is an outlined rounded pill in the same blue as
+--             the gk/ge popups' border, nothing filled; inactive tabs are
+--             plain dim text (default)
 --   attached  a baseline runs along the bar and breaks under the active tab,
 --             which has thin walls and a tint — the tab opens into the editor
 --   accent    a coloured underline marks the active tab (IntelliJ / Zed)
--- Both are one-row designs: the tabline can't draw a top edge.
+-- All one-row designs: the tabline can't draw a top edge.
 local M = {}
 
-M.styles = { "attached", "accent" }
-M.current = vim.g.tab_style or "attached"
+M.styles = { "outline", "attached", "accent" }
+M.current = vim.g.tab_style or "outline"
 
 local function palette()
   return require("catppuccin.palettes").get_palette("mocha")
@@ -104,7 +107,51 @@ local function accent()
     }
 end
 
-local builders = { attached = attached, accent = accent }
+---@return table highlights, table options
+local function outline()
+  local c = palette()
+  local border = c.blue -- CursorPopupBorder
+  local hl = {}
+  for _, name in ipairs(group_names()) do
+    hl[name] = { bg = "NONE", underline = false, bold = false, italic = false }
+  end
+  local text = {
+    background = { fg = c.overlay1 },
+    buffer_visible = { fg = c.subtext0 },
+    buffer_selected = { fg = c.text },
+    separator = { fg = "NONE" },
+    -- the pill's left cap sits in the indicator slot...
+    indicator_selected = { fg = border },
+    -- ...and its right cap is the close button, which bufferline only draws
+    -- on the current tab (hover reveal); a modified buffer swaps it for
+    -- the modified icon — the same cap, in peach
+    close_button_selected = { fg = border },
+    close_button = { fg = c.overlay1 },
+    close_button_visible = { fg = c.subtext0 },
+    modified = { fg = c.peach },
+    modified_visible = { fg = c.peach },
+    modified_selected = { fg = c.peach },
+    duplicate = { fg = c.overlay1, italic = true },
+    duplicate_visible = { fg = c.subtext0, italic = true },
+    duplicate_selected = { fg = c.subtext1, italic = true },
+  }
+  for name, attrs in pairs(text) do
+    hl[name] = vim.tbl_extend("force", hl[name] or {}, attrs)
+  end
+  return hl,
+    {
+      -- thin (outlined) half-circle caps, the hollow siblings of the filled
+      -- ones the statusline pills use
+      indicator = { style = "icon", icon = "\u{e0b7}" },
+      buffer_close_icon = "\u{e0b5}",
+      modified_icon = "\u{e0b5}",
+      show_buffer_close_icons = true,
+      hover = { enabled = true, delay = 0, reveal = { "close" } },
+      separator_style = { " ", " " },
+    }
+end
+
+local builders = { outline = outline, attached = attached, accent = accent }
 
 --- Apply a style on top of the spec's bufferline opts (LazyVim's merged
 --- with ours) and re-run setup so it takes effect immediately.
@@ -136,7 +183,12 @@ function M.apply(style)
 end
 
 function M.toggle()
-  local i = M.current == "attached" and 2 or 1
+  local i = 1
+  for n, style in ipairs(M.styles) do
+    if style == M.current then
+      i = n % #M.styles + 1
+    end
+  end
   M.apply(M.styles[i])
   vim.notify("Tab style: " .. M.current, vim.log.levels.INFO, { title = "Tabs" })
 end
