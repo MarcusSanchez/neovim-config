@@ -30,6 +30,15 @@ function M.has_session()
   return M.file() ~= nil
 end
 
+--- Is this start going to restore a session (bare `nvim`, session on disk)?
+--- Decided once, early (plugin config time), so startup UI can act on it.
+function M.restoring()
+  if M._restoring == nil then
+    M._restoring = vim.fn.argc(-1) == 0 and M.has_session()
+  end
+  return M._restoring
+end
+
 --- Restore the cwd's session, when starting bare and one exists.
 function M.restore()
   if M.bare_start() and M.has_session() then
