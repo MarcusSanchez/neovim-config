@@ -122,6 +122,12 @@ function M.apply(style)
   for _, name in ipairs(vim.fn.getcompletion("BufferLine", "highlight")) do
     vim.api.nvim_set_hl(0, name, {})
   end
+  -- the per-filetype icon groups are derived from the tab groups and cached
+  -- at first use; without a reset the icon cell would keep the old style's
+  -- attributes and punch a hole in the tab
+  pcall(function()
+    require("bufferline.highlights").reset_icon_hl_cache()
+  end)
   require("bufferline").setup(vim.tbl_deep_extend("force", base, {
     options = options,
     highlights = highlights,

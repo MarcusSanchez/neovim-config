@@ -26,6 +26,20 @@ vim.schedule(function()
     check("attached: active tab tinted", hex(hl("BufferLineBufferSelected").bg), "#313244")
     check("attached: active tab's modified dot shares the tint", hex(hl("BufferLineModifiedSelected").bg), "#313244")
     check("attached: left wall drawn", render():find("▏", 1, true) ~= nil, true)
+    -- the file icon cell must carry the tab's attributes, not a stale style's
+    local function icon_groups()
+      local r = vim.api.nvim_eval_statusline(vim.o.tabline, { use_tabline = true, highlights = true })
+      local sel, inactive
+      for _, h in ipairs(r.highlights) do
+        if h.group:find("^BufferLine%u%l*Icons?.*Selected$") or (h.group:find("Icon") and h.group:find("Selected$")) then sel = h.group end
+        if h.group:find("Icon") and not h.group:find("Selected$") and not h.group:find("Visible$") then inactive = h.group end
+      end
+      return sel, inactive
+    end
+    local sel, inactive = icon_groups()
+    check("attached: active icon cell tinted", hex(hl(sel).bg), "#313244")
+    check("attached: active icon cell not underlined", hl(sel).underline, nil)
+    check("attached: inactive icon cell on the baseline", hl(inactive).underline, true)
     check("attached: dividers drawn", render():find("│", 1, true) ~= nil, true)
     tabs.apply("accent")
     check("accent: active tab underlined", hl("BufferLineBufferSelected").underline, true)
@@ -33,6 +47,9 @@ vim.schedule(function()
     check("accent: underline spans the close button too", hl("BufferLineCloseButtonSelected").underline, true)
     check("accent: no baseline on the bar", hl("BufferLineFill").underline, nil)
     check("accent: no baseline under inactive tabs", hl("BufferLineBackground").underline, nil)
+    sel, inactive = icon_groups()
+    check("accent: active icon cell underlined lavender", hex(hl(sel).sp), "#b4befe")
+    check("accent: inactive icon cell not underlined", hl(inactive).underline, nil)
     tabs.toggle()
     check("toggle flips back", tabs.current, "attached")
     check("toggle re-applied the baseline", hl("BufferLineFill").underline, true)
