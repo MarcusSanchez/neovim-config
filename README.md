@@ -22,6 +22,7 @@ lua/util/                feature logic, one module per feature
   autosave.lua           debounced normal-mode autosave, no formatting
   scroll.lua             'scrolloff' holds past the end of the buffer
   folds.lua              folds persist across sessions, anchored to the text they hide
+  session.lua            a bare `nvim` restores the directory's session instead of the dashboard
   foldtext.lua           closed folds read `func main() { ... }`, first line highlighted
 lua/plugins/             one lazy.nvim spec per plugin (LazyVim merges them)
 lua/benched/             shelved specs (oil, harpoon) — not imported, see its README
@@ -75,6 +76,9 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
   gopls/typescript leaving a `}` line behind. A closed fold is drawn as its
   first line (highlighted) plus ` ... }`, IntelliJ-style; the dots and the
   bracket are only drawn.
+- **Sessions**: a bare `nvim` in a directory you've worked in restores that
+  session (persistence.nvim) instead of showing the dashboard; the dashboard
+  appears only when there's nothing to restore.
 - **Folds persist**: close a fold, come back to the file next week, it's
   still closed — if the same text is still there (it follows the text when
   lines shift; edited text is left unfolded rather than folded wrong).

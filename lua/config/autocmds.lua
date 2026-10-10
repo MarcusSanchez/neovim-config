@@ -70,6 +70,14 @@ require("util.scroll").setup()
 -- folds survive closing the file and restarting nvim
 require("util.folds").setup()
 
+-- a bare `nvim` in a project with a session restores it instead of the
+-- dashboard. Scheduled: this file runs inside LazyVim's VeryLazy handler,
+-- before keymaps.lua, and the restored buffers' LSPs must find the LspAttach
+-- maps defined there.
+vim.schedule(function()
+  require("util.session").restore()
+end)
+
 --------------------------------------------------------------------------------
 -- Filetypes
 --------------------------------------------------------------------------------
