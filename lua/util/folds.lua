@@ -27,9 +27,11 @@ end
 -- windows whose saved folds have been applied; a window still waiting on
 -- fold structure must not write state (it would record "nothing closed")
 local ready = {} ---@type table<integer, boolean>
--- windows still inside treesitter's settling period after a restore, with
--- the folds to keep re-applying until it ends
-local settling = {} ---@type table<integer, { folds: util.folds.Fold[], until_ms: integer }>
+-- windows being watched after a restore: treesitter's early fold passes can
+-- rebuild the window's folds (which reopens everything); a rebuild changes
+-- the fold *levels*, which a user's zo never does, so that's the signal to
+-- re-apply on — and the only one
+local watching = {} ---@type table<integer, { folds: util.folds.Fold[], signature: string }>
 -- the current restore cycle per window; a new BufWinEnter starts a new one
 -- and the old cycle's timers see a different token and stop
 local cycles = {} ---@type table<integer, table>
@@ -139,16 +141,36 @@ local function apply(buf, win, folds)
   return pending
 end
 
+--- The fold levels over every line a saved fold would cover, as one string.
+--- Changes only when the window's fold structure is (re)built.
+---@param folds util.folds.Fold[]
+local function signature(buf, win, folds)
+  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  local parts = {}
+  vim.api.nvim_win_call(win, function()
+    for _, fold in ipairs(folds) do
+      local at = locate(fold, lines)
+      if at then
+        for l = at, math.min(at + fold.stop - fold.start, #lines) do
+          parts[#parts + 1] = vim.fn.foldlevel(l)
+        end
+      end
+      parts[#parts + 1] = "|"
+    end
+  end)
+  return table.concat(parts, ",")
+end
+
 function M.save(buf, win)
   win = win or vim.api.nvim_get_current_win()
   if not real_file(buf) or not real_window(win) or not ready[win] then
     return
   end
-  -- leaving mid-settle: make sure a fold treesitter just reopened on us is
-  -- back before reading the window's state
-  local st = settling[win]
-  if st and vim.uv.now() < st.until_ms then
-    apply(buf, win, st.folds)
+  -- leaving while still watching: if treesitter rebuilt the folds since the
+  -- restore, put the saved ones back before reading the window's state
+  local w = watching[win]
+  if w and signature(buf, win, w.folds) ~= w.signature then
+    apply(buf, win, w.folds)
   end
   local folds = closed_folds(win)
   local file = state_file(buf)
@@ -162,7 +184,7 @@ end
 
 function M.load(buf, win)
   win = win or vim.api.nvim_get_current_win()
-  ready[win], settling[win] = nil, nil
+  ready[win], watching[win] = nil, nil
   local token = {}
   cycles[win] = token
   if not real_file(buf) or not real_window(win) then
@@ -174,37 +196,54 @@ function M.load(buf, win)
     local ok, saved = pcall(vim.json.decode, table.concat(vim.fn.readfile(file), "\n"))
     folds = ok and type(saved) == "table" and saved or {}
   end
-  -- treesitter fold levels arrive asynchronously after the buffer opens
+  -- Treesitter fold levels arrive asynchronously after the buffer opens
   -- (indent folds are there at once), and its first passes can rebuild the
-  -- window's folds and reopen whatever was just closed. So: retry until the
-  -- fold structure exists where a saved fold goes, then keep re-applying for
-  -- a settling period, and only then consider this window's state the
-  -- user's own (saveable).
-  local delay, deadline = 50, vim.uv.now() + 10000
-  local function attempt()
-    if cycles[win] ~= token or not vim.api.nvim_win_is_valid(win) or vim.api.nvim_win_get_buf(win) ~= buf then
-      return
-    end
-    local pending = apply(buf, win, folds)
-    local now = vim.uv.now()
-    if #pending == 0 and not settling[win] then
-      ready[win] = true
-      settling[win] = { folds = folds, until_ms = now + 2500 }
-    end
-    if settling[win] then
-      if now >= settling[win].until_ms then
-        settling[win] = nil
+  -- window's folds, reopening anything closed in between. So: wait until
+  -- the fold structure where the saved folds go exists, apply, then watch a
+  -- little longer and re-apply only if the structure changes again. A fold
+  -- the user opens meanwhile leaves the structure alone and so is left alone.
+  if #folds == 0 then
+    ready[win] = true -- nothing to restore; the window's state is the user's from the start
+    return
+  end
+  local deadline = vim.uv.now() + 10000
+  local checks = { 500, 1000, 2000 } -- after applying: watch at these offsets
+  local function alive()
+    return cycles[win] == token and vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == buf
+  end
+  local function watch(i)
+    vim.defer_fn(function()
+      if not alive() or not watching[win] then
         return
       end
-      vim.defer_fn(attempt, 250)
-    elseif now < deadline then
-      vim.defer_fn(attempt, delay)
-      delay = math.min(delay * 2, 500)
+      if signature(buf, win, folds) ~= watching[win].signature then
+        apply(buf, win, folds) -- rebuilt: put them back, keep watching
+        watching[win].signature = signature(buf, win, folds)
+        return watch(1)
+      end
+      if checks[i + 1] then
+        return watch(i + 1)
+      end
+      watching[win] = nil
+    end, i == 1 and checks[1] or checks[i] - checks[i - 1])
+  end
+  local function settle()
+    if not alive() then
+      return
+    end
+    if signature(buf, win, folds):find("[1-9]") then
+      apply(buf, win, folds)
+      ready[win] = true
+      watching[win] = { folds = folds, signature = signature(buf, win, folds) }
+      return watch(1)
+    end
+    if vim.uv.now() < deadline then
+      vim.defer_fn(settle, 250)
     else
       ready[win] = true -- fold structure never came; the user's state rules
     end
   end
-  attempt()
+  settle()
 end
 
 function M.setup()
@@ -225,7 +264,7 @@ function M.setup()
     group = group,
     callback = function(ev)
       local win = tonumber(ev.match)
-      ready[win], settling[win], cycles[win] = nil, nil, nil
+      ready[win], watching[win], cycles[win] = nil, nil, nil
     end,
   })
 end

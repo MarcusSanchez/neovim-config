@@ -27,6 +27,15 @@ vim.schedule(function()
     vim.wait(3000, function() return false end)
     check("pass 2: still closed after treesitter settles", vim.fn.foldclosed(mod), mod)
     check("pass 2: fn foobar still open", vim.fn.foldclosed(1), -1)
+    -- the user opening a restored fold must stick: nothing re-closes it
+    vim.cmd(("normal! %dGzo"):format(mod))
+    local refolded
+    for _ = 1, 25 do
+      vim.wait(100, function() return false end)
+      if vim.fn.foldclosed(mod) ~= -1 then refolded = true break end
+    end
+    check("pass 2: zo on a restored fold is not undone", refolded, nil)
+    vim.cmd(("normal! %dGzc"):format(mod))
     -- a picker-style preview (the real buffer in a float, no folds closed)
     -- coming and going must not wipe the saved state
     local state = vim.fn.stdpath("state") .. "/folds/" .. vim.api.nvim_buf_get_name(0):gsub("[/\\:]", "%%") .. ".json"
