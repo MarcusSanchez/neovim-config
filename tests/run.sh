@@ -3,7 +3,7 @@
 # Needs gopls, rust-analyzer and buf on PATH (mason installs them).
 #
 #   tests/run.sh          # everything
-#   tests/run.sh go       # one suite: go | rust | session | proto | scroll | keys | folds
+#   tests/run.sh go       # one suite: go | rust | session | proto | scroll | keys | tabs | folds
 #
 # Each suite drives a real nvim with this config against a fixture project
 # and prints PASS/FAIL lines. Fixtures are copied to a temp dir first: the
@@ -48,10 +48,14 @@ if [[ $want == all || $want == session ]]; then
   export XDG_STATE_HOME="$work/state"
 fi
 [[ $want == all || $want == proto ]] && run proto "$work/proto" acme/v1/user.proto "$here/proto.lua" "$work/proto/result.log"
-if [[ $want == all || $want == scroll || $want == keys || $want == folds ]]; then
+if [[ $want == all || $want == scroll || $want == keys || $want == tabs || $want == folds ]]; then
   seq 1 100 | sed 's/^/line /' > "$work/long.txt"
   [[ $want == all || $want == scroll ]] && run scroll "$work" long.txt "$here/scroll.lua" "$work/result.log"
   [[ $want == all || $want == keys ]] && run keys "$work" long.txt "$here/keys.lua" "$work/result.log"
+  if [[ $want == all || $want == tabs ]]; then
+    printf 'a\n' > "$work/folds.txt"
+    run tabs "$work" long.txt "$here/tabs.lua" "$work/result.log"
+  fi
   if [[ $want == all || $want == folds ]]; then
     # two sessions: the first folds and quits, the second must find the folds
     { for b in one two three; do echo "block $b"; for i in 1 2 3 4 5 6 7 8 9; do echo "    $b line $i"; done; done; } > "$work/folds.txt"

@@ -23,6 +23,7 @@ lua/util/                feature logic, one module per feature
   scroll.lua             'scrolloff' holds past the end of the buffer
   folds.lua              folds persist across sessions, anchored to the text they hide
   session.lua            a bare `nvim` restores the directory's session instead of the dashboard
+  tabs.lua               tab-bar styles (attached | accent), :TabStyle / <leader>uT to flip
   foldtext.lua           closed folds read `func main() { ... }`, first line highlighted
 lua/plugins/             one lazy.nvim spec per plugin (LazyVim merges them)
 lua/benched/             shelved specs (oil, harpoon) — not imported, see its README
@@ -76,6 +77,10 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
   gopls/typescript leaving a `}` line behind. A closed fold is drawn as its
   first line (highlighted) plus ` ... }`, IntelliJ-style; the dots and the
   bracket are only drawn.
+- **Tabs** come in two switchable looks, both one row (the tabline can't
+  draw a top edge): *attached* runs a baseline along the bar that breaks
+  under the active tab, which gets thin walls and a tint; *accent* underlines
+  the active tab in lavender. `<leader>uT` flips, `:TabStyle <name>` picks.
 - **Sessions**: a bare `nvim` in a directory you've worked in restores that
   session (persistence.nvim) instead of showing the dashboard; the dashboard
   appears only when there's nothing to restore.
