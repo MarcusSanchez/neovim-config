@@ -48,4 +48,74 @@ function M.restore()
   return false
 end
 
+--- Keep the explorer sidebar out of the session file: its scratch buffer
+--- comes back as an empty split with a [No Name] buffer. Close it before
+--- the save, remember that it was open (a global the session's "globals"
+--- option carries), and reopen it after the load.
+function M.setup()
+  local group = vim.api.nvim_create_augroup("session_explorer", { clear = true })
+  vim.api.nvim_create_autocmd("User", {
+    group = group,
+    pattern = "PersistenceSavePre",
+    callback = function()
+      -- by now snacks has flagged its pickers closed but their windows are
+      -- still in the layout, so go by the windows: any non-floating window
+      -- showing a snacks buffer is the sidebar
+      local had = false
+      for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+        if
+          vim.api.nvim_win_get_config(win).relative == ""
+          and vim.bo[vim.api.nvim_win_get_buf(win)].filetype:find("^snacks_")
+        then
+          had = true
+          pcall(vim.api.nvim_win_close, win, true)
+        end
+      end
+      -- decided once per exit: the hook can run again (a retried quit) after
+      -- the sidebar is already gone, and must not downgrade a 1 to a 0
+      if M._exit_explorer == nil then
+        M._exit_explorer = had
+      end
+      vim.g.SessionExplorer = M._exit_explorer and 1 or 0
+      require("util.explorer").close()
+    end,
+  })
+  vim.api.nvim_create_autocmd("User", {
+    group = group,
+    pattern = "PersistenceLoadPost",
+    callback = function()
+      -- anything the layout left behind as an empty unnamed buffer
+      for _, b in ipairs(vim.api.nvim_list_bufs()) do
+        if
+          vim.api.nvim_buf_is_loaded(b)
+          and vim.api.nvim_buf_get_name(b) == ""
+          and vim.bo[b].buftype == ""
+          and not vim.bo[b].modified
+          and vim.api.nvim_buf_line_count(b) == 1
+          and vim.api.nvim_buf_get_lines(b, 0, 1, false)[1] == ""
+          and #vim.api.nvim_list_bufs() > 1
+        then
+          pcall(vim.api.nvim_buf_delete, b, { force = true })
+        end
+      end
+      if vim.g.SessionExplorer == 1 then
+        vim.schedule(function()
+          if not require("util.explorer").get() then
+            Snacks.explorer({
+              cwd = LazyVim.root(),
+              -- the picker shows asynchronously; hand focus back to the
+              -- editor window it was opened from once it's up
+              on_show = function(picker)
+                if picker.main and vim.api.nvim_win_is_valid(picker.main) then
+                  vim.api.nvim_set_current_win(picker.main)
+                end
+              end,
+            })
+          end
+        end)
+      end
+    end,
+  })
+end
+
 return M

@@ -74,6 +74,7 @@ require("util.folds").setup()
 -- dashboard. Scheduled: this file runs inside LazyVim's VeryLazy handler,
 -- before keymaps.lua, and the restored buffers' LSPs must find the LspAttach
 -- maps defined there.
+require("util.session").setup()
 vim.schedule(function()
   require("util.session").restore()
 end)
