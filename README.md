@@ -23,7 +23,7 @@ lua/util/                feature logic, one module per feature
   scroll.lua             'scrolloff' holds past the end of the buffer
   folds.lua              folds persist across sessions, anchored to the text they hide
   session.lua            a bare `nvim` restores the directory's session instead of the dashboard
-  tabs.lua               tab-bar styles (outline | attached | accent), :TabStyle / <leader>uT to flip
+  tabs.lua               hollow-pill tab-bar presets, :TabStyle <name> / <leader>uT cycles
   foldtext.lua           closed folds read `func main() { ... }`, first line highlighted
 lua/plugins/             one lazy.nvim spec per plugin (LazyVim merges them)
 lua/benched/             shelved specs (oil, harpoon) — not imported, see its README
@@ -77,13 +77,14 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
   gopls/typescript leaving a `}` line behind. A closed fold is drawn as its
   first line (highlighted) plus ` ... }`, IntelliJ-style; the dots and the
   bracket are only drawn.
-- **Tabs** come in switchable one-row looks (the tabline can't draw a top
-  edge). *outline*, the default: the active tab is an outlined rounded pill
-  in the gk/ge popups' border blue with nothing filled (peach when
-  modified), inactive tabs plain dim text. *attached*: a baseline along the
-  bar that breaks under the active tab, with thin walls and a tint.
-  *accent*: a lavender underline on the active tab. `<leader>uT` cycles,
-  `:TabStyle <name>` picks.
+- **Tabs**: the active tab is a hollow rounded pill in the gk/ge popups'
+  border blue, nothing filled (the right cap turns peach when modified),
+  inactive tabs plain dim text — one row, the tabline can't draw a top edge.
+  Presets vary one thing each: `outline` (default), `outline-all` (every
+  tab outlined, inactive dim), `outline-divided` (dividers between inactive
+  tabs), `outline-solid` (active tab filled, like the statusline pill),
+  `outline-roomy` (more space inside), `outline-lavender` (mode-pill
+  lavender). `<leader>uT` cycles, `:TabStyle <name>` picks.
 - **Sessions**: a bare `nvim` in a directory you've worked in restores that
   session (persistence.nvim) instead of showing the dashboard; the dashboard
   appears only when there's nothing to restore.

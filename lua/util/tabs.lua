@@ -1,14 +1,30 @@
--- Tab bar (bufferline) styles, switchable at runtime to compare:
---   outline   the active tab is an outlined rounded pill in the same blue as
---             the gk/ge popups' border, nothing filled; inactive tabs are
---             plain dim text (default)
---   attached  a baseline runs along the bar and breaks under the active tab,
---             which has thin walls and a tint — the tab opens into the editor
---   accent    a coloured underline marks the active tab (IntelliJ / Zed)
--- All one-row designs: the tabline can't draw a top edge.
+-- Tab bar (bufferline) styles: a family of hollow-pill looks — the active
+-- tab outlined with thin half-circle caps like the gk/ge popups' border,
+-- nothing filled unless a preset says so — switchable at runtime to
+-- compare (:TabStyle <name>, <leader>uT cycles). One row only: the tabline
+-- can't draw a top edge.
 local M = {}
 
-M.styles = { "outline", "attached", "accent" }
+local LEFT, RIGHT = "\u{e0b7}", "\u{e0b5}" -- thin (outlined) half circles
+local LEFT_FILL, RIGHT_FILL = "\u{e0b6}", "\u{e0b4}" -- filled, as the statusline pills
+
+---@class util.tabs.Preset
+---@field all? boolean outline every tab (inactive ones dim), not just the active
+---@field dividers? boolean thin dividers between inactive tabs
+---@field solid? boolean the active tab filled, with dark text
+---@field roomy? boolean extra space inside the pill
+---@field color? string palette colour for the active outline (default blue)
+
+---@type table<string, util.tabs.Preset>
+M.presets = {
+  ["outline"] = {},
+  ["outline-all"] = { all = true },
+  ["outline-divided"] = { dividers = true },
+  ["outline-solid"] = { solid = true },
+  ["outline-roomy"] = { roomy = true },
+  ["outline-lavender"] = { color = "lavender" },
+}
+M.styles = { "outline", "outline-all", "outline-divided", "outline-solid", "outline-roomy", "outline-lavender" }
 M.current = vim.g.tab_style or "outline"
 
 local function palette()
@@ -27,90 +43,12 @@ local function group_names()
   return {}
 end
 
+---@param p util.tabs.Preset
 ---@return table highlights, table options
-local function attached()
+local function build(p)
   local c = palette()
-  local line, tint = c.overlay0, c.surface0
-  local hl = {}
-  for _, name in ipairs(group_names()) do
-    if name:find("_selected$") then
-      hl[name] = { bg = tint, underline = false }
-    else
-      hl[name] = { bg = "NONE", underline = true, sp = line }
-    end
-  end
-  -- text colours on top of the structure above
-  local text = {
-    fill = {},
-    background = { fg = c.overlay1 },
-    buffer_visible = { fg = c.subtext0 },
-    buffer_selected = { fg = c.text, bold = false, italic = false },
-    separator = { fg = line },
-    modified = { fg = c.peach },
-    modified_visible = { fg = c.peach },
-    modified_selected = { fg = c.peach },
-    close_button = { fg = c.overlay1 },
-    close_button_visible = { fg = c.subtext0 },
-    close_button_selected = { fg = c.subtext0 },
-    -- the active tab's left wall: outside the tint, no baseline under it
-    indicator_selected = { fg = line, bg = "NONE", underline = false },
-    duplicate = { fg = c.overlay1, italic = true },
-    duplicate_visible = { fg = c.subtext0, italic = true },
-    duplicate_selected = { fg = c.subtext1, italic = true },
-  }
-  for name, attrs in pairs(text) do
-    hl[name] = vim.tbl_extend("force", hl[name] or {}, attrs)
-  end
-  return hl,
-    {
-      indicator = { style = "icon", icon = "▏" },
-      -- after the active tab: a wall hugging it; after the others: a divider
-      separator_style = { "▏", "│" },
-      show_buffer_close_icons = true,
-    }
-end
-
----@return table highlights, table options
-local function accent()
-  local c = palette()
-  local hl = {}
-  for _, name in ipairs(group_names()) do
-    if name:find("_selected$") then
-      hl[name] = { bg = c.surface0, sp = c.lavender, underline = true }
-    else
-      hl[name] = { bg = "NONE", underline = false }
-    end
-  end
-  local text = {
-    background = { fg = c.overlay1 },
-    buffer_visible = { fg = c.subtext0 },
-    buffer_selected = { fg = c.text, bold = false, italic = false },
-    separator = { fg = c.surface1 },
-    modified = { fg = c.peach },
-    modified_visible = { fg = c.peach },
-    modified_selected = { fg = c.peach },
-    close_button = { fg = c.overlay1 },
-    close_button_visible = { fg = c.subtext0 },
-    close_button_selected = { fg = c.subtext0 },
-    duplicate = { fg = c.overlay1, italic = true },
-    duplicate_visible = { fg = c.subtext0, italic = true },
-    duplicate_selected = { fg = c.subtext1, italic = true },
-  }
-  for name, attrs in pairs(text) do
-    hl[name] = vim.tbl_extend("force", hl[name] or {}, attrs)
-  end
-  return hl,
-    {
-      indicator = { style = "underline" },
-      separator_style = { "│", "│" },
-      show_buffer_close_icons = true,
-    }
-end
-
----@return table highlights, table options
-local function outline()
-  local c = palette()
-  local border = c.blue -- CursorPopupBorder
+  local border = c[p.color or "blue"]
+  local dim = c.surface2
   local hl = {}
   for _, name in ipairs(group_names()) do
     hl[name] = { bg = "NONE", underline = false, bold = false, italic = false }
@@ -119,15 +57,19 @@ local function outline()
     background = { fg = c.overlay1 },
     buffer_visible = { fg = c.subtext0 },
     buffer_selected = { fg = c.text },
-    separator = { fg = "NONE" },
-    -- the pill's left cap sits in the indicator slot...
+    separator = { fg = p.dividers and c.surface1 or "NONE" },
+    -- caps: left in the indicator slot (active only) or the numbers slot
+    -- (every tab); right as the close button, shown on the active tab only
+    -- under hover reveal, or on every tab when hover is off
     indicator_selected = { fg = border },
-    -- ...and its right cap is the close button, which bufferline only draws
-    -- on the current tab (hover reveal); a modified buffer swaps it for
-    -- the modified icon — the same cap, in peach
+    numbers = { fg = dim },
+    numbers_visible = { fg = dim },
+    numbers_selected = { fg = border },
+    close_button = { fg = dim },
+    close_button_visible = { fg = dim },
     close_button_selected = { fg = border },
-    close_button = { fg = c.overlay1 },
-    close_button_visible = { fg = c.subtext0 },
+    -- a modified buffer swaps its right cap for the modified icon: the same
+    -- cap, in peach
     modified = { fg = c.peach },
     modified_visible = { fg = c.peach },
     modified_selected = { fg = c.peach },
@@ -135,50 +77,68 @@ local function outline()
     duplicate_visible = { fg = c.subtext0, italic = true },
     duplicate_selected = { fg = c.subtext1, italic = true },
   }
+  if p.solid then
+    -- filled pill: the caps are drawn in the pill colour, the inside is it
+    for _, name in ipairs(group_names()) do
+      if name:find("_selected$") then
+        hl[name].bg = border
+        hl[name].fg = c.base
+      end
+    end
+    text.buffer_selected = { fg = c.base, bg = border }
+    text.indicator_selected = { fg = border, bg = "NONE" }
+    text.close_button_selected = { fg = border, bg = "NONE" }
+    text.modified_selected = { fg = c.peach, bg = "NONE" }
+    text.duplicate_selected = { fg = c.base, bg = border, italic = true }
+  end
   for name, attrs in pairs(text) do
     hl[name] = vim.tbl_extend("force", hl[name] or {}, attrs)
   end
-  return hl,
-    {
-      -- thin (outlined) half-circle caps, the hollow siblings of the filled
-      -- ones the statusline pills use
-      indicator = { style = "icon", icon = "\u{e0b7}" },
-      buffer_close_icon = "\u{e0b5}",
-      modified_icon = "\u{e0b5}",
-      show_buffer_close_icons = true,
-      hover = { enabled = true, delay = 0, reveal = { "close" } },
-      separator_style = { " ", " " },
-    }
+
+  local left, right = LEFT, RIGHT
+  if p.solid then
+    left, right = LEFT_FILL, RIGHT_FILL
+  end
+  local options = {
+    indicator = p.all and { style = "none" } or { style = "icon", icon = left },
+    numbers = p.all and function()
+      return left
+    end or "none",
+    buffer_close_icon = right,
+    modified_icon = right,
+    show_buffer_close_icons = true,
+    hover = { enabled = not p.all, delay = 0, reveal = { "close" } },
+    separator_style = { " ", p.dividers and "│" or " " },
+    name_formatter = p.roomy and function(buf)
+      return " " .. buf.name .. " "
+    end or nil,
+  }
+  return hl, options
 end
 
-local builders = { outline = outline, attached = attached, accent = accent }
-
---- Apply a style on top of the spec's bufferline opts (LazyVim's merged
+--- Apply a preset on top of the spec's bufferline opts (LazyVim's merged
 --- with ours) and re-run setup so it takes effect immediately.
 ---@param style? string
 function M.apply(style)
   style = style or M.current
-  assert(builders[style], "unknown tab style: " .. tostring(style))
+  assert(M.presets[style], "unknown tab style: " .. tostring(style))
   M.current, vim.g.tab_style = style, style
   local plugin = require("lazy.core.config").plugins["bufferline.nvim"]
   local base = require("lazy.core.plugin").values(plugin, "opts", false)
-  local highlights, options = builders[style]()
+  local highlights, options = build(M.presets[style])
   -- bufferline defines its groups as defaults, which never override groups
   -- that already exist — so a re-setup would change nothing. Clear ours
-  -- first (a colorscheme switch does the same for it).
+  -- first (a colorscheme switch does the same for it), and the cache of
+  -- per-filetype icon groups derived from them.
   for _, name in ipairs(vim.fn.getcompletion("BufferLine", "highlight")) do
     vim.api.nvim_set_hl(0, name, {})
   end
-  -- the per-filetype icon groups are derived from the tab groups and cached
-  -- at first use; without a reset the icon cell would keep the old style's
-  -- attributes and punch a hole in the tab
   pcall(function()
     require("bufferline.highlights").reset_icon_hl_cache()
   end)
-  require("bufferline").setup(vim.tbl_deep_extend("force", base, {
-    options = options,
-    highlights = highlights,
-  }))
+  local merged = vim.tbl_deep_extend("force", base, { options = options, highlights = highlights })
+  merged.options.name_formatter = options.name_formatter -- deep_extend drops a nil
+  require("bufferline").setup(merged)
   vim.cmd.redrawtabline()
 end
 
