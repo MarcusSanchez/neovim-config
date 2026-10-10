@@ -52,6 +52,11 @@ vim.schedule(function()
     vim.wait(3000, function() return require("util.explorer").get() ~= nil end, 50)
     check("pass 2: explorer reopened", require("util.explorer").get() ~= nil, true)
     check("pass 2: editor window keeps focus", vim.bo.filetype, "go")
+    -- the tabline section above the sidebar must match the bar, not the
+    -- explorer window's opaque SnacksNormal
+    local r = vim.api.nvim_eval_statusline(vim.o.tabline, { use_tabline = true, highlights = true })
+    local last = r.highlights[#r.highlights]
+    check("pass 2: tabline offset above the sidebar uses the bar's fill", last and last.group, "BufferLineFill")
     log("OK")
   end)
   log(ok and "DONE" or ("ERROR: " .. tostring(err)))
