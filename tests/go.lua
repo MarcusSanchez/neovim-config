@@ -103,6 +103,23 @@ vim.schedule(function()
     check("zc on func main folds through its closing brace", vim.fn.foldclosed(9) .. ".." .. vim.fn.foldclosedend(9), "9..13")
     check("the } line is inside the fold", vim.fn.getline(13), "}")
     check("fold line reads like IntelliJ", vim.fn.foldtextresult(9), "func main() { ... }")
+    -- the fold line keeps the open line's colours: rainbow brackets included
+    -- (rainbow-delimiters attaches on FileType, which fired before it loaded
+    -- in this headless run — attach it by hand, as a real session would have)
+    pcall(function() require("rainbow-delimiters.lib").attach(0) end); wait(500)
+    local chunks
+    _G.__fold_probe = function() chunks = require("util.foldtext").text(); return chunks end
+    local ft = vim.wo.foldtext
+    vim.wo.foldtext = "v:lua.__fold_probe()"
+    vim.fn.foldtextresult(9)
+    vim.wo.foldtext = ft
+    local groups = {}
+    for _, c in ipairs(chunks or {}) do groups[c[1]] = c[2] end
+    -- gopls' semantic token wins over the treesitter capture, as on the open line
+    check("fold line: func keyword highlighted", (groups["func"] or ""):match("keyword") ~= nil, true)
+    check("fold line: () in rainbow colour", (groups["()"] or ""):match("^RainbowDelimiter") ~= nil, true)
+    check("fold line: { in rainbow colour", (groups["{"] or ""):match("^RainbowDelimiter") ~= nil, true)
+    check("fold line: ellipsis dim", groups[" ... "], "FoldEllipsis")
     vim.cmd("normal! zR")
     -- explorer helpers
     local ex = require("util.explorer"); check("explorer closed -> nil", ex.get(), nil)
