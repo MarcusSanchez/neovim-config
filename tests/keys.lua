@@ -11,6 +11,20 @@ vim.schedule(function()
     vim.api.nvim_exec_autocmds("FileType", { buffer = 0 }) -- as LazyVim re-fires it after loading autocmds
     check("text files: no spell squiggles", vim.wo.spell, false)
     check("text files: still wrap", vim.wo.wrap, true)
+    -- leaving insert mode doesn't step the cursor back
+    local function keys(k) vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(k, true, false, true), "x", false) end
+    vim.api.nvim_win_set_cursor(0, { 50, 2 }) -- "line 50", on 'n'
+    keys("ajj"); keys("ajj"); keys("ajj")
+    check("a jj x3 walks right three columns", vim.api.nvim_win_get_cursor(0)[2], 5)
+    keys("$"); keys("ajj"); keys("ajj")
+    check("a jj at end of line stays on the last character", vim.api.nvim_win_get_cursor(0)[2], #vim.fn.getline(50) - 1)
+    check("...and never wraps to a new line", vim.fn.line("."), 50)
+    vim.api.nvim_win_set_cursor(0, { 50, 3 })
+    keys("ijj"); keys("ijj"); keys("ijj")
+    check("i jj x3 stays put", vim.api.nvim_win_get_cursor(0)[2], 3)
+    keys("i<Esc>")
+    check("<Esc> behaves like jj", vim.api.nvim_win_get_cursor(0)[2], 3)
+    check("buffer unchanged by the above", vim.fn.getline(50), "line 50")
     -- motions
     vim.api.nvim_win_set_cursor(0, { 50, 0 })
     vim.cmd("normal j"); check("j goes up", vim.fn.line("."), 49)

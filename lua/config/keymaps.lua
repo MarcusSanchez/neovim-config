@@ -90,8 +90,17 @@ map("n", "<Tab>", "i<tab>", opts("Insert Tab"))
 -- Insert Mode Enhancements
 --------------------------------------------------------------------------------
 
--- 'jj' to exit insert mode
-map("i", "jj", "<Esc>", opts("Exit Insert Mode"))
+-- Leave insert mode where the insert ended instead of one column back (the
+-- `^ mark is that spot; normal mode clamps it to the line's last character):
+-- `a jj` repeated walks right one character at a time, `i jj` stays put.
+-- Keeps LazyVim's insert-mode <Esc> extras (clear hlsearch, stop snippet).
+local function leave_insert()
+  vim.cmd("noh")
+  LazyVim.cmp.actions.snippet_stop()
+  return "<Esc>`^"
+end
+map("i", "<Esc>", leave_insert, { expr = true, desc = "Exit Insert Mode (stay put)" })
+map("i", "jj", leave_insert, { expr = true, desc = "Exit Insert Mode" })
 
 --------------------------------------------------------------------------------
 -- Line Manipulation
