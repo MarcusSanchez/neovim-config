@@ -16,3 +16,6 @@ vim.opt.whichwrap:append("h,l")
 -- LSP workspace root. Keeps <space><space>/g/ searching the whole repo
 -- (frontend/, mobile/, ...) even when editing backend/main.go.
 vim.g.root_spec = { "cwd" }
+
+-- closed folds read `func main() { ... }` (lua/util/foldtext.lua)
+vim.opt.foldtext = "v:lua.require('util.foldtext').text()"

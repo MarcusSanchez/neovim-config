@@ -22,6 +22,7 @@ lua/util/                feature logic, one module per feature
   autosave.lua           debounced normal-mode autosave, no formatting
   scroll.lua             'scrolloff' holds past the end of the buffer
   folds.lua              folds persist across sessions, anchored to the text they hide
+  foldtext.lua           closed folds read `func main() { ... }`, first line highlighted
 lua/plugins/             one lazy.nvim spec per plugin (LazyVim merges them)
 lua/benched/             shelved specs (oil, harpoon) — not imported, see its README
 queries/<lang>/context.scm   treesitter-context: pin declarations only, not loops/ifs
@@ -71,7 +72,9 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
   checks aren't exposed over LSP — run `buf breaking`.
 - **Folds are treesitter's** everywhere (LazyVim's LSP folding is off): a
   folded `{ }` block hides its closing brace in every language, instead of
-  gopls/typescript leaving a `}` line behind.
+  gopls/typescript leaving a `}` line behind. A closed fold is drawn as its
+  first line (highlighted) plus ` ... }`, IntelliJ-style; the dots and the
+  bracket are only drawn.
 - **Folds persist**: close a fold, come back to the file next week, it's
   still closed — if the same text is still there (it follows the text when
   lines shift; edited text is left unfolded rather than folded wrong).

@@ -102,6 +102,7 @@ vim.schedule(function()
     vim.cmd("normal! 9Gzc")
     check("zc on func main folds through its closing brace", vim.fn.foldclosed(9) .. ".." .. vim.fn.foldclosedend(9), "9..13")
     check("the } line is inside the fold", vim.fn.getline(13), "}")
+    check("fold line reads like IntelliJ", vim.fn.foldtextresult(9), "func main() { ... }")
     vim.cmd("normal! zR")
     -- explorer helpers
     local ex = require("util.explorer"); check("explorer closed -> nil", ex.get(), nil)

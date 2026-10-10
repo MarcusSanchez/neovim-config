@@ -55,6 +55,9 @@ return {
             TreesitterContextBottom = { style = {} },
             TreesitterContextLineNumberBottom = { style = {} },
 
+            -- the ` ... }` a closed fold shows (lua/util/foldtext.lua)
+            FoldEllipsis = { fg = colors.overlay1 },
+
             -- snacks picker / explorer
             -- transparent_background only covers Normal, not NormalFloat, so the
             -- picker windows end up sitting on an opaque mantle slab. Every
