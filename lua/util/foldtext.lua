@@ -7,8 +7,9 @@ local M = {}
 
 --- The fold's first line as highlighted chunks, from the buffer's treesitter
 --- highlights query (per-column, last capture wins, like the highlighter).
+---@param dim_from? integer 1-based column from which trailing opening brackets are drawn dim
 ---@return { [1]: string, [2]: string }[]
-local function highlighted(buf, lnum, line)
+local function highlighted(buf, lnum, line, dim_from)
   local lang = vim.treesitter.language.get_lang(vim.bo[buf].filetype)
   local ok, parser = pcall(vim.treesitter.get_parser, buf, lang)
   local query = ok and parser and vim.treesitter.query.get(parser:lang(), "highlights")
@@ -59,6 +60,15 @@ local function highlighted(buf, lnum, line)
       end
     end
   end
+  -- the opening bracket(s) the fold hides behind read as part of the drawn
+  -- ` ... }` tail, so they take its colour rather than a rainbow one
+  if dim_from then
+    for col = dim_from, #line do
+      if line:sub(col, col):match("[%({%[]") then
+        hl[col] = "FoldEllipsis"
+      end
+    end
+  end
   -- columns above are byte offsets into the real line; tabs are expanded
   -- per chunk afterwards so they display at their width
   local tab = string.rep(" ", vim.bo[buf].tabstop)
@@ -82,7 +92,7 @@ function M.text()
   local buf = vim.api.nvim_get_current_buf()
   local first = vim.api.nvim_buf_get_lines(buf, vim.v.foldstart - 1, vim.v.foldstart, false)[1] or ""
   local last = vim.api.nvim_buf_get_lines(buf, vim.v.foldend - 1, vim.v.foldend, false)[1] or ""
-  local chunks = highlighted(buf, vim.v.foldstart, first)
+  local chunks = highlighted(buf, vim.v.foldstart, first, first:find("[%({%[]+%s*$"))
   local tail = closer(last)
   chunks[#chunks + 1] = { tail and " ... " or " ...", "FoldEllipsis" }
   if tail then

@@ -118,7 +118,7 @@ vim.schedule(function()
     -- gopls' semantic token wins over the treesitter capture, as on the open line
     check("fold line: func keyword highlighted", (groups["func"] or ""):match("keyword") ~= nil, true)
     check("fold line: () in rainbow colour", (groups["()"] or ""):match("^RainbowDelimiter") ~= nil, true)
-    check("fold line: { in rainbow colour", (groups["{"] or ""):match("^RainbowDelimiter") ~= nil, true)
+    check("fold line: the { the fold hides behind is dim like the tail", groups["{"], "FoldEllipsis")
     check("fold line: ellipsis dim", groups[" ... "], "FoldEllipsis")
     vim.cmd("normal! zR")
     -- explorer helpers
