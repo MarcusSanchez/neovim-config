@@ -20,7 +20,27 @@ vim.schedule(function()
       return (s:gsub("\u{e0b7}", "("):gsub("\u{e0b5}", ")"):gsub("\u{e0b6}", "["):gsub("\u{e0b4}", "]"))
     end
     local function count(s, ch) return select(2, s:gsub("%" .. ch, "")) end
-    check("default style", tabs.current, "outline")
+    check("default style", tabs.current, "classic")
+    check("the cycle key is not LazyVim's treesitter toggle", vim.fn.maparg("<leader>uB", "n", false, true).desc, "Toggle Tab Style")
+    check("<leader>uT still LazyVim's", (vim.fn.maparg("<leader>uT", "n", false, true).desc or ""):find("[Tt]reesitter") ~= nil, true)
+
+    tabs.apply("classic")
+    check("classic: the bar is a solid strip", hex(hl("BufferLineFill").bg), "#181825")
+    check("classic: inactive tabs sit on the strip", hex(hl("BufferLineBackground").bg), "#181825")
+    check("classic: active tab cut out (transparent)", hl("BufferLineBufferSelected").bg, nil)
+    check("classic: active tab's icon cell cut out too", (function()
+      local r = vim.api.nvim_eval_statusline(vim.o.tabline, { use_tabline = true, highlights = true })
+      for _, h in ipairs(r.highlights) do if h.group:find("Icon") and h.group:find("Selected$") then return hl(h.group).bg end end
+    end)(), nil)
+    check("classic: blue indicator on the active tab", hex(hl("BufferLineIndicatorSelected").fg), "#89b4fa")
+    check("classic: thin separators drawn", render():find("▏", 1, true) ~= nil, true)
+    check("classic: no caps", count(render(), "(") + count(render(), "[") , 0)
+
+    tabs.apply("classic-raised")
+    check("classic-raised: active tab a lighter block", hex(hl("BufferLineBufferSelected").bg), "#313244")
+
+    tabs.apply("classic-crust")
+    check("classic-crust: darker strip", hex(hl("BufferLineFill").bg), "#11111b")
 
     tabs.apply("outline")
     check("outline: one hollow pill", count(render(), "(") .. count(render(), ")"), "11")
@@ -54,7 +74,7 @@ vim.schedule(function()
     check("outline-lavender: caps lavender", hex(hl("BufferLineIndicatorSelected").fg), "#b4befe")
 
     tabs.apply("outline-lavender"); tabs.toggle()
-    check("toggle wraps around to the first", tabs.current, "outline")
+    check("toggle wraps around to the first", tabs.current, "classic")
     vim.cmd("TabStyle outline-all")
     check(":TabStyle picks a preset", tabs.current, "outline-all")
     log("OK")

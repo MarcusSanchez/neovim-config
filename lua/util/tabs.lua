@@ -1,8 +1,8 @@
--- Tab bar (bufferline) styles: a family of hollow-pill looks — the active
--- tab outlined with thin half-circle caps like the gk/ge popups' border,
--- nothing filled unless a preset says so — switchable at runtime to
--- compare (:TabStyle <name>, <leader>uT cycles). One row only: the tabline
--- can't draw a top edge.
+-- Tab bar (bufferline) styles, switchable at runtime to compare
+-- (:TabStyle <name>, <leader>uB cycles). "classic" keeps LazyVim's default
+-- tab shapes on a contained strip; the "outline" family draws the active
+-- tab as a hollow pill like the gk/ge popups' border. One row only: the
+-- tabline can't draw a top edge.
 local M = {}
 
 local LEFT, RIGHT = "\u{e0b7}", "\u{e0b5}" -- thin (outlined) half circles
@@ -15,8 +15,20 @@ local LEFT_FILL, RIGHT_FILL = "\u{e0b6}", "\u{e0b4}" -- filled, as the statuslin
 ---@field roomy? boolean extra space inside the pill
 ---@field color? string palette colour for the active outline (default blue)
 
----@type table<string, util.tabs.Preset>
+---@class util.tabs.ClassicPreset
+---@field classic true LazyVim's default tab shapes (thin separators, ▎ indicator), styled
+---@field strip? string palette colour of the bar (default mantle)
+---@field raised? boolean the active tab as a lighter block on the strip instead of a cut-out
+
+---@type table<string, util.tabs.Preset|util.tabs.ClassicPreset>
 M.presets = {
+  -- LazyVim's shapes on a contained strip: the bar is a solid dark band and
+  -- the active tab is cut out of it, showing the (transparent) editor
+  -- through, with a blue ▎ on its left
+  ["classic"] = { classic = true },
+  ["classic-raised"] = { classic = true, raised = true },
+  ["classic-crust"] = { classic = true, strip = "crust" },
+  -- the hollow-pill family
   ["outline"] = {},
   ["outline-all"] = { all = true },
   ["outline-divided"] = { dividers = true },
@@ -24,8 +36,18 @@ M.presets = {
   ["outline-roomy"] = { roomy = true },
   ["outline-lavender"] = { color = "lavender" },
 }
-M.styles = { "outline", "outline-all", "outline-divided", "outline-solid", "outline-roomy", "outline-lavender" }
-M.current = vim.g.tab_style or "outline"
+M.styles = {
+  "classic",
+  "classic-raised",
+  "classic-crust",
+  "outline",
+  "outline-all",
+  "outline-divided",
+  "outline-solid",
+  "outline-roomy",
+  "outline-lavender",
+}
+M.current = vim.g.tab_style or "classic"
 
 local function palette()
   return require("catppuccin.palettes").get_palette("mocha")
@@ -43,9 +65,68 @@ local function group_names()
   return {}
 end
 
+---@param p util.tabs.ClassicPreset
+---@return table highlights, table options
+local function build_classic(p)
+  local c = palette()
+  local strip = c[p.strip or "mantle"]
+  local active_bg = p.raised and c.surface0 or "NONE"
+  local hl = {}
+  for _, name in ipairs(group_names()) do
+    if name:find("_selected$") then
+      hl[name] = { bg = active_bg, underline = false, bold = false, italic = false }
+    else
+      hl[name] = { bg = strip, underline = false, bold = false, italic = false }
+    end
+  end
+  local text = {
+    fill = { bg = strip },
+    background = { fg = c.overlay1 },
+    buffer_visible = { fg = c.subtext0 },
+    buffer_selected = { fg = c.text },
+    separator = { fg = c.surface1 },
+    separator_visible = { fg = c.surface1 },
+    separator_selected = { fg = c.surface1 },
+    indicator_selected = { fg = c.blue },
+    modified = { fg = c.peach },
+    modified_visible = { fg = c.peach },
+    modified_selected = { fg = c.peach },
+    close_button = { fg = c.overlay1 },
+    close_button_visible = { fg = c.subtext0 },
+    close_button_selected = { fg = c.subtext0 },
+    duplicate = { fg = c.overlay1, italic = true },
+    duplicate_visible = { fg = c.subtext0, italic = true },
+    duplicate_selected = { fg = c.subtext1, italic = true },
+    offset_separator = { fg = c.surface1, bg = strip },
+    tab = { fg = c.overlay1 },
+    tab_selected = { fg = c.text },
+    tab_separator = { fg = strip, bg = strip },
+    tab_separator_selected = { fg = strip },
+    trunc_marker = { fg = c.overlay1 },
+  }
+  for name, attrs in pairs(text) do
+    hl[name] = vim.tbl_extend("force", hl[name] or {}, attrs)
+  end
+  return hl,
+    {
+      -- LazyVim / bufferline defaults, spelled out
+      indicator = { style = "icon", icon = "▎" },
+      separator_style = "thin",
+      buffer_close_icon = "󰅖",
+      modified_icon = "●",
+      show_buffer_close_icons = true,
+      hover = { enabled = false },
+      numbers = "none",
+      name_formatter = nil,
+    }
+end
+
 ---@param p util.tabs.Preset
 ---@return table highlights, table options
 local function build(p)
+  if p.classic then
+    return build_classic(p)
+  end
   local c = palette()
   local border = c[p.color or "blue"]
   local dim = c.surface2
