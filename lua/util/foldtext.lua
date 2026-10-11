@@ -122,7 +122,8 @@ end
 --- syntax tree: the bracket's parent node (parameters, arguments, block…)
 --- ends on that line. nil when treesitter can't say.
 local function closing_line(buf, lnum, col)
-  local ok, node = pcall(vim.treesitter.get_node, { bufnr = buf, pos = { lnum - 1, col - 1 }, ignore_injections = true })
+  local ok, node =
+    pcall(vim.treesitter.get_node, { bufnr = buf, pos = { lnum - 1, col - 1 }, ignore_injections = true })
   if not ok or not node then
     return
   end
