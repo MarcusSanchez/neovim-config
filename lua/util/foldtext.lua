@@ -8,7 +8,7 @@ local M = {}
 --- The fold's first line as highlighted chunks, from the buffer's treesitter
 --- highlights query (per-column, last capture wins, like the highlighter).
 ---@param dim_from? integer 1-based column from which trailing opening brackets are drawn dim
----@return { [1]: string, [2]: string }[]
+---@return { [1]: string, [2]: string }[] chunks, table<integer, string> hl per byte column
 local function highlighted(buf, lnum, line, dim_from)
   local lang = vim.treesitter.language.get_lang(vim.bo[buf].filetype)
   local ok, parser = pcall(vim.treesitter.get_parser, buf, lang)
@@ -79,7 +79,24 @@ local function highlighted(buf, lnum, line, dim_from)
       from, cur = col, hl[col]
     end
   end
-  return chunks
+  return chunks, hl
+end
+
+local pairs_of = { [")"] = "(", ["]"] = "[", ["}"] = "{" }
+
+--- Columns of the first line's openers still unmatched at its end, bottom
+--- to top. The fold's closers on the last line pop these in order.
+local function unmatched_openers(line)
+  local stack = {}
+  for col = 1, #line do
+    local ch = line:sub(col, col)
+    if ch:match("[%({%[]") then
+      stack[#stack + 1] = col
+    elseif pairs_of[ch] and stack[#stack] and line:sub(stack[#stack], stack[#stack]) == pairs_of[ch] then
+      stack[#stack] = nil
+    end
+  end
+  return stack
 end
 
 --- Closing punctuation at the end of the fold (`}`, `)`, `]`, `},`, `});`…),
@@ -92,11 +109,27 @@ function M.text()
   local buf = vim.api.nvim_get_current_buf()
   local first = vim.api.nvim_buf_get_lines(buf, vim.v.foldstart - 1, vim.v.foldstart, false)[1] or ""
   local last = vim.api.nvim_buf_get_lines(buf, vim.v.foldend - 1, vim.v.foldend, false)[1] or ""
-  local chunks = highlighted(buf, vim.v.foldstart, first, first:find("[%({%[]+%s*$"))
+  local dim_from = first:find("[%({%[]+%s*$")
+  local chunks, hl = highlighted(buf, vim.v.foldstart, first, dim_from)
   local tail = closer(last)
   chunks[#chunks + 1] = { tail and " ... " or " ...", "FoldEllipsis" }
   if tail then
-    chunks[#chunks + 1] = { tail, "FoldEllipsis" }
+    -- each closer pops the first line's innermost unmatched opener: one the
+    -- fold hides behind (dim, like the dots) or one that's visible on the
+    -- first line, whose colour it takes — `func(...) error { ... })` keeps
+    -- the `)` in its `(`'s colour
+    local openers = unmatched_openers(first)
+    for i = 1, #tail do
+      local ch = tail:sub(i, i)
+      local group = "FoldEllipsis"
+      if pairs_of[ch] then
+        local col = table.remove(openers)
+        if col and not (dim_from and col >= dim_from) then
+          group = hl[col] or "Folded"
+        end
+      end
+      chunks[#chunks + 1] = { ch, group }
+    end
   end
   return chunks
 end

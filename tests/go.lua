@@ -120,6 +120,25 @@ vim.schedule(function()
     check("fold line: () in rainbow colour", (groups["()"] or ""):match("^RainbowDelimiter") ~= nil, true)
     check("fold line: the { the fold hides behind is dim like the tail", groups["{"], "FoldEllipsis")
     check("fold line: ellipsis dim", groups[" ... "], "FoldEllipsis")
+    -- a closer on the fold's last line that pairs with an opener visible on
+    -- the first line keeps that opener's colour; only the hidden block's
+    -- closer is dim: `x := g(1, func() int { ... })`
+    vim.fn.writefile({ "package main", "", "func g(int, func() int) int { return 0 }", "", "func f() {", "\tx := g(1, func() int {", "\t\treturn 2", "\t})", "\t_ = x", "}" }, "lit.go")
+    vim.cmd("edit lit.go")
+    local nb = vim.api.nvim_get_current_buf()
+    pcall(function() require("rainbow-delimiters.lib").attach(0) end)
+    vim.wait(5000, function() return vim.fn.foldlevel(7) > 1 end, 50); wait(500)
+    vim.cmd("normal! 6Gzc")
+    check("literal fold reads right", vim.fn.foldtextresult(6), "    x := g(1, func() int { ... })")
+    chunks = nil
+    vim.wo.foldtext = "v:lua.__fold_probe()"; vim.fn.foldtextresult(6); vim.wo.foldtext = ft
+    local n = #chunks
+    check("hidden block's } is dim", chunks[n - 1][1] .. "=" .. chunks[n - 1][2], "}=FoldEllipsis")
+    local g_open
+    for i, c in ipairs(chunks) do if c[1] == "g" and chunks[i + 1] and chunks[i + 1][1]:sub(1, 1) == "(" then g_open = chunks[i + 1][2] end end
+    check("visible ( has a colour", g_open ~= nil and g_open ~= "FoldEllipsis", true)
+    check("its ) on the fold line takes the same colour", chunks[n][1] .. "=" .. chunks[n][2], ")=" .. tostring(g_open))
+    vim.cmd("normal! zR"); vim.cmd("buffer main.go"); vim.api.nvim_buf_delete(nb, { force = true }); vim.fn.delete("lit.go")
     vim.cmd("normal! zR")
     -- explorer helpers
     local ex = require("util.explorer"); check("explorer closed -> nil", ex.get(), nil)
