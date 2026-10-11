@@ -11,9 +11,9 @@ local OPENERS = "[%({%[\"'`]"
 
 --- The fold's first line as highlighted chunks, from the buffer's treesitter
 --- highlights query (per-column, last capture wins, like the highlighter).
----@param dim_from? integer 1-based column from which trailing opening brackets are drawn dim
+---@param dim? table<integer, boolean> 1-based columns drawn dim (the brackets the fold hides behind)
 ---@return { [1]: string, [2]: string }[] chunks, table<integer, string> hl per byte column
-local function highlighted(buf, lnum, line, dim_from)
+local function highlighted(buf, lnum, line, dim)
   local lang = vim.treesitter.language.get_lang(vim.bo[buf].filetype)
   local ok, parser = pcall(vim.treesitter.get_parser, buf, lang)
   local query = ok and parser and vim.treesitter.query.get(parser:lang(), "highlights")
@@ -66,12 +66,8 @@ local function highlighted(buf, lnum, line, dim_from)
   end
   -- the opening bracket(s) the fold hides behind read as part of the drawn
   -- ` ... }` tail, so they take its colour rather than a rainbow one
-  if dim_from then
-    for col = dim_from, #line do
-      if line:sub(col, col):match(OPENERS) then
-        hl[col] = "FoldEllipsis"
-      end
-    end
+  for col in pairs(dim or {}) do
+    hl[col] = "FoldEllipsis"
   end
   -- columns above are byte offsets into the real line; tabs are expanded
   -- per chunk afterwards so they display at their width
@@ -109,20 +105,139 @@ local function closer(last)
   return last:match("^%s*([%)%]}\"'`#]+[,;]?)%s*$")
 end
 
+--- Columns of the trailing opening brackets on a line (`func h(`, `x := {`).
+local function trailing_openers(line)
+  local cols, from = {}, line:find(OPENERS .. "+%s*$")
+  if from then
+    for col = from, #line do
+      if line:sub(col, col):match(OPENERS) then
+        cols[col] = true
+      end
+    end
+  end
+  return cols, from
+end
+
+--- The 1-based line where the bracket at (lnum, col) is closed, per the
+--- syntax tree: the bracket's parent node (parameters, arguments, block…)
+--- ends on that line. nil when treesitter can't say.
+local function closing_line(buf, lnum, col)
+  local ok, node = pcall(vim.treesitter.get_node, { bufnr = buf, pos = { lnum - 1, col - 1 }, ignore_injections = true })
+  if not ok or not node then
+    return
+  end
+  -- get_node returns the smallest *named* node at the position: for `(`
+  -- that's the parameter/argument list itself, for `{` the block — the
+  -- bracketed node, which starts right at the bracket. Walk up while the
+  -- node doesn't start there.
+  while node do
+    local srow, scol = node:start()
+    if srow == lnum - 1 and scol == col - 1 then
+      break
+    end
+    node = node:parent()
+  end
+  if not node then
+    return
+  end
+  local erow = node:end_()
+  return erow + 1
+end
+
 function M.text()
   local buf = vim.api.nvim_get_current_buf()
-  local first = vim.api.nvim_buf_get_lines(buf, vim.v.foldstart - 1, vim.v.foldstart, false)[1] or ""
-  local last = vim.api.nvim_buf_get_lines(buf, vim.v.foldend - 1, vim.v.foldend, false)[1] or ""
-  local dim_from = first:find(OPENERS .. "+%s*$")
-  local chunks, hl = highlighted(buf, vim.v.foldstart, first, dim_from)
+  local first_lnum, last_lnum = vim.v.foldstart, vim.v.foldend
+  local function line_at(lnum)
+    return vim.api.nvim_buf_get_lines(buf, lnum - 1, lnum, false)[1] or ""
+  end
+
+  -- Walk the fold: a line whose trailing opener closes *before* the fold's
+  -- last line (a wrapped parameter list, a call spanning lines) is followed
+  -- by ` ... ` and the line that closes it, so `fn send(` … `) -> R {` … `}`
+  -- reads `fn send( ... ) -> R { ... }`. Each segment's hidden brackets are
+  -- dim: the trailing openers, and the leading closers of a continuation.
+  local chunks = {}
+  local lnum, line, lead = first_lnum, line_at(first_lnum), 0
+  for _ = 1, 4 do
+    local dim, from = trailing_openers(line)
+    for col = 1, lead do
+      dim[col] = true
+    end
+    vim.list_extend(chunks, (highlighted(buf, lnum, line, dim)))
+    if not from then
+      break
+    end
+    local close = closing_line(buf, lnum, #line:gsub("%s+$", ""))
+    if not close or close >= last_lnum or close <= lnum then
+      break
+    end
+    chunks[#chunks + 1] = { " ... ", "FoldEllipsis" }
+    local raw = line_at(close)
+    local indent = raw:match("^%s*")
+    line, lnum = raw:sub(#indent + 1), close
+    lead = #(line:match("^[%)%]}\"'`#]*") or "")
+    -- the continuation's own columns are offset by the indent we dropped;
+    -- highlight it against the real line and drop the indent chunk after
+    local real_dim = {}
+    for col = 1, lead do
+      real_dim[col + #indent] = true
+    end
+    local topen = trailing_openers(raw)
+    for col in pairs(topen) do
+      real_dim[col] = true
+    end
+    local seg = highlighted(buf, lnum, raw, real_dim)
+    if seg[1] and seg[1][1]:match("^%s+$") then
+      table.remove(seg, 1)
+    elseif seg[1] then
+      seg[1][1] = seg[1][1]:gsub("^%s+", "")
+    end
+    vim.list_extend(chunks, seg)
+    line, lead = raw, 0
+    -- the trailing-opener test above already ran for `raw` inside highlighted;
+    -- continue the walk from this line
+    local _, nfrom = trailing_openers(raw)
+    if not nfrom then
+      break
+    end
+    local nclose = closing_line(buf, lnum, #raw:gsub("%s+$", ""))
+    if not nclose or nclose >= last_lnum or nclose <= lnum then
+      break
+    end
+    -- more than two hops is rare; keep going by re-entering the loop body
+    -- with this line as the head (chunks for it are already appended)
+    chunks[#chunks + 1] = { " ... ", "FoldEllipsis" }
+    raw = line_at(nclose)
+    indent = raw:match("^%s*")
+    lnum = nclose
+    lead = #(raw:sub(#indent + 1):match("^[%)%]}\"'`#]*") or "")
+    real_dim = {}
+    for col = 1, lead do
+      real_dim[col + #indent] = true
+    end
+    for col in pairs((trailing_openers(raw))) do
+      real_dim[col] = true
+    end
+    seg = highlighted(buf, lnum, raw, real_dim)
+    if seg[1] and seg[1][1]:match("^%s+$") then
+      table.remove(seg, 1)
+    elseif seg[1] then
+      seg[1][1] = seg[1][1]:gsub("^%s+", "")
+    end
+    vim.list_extend(chunks, seg)
+    line = raw
+    break
+  end
+
+  -- the tail: ` ... ` and the last line's closers, each coloured like the
+  -- opener it pairs with on the head line (dim when that opener is hidden)
+  local last = line_at(last_lnum)
   local tail = closer(last)
+  local _, hl = highlighted(buf, lnum, line)
+  local dim_from = select(2, trailing_openers(line))
   chunks[#chunks + 1] = { tail and " ... " or " ...", "FoldEllipsis" }
   if tail then
-    -- each closer pops the first line's innermost unmatched opener: one the
-    -- fold hides behind (dim, like the dots) or one that's visible on the
-    -- first line, whose colour it takes — `func(...) error { ... })` keeps
-    -- the `)` in its `(`'s colour
-    local openers = unmatched_openers(first)
+    local openers = unmatched_openers(line)
     for i = 1, #tail do
       local ch = tail:sub(i, i)
       local group = "FoldEllipsis"

@@ -138,6 +138,19 @@ vim.schedule(function()
     for i, c in ipairs(chunks) do if c[1] == "g" and chunks[i + 1] and chunks[i + 1][1]:sub(1, 1) == "(" then g_open = chunks[i + 1][2] end end
     check("visible ( has a colour", g_open ~= nil and g_open ~= "FoldEllipsis", true)
     check("its ) on the fold line takes the same colour", chunks[n][1] .. "=" .. chunks[n][2], ")=" .. tostring(g_open))
+    -- a wrapped signature: the fold line shows where the `(` closes too
+    vim.fn.writefile({ "package main", "", "func h(", "\ta int,", "\tb int,", ") int {", "\treturn a + b", "}" }, "sig.go")
+    vim.cmd("edit sig.go")
+    local gb = vim.api.nvim_get_current_buf()
+    vim.wait(5000, function() return vim.fn.foldlevel(4) > 0 end, 50); wait(500)
+    vim.cmd("normal! 3Gzc")
+    check("wrapped signature fold line", vim.fn.foldtextresult(3), "func h( ... ) int { ... }")
+    chunks = nil
+    vim.wo.foldtext = "v:lua.__fold_probe()"; vim.fn.foldtextresult(3); vim.wo.foldtext = ft
+    local dims = {}
+    for _, c in ipairs(chunks) do if c[2] == "FoldEllipsis" then dims[#dims + 1] = c[1] end end
+    check("hidden brackets and dots dim, signature text not", table.concat(dims, "|"), "(| ... |)|{| ... |}")
+    vim.cmd("normal! zR"); vim.cmd("buffer main.go"); vim.api.nvim_buf_delete(gb, { force = true }); vim.fn.delete("sig.go")
     -- a folded multi-line string closes its quote on the fold line
     vim.fn.writefile({ "package main", "", "var q = `", "select 1", "`", "", "var r = []string{`", "a", "`, \"b\"}" }, "str.go")
     vim.cmd("edit str.go")
