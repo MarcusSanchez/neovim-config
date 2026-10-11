@@ -1,18 +1,15 @@
--- BENCHED 2026-08-13 — the snacks explorer sidebar + bufferline tabs are
--- back. To revive: move this file to lua/plugins/, set `explorer.enabled =
--- false` in plugins/snacks.lua and disable LazyVim's explorer keys there
--- ({ "<leader>e", false } etc.), and drop the ,a/,c maps in config/keymaps.lua.
---
 -- Oil edits the filesystem like a buffer: rename a line to rename a file,
 -- add a line (end with / for a directory) to create, delete a line to delete.
 -- Changes only apply on :w. Inside oil: <CR> enters a directory, - goes up,
--- g? shows all mappings.
+-- g? shows all mappings. Lives alongside the snacks explorer sidebar: `-`
+-- opens the current file's directory in a float, `,o` the project root.
+-- (Revived 2026-10-11 after being benched since 2026-08-13.)
 return {
   "stevearc/oil.nvim",
-  -- load at startup so `nvim <dir>` opens oil instead of netrw
-  lazy = false,
+  cmd = "Oil",
   opts = {
-    default_file_explorer = true,
+    -- `nvim <dir>` keeps opening the snacks explorer; oil is reached by key
+    default_file_explorer = false,
     delete_to_trash = true,
     -- merged with oil's default buffer-local maps (<C-c> also closes)
     keymaps = {
@@ -42,7 +39,7 @@ return {
       desc = "Open Parent Directory (Oil Float)",
     },
     {
-      ",a",
+      ",o",
       function()
         require("oil").open_float(LazyVim.root())
       end,

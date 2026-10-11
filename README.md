@@ -25,7 +25,7 @@ lua/util/                feature logic, one module per feature
   session.lua            a bare `nvim` restores the directory's session instead of the dashboard
   foldtext.lua           closed folds read `func main() { ... }`, first line highlighted
 lua/plugins/             one lazy.nvim spec per plugin (LazyVim merges them)
-lua/benched/             shelved specs (oil, harpoon) — not imported, see its README
+lua/benched/             shelved specs (neo-tree) — not imported, see its README
 queries/<lang>/context.scm   treesitter-context: pin declarations only, not loops/ifs
 tests/                   headless regression suite — tests/run.sh
 ```
@@ -50,6 +50,8 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
 | `gk` / `ge` | hover docs / line diagnostics, in a cursor popup; `<Esc>` dismisses; `gd` inside the hover follows a link (file links jump there, https opens the browser) |
 | `,a` / `,c` | toggle-focus / close the explorer sidebar |
 | `,q` `,f` `,r` `,g` `,d` `,j` `,u` | close buffer, format+save, rename, code action, fold, split/join, undotree |
+| `-` / `,o` | oil: edit the current file's directory / the project root as a buffer (float) |
+| `,ha` `,hl` `,1`…`,9` | harpoon: pin file, open the list, jump to slot |
 | `,w` `,e` `<leader>j` `<leader>k` | window left / right / up / down |
 | `A-h` / `A-l` | previous / next buffer |
 | `C-j` / `C-k` | add multicursor above / below |

@@ -1,6 +1,7 @@
--- BENCHED 2026-08-13 — bufferline tabs took over quick buffer jumps.
--- To revive: move this file to lua/plugins/, restore the ",h" group line in
--- plugins/which-key.lua.
+-- Harpoon: pin the handful of files you keep bouncing between and jump to
+-- them by slot. ,ha pins the current file, ,hl opens the list (edit it like
+-- a buffer, :w or q to close), ,1 … ,9 jump to a slot. Lives alongside
+-- bufferline tabs. (Revived 2026-10-11 after being benched since 2026-08-13.)
 local keys = {
   {
     ",ha",

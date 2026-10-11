@@ -56,6 +56,21 @@ vim.schedule(function()
     local t = Snacks.config.get("terminal", {}).win.keys
     check("terminal <C-j> desc", t.nav_j.desc, "Go to Upper Window")
     check("terminal <C-k> desc", t.nav_k.desc, "Go to Lower Window")
+    -- oil and harpoon live alongside the snacks explorer
+    check(",a is still the explorer", vim.fn.maparg(",a", "n", false, true).desc, "Toggle/Focus Explorer (Root Dir)")
+    check("- opens oil for the file's directory", vim.fn.maparg("-", "n", false, true).desc, "Open Parent Directory (Oil Float)")
+    check(",o opens oil at the project root", vim.fn.maparg(",o", "n", false, true).desc, "Open Project Root (Oil Float)")
+    require("oil").open_float()
+    vim.wait(3000, function() return vim.bo.filetype == "oil" end, 50)
+    check("oil float shows the directory as a buffer", vim.bo.filetype, "oil")
+    vim.wait(5000, function() return vim.fn.search("long.txt", "nw") > 0 end, 50) -- the listing fills in async
+    check("oil lists this file", vim.fn.search("long.txt", "nw") > 0, true)
+    require("oil").close()
+    check("harpoon keys", vim.fn.maparg(",ha", "n", false, true).desc .. " / " .. vim.fn.maparg(",hl", "n", false, true).desc .. " / " .. vim.fn.maparg(",3", "n", false, true).desc, "Harpoon Add File / Harpoon Quick Menu / Harpoon File 3")
+    require("harpoon"):list():clear()
+    vim.fn.maparg(",ha", "n", false, true).callback()
+    check("harpoon pins the current file", require("harpoon"):list():length(), 1)
+    require("harpoon"):list():clear()
     -- undotree
     require("lazy").load({ plugins = { "undotree" } })
     check("undotree custom map defined", vim.fn.exists("*g:Undotree_CustomMap"), 1)

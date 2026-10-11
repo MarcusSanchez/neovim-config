@@ -160,9 +160,9 @@ map("n", ",q", "<leader>bd", { remap = true, desc = "Close Current Buffer" })
 -- let ,f format the current buffer
 map("n", ",f", ":w<CR>", { desc = "Format + Save Current Buffer" })
 
--- snacks explorer sidebar (lua/util/explorer.lua; the oil/harpoon/neo-tree
--- alternatives are benched in lua/benched/). ,a opens it, focuses it when
--- open, closes it when focused; ,c closes it.
+-- snacks explorer sidebar (lua/util/explorer.lua; oil lives next to it on
+-- `-`/`,o`, harpoon on `,h…`, neo-tree is benched in lua/benched/). ,a opens
+-- it, focuses it when open, closes it when focused; ,c closes it.
 map("n", ",a", function()
   require("util.explorer").toggle()
 end, { desc = "Toggle/Focus Explorer (Root Dir)" })
