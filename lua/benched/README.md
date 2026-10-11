@@ -9,3 +9,6 @@ notes at the top of the file.
   benched 2026-08-13 in favour of bufferline tabs.
 - `oil.lua` — buffer-as-filesystem explorer in a float (`-` / `,a`),
   benched 2026-08-13 in favour of the snacks explorer sidebar.
+- `neo-tree.lua` — neo-tree as the sidebar, benched 2026-10-11 after a day:
+  same shape as the snacks explorer minus its filter input. The helper
+  `lua/util/explorer.lua` still has its backend.

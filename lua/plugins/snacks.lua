@@ -32,9 +32,9 @@ return {
       },
     },
     -- dashboard config lives in dashboard.lua
-    -- the sidebar is neo-tree for now (plugins/neo-tree.lua, util/explorer.lua);
-    -- set this back to true and vim.g.explorer = "snacks" to return
-    explorer = { enabled = false },
+    -- the explorer rides as the right sidebar below (neo-tree was tried and
+    -- benched: lua/benched/neo-tree.lua)
+    explorer = { enabled = true },
     -- j/k are swapped in this config (see config/keymaps.lua): every
     -- picker list and the terminal window nav follow suit
     picker = {

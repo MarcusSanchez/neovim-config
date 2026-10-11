@@ -1,12 +1,11 @@
 -- The file-explorer sidebar: open/focus/close helpers shared by the ,a/,c
 -- keymaps, the :q-on-last-window autocmd, the session hooks and the tab bar.
 -- Two backends behind one API, picked by vim.g.explorer:
---   "neo-tree"  (current, on trial since 2026-10-11)
---   "snacks"    the snacks picker explorer (plugins/snacks.lua keeps its
---               config; flip vim.g.explorer and re-enable it there)
+--   "snacks"    the snacks picker explorer (current)
+--   "neo-tree"  benched 2026-10-11 (lua/benched/neo-tree.lua says how to revive)
 local M = {}
 
-M.backend = vim.g.explorer or "neo-tree"
+M.backend = vim.g.explorer or "snacks"
 
 --- Is this buffer a sidebar buffer (either backend)?
 function M.is_sidebar_buf(buf)
@@ -76,7 +75,7 @@ backends.snacks = {
 }
 
 local function b()
-  return backends[M.backend] or backends["neo-tree"]
+  return backends[M.backend] or backends.snacks
 end
 
 --- The open explorer on this tab (a window id or picker), or nil.

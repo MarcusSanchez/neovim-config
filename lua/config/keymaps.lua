@@ -160,7 +160,7 @@ map("n", ",q", "<leader>bd", { remap = true, desc = "Close Current Buffer" })
 -- let ,f format the current buffer
 map("n", ",f", ":w<CR>", { desc = "Format + Save Current Buffer" })
 
--- the sidebar — neo-tree, on trial (lua/util/explorer.lua; the oil/harpoon
+-- snacks explorer sidebar (lua/util/explorer.lua; the oil/harpoon/neo-tree
 -- alternatives are benched in lua/benched/). ,a opens it, focuses it when
 -- open, closes it when focused; ,c closes it.
 map("n", ",a", function()

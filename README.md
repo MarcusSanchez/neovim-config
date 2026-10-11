@@ -18,7 +18,7 @@ lua/util/                feature logic, one module per feature
   symbols.lua            gs workspace symbol search minus the noise
   noise.lua              what counts as test/generated code (paths + rust treesitter)
   popup.lua              gk hover / ge diagnostics styling and <Esc> dismissal
-  explorer.lua           sidebar open/focus/close helpers (neo-tree on trial; snacks backend kept)
+  explorer.lua           sidebar open/focus/close helpers (snacks; a neo-tree backend is kept)
   autosave.lua           debounced normal-mode autosave, no formatting
   scroll.lua             'scrolloff' holds past the end of the buffer
   folds.lua              folds persist across sessions, anchored to the text they hide
@@ -48,7 +48,7 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
 | `gh` | back to where the last jump came from (tagstack) |
 | `gs` / `g/` | workspace symbols / project grep (literal, no escaping) |
 | `gk` / `ge` | hover docs / line diagnostics, in a cursor popup; `<Esc>` dismisses; `gd` inside the hover follows a link (file links jump there, https opens the browser) |
-| `,a` / `,c` | toggle-focus / close the sidebar (neo-tree; `<Esc>` in it returns to the editor) |
+| `,a` / `,c` | toggle-focus / close the explorer sidebar |
 | `,q` `,f` `,r` `,g` `,d` `,j` `,u` | close buffer, format+save, rename, code action, fold, split/join, undotree |
 | `,w` `,e` `<leader>j` `<leader>k` | window left / right / up / down |
 | `A-h` / `A-l` | previous / next buffer |
