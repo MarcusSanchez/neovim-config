@@ -31,9 +31,10 @@ return {
         },
       },
     },
-    -- dashboard config lives in dashboard.lua; the explorer rides as the
-    -- right sidebar below
-    explorer = { enabled = true },
+    -- dashboard config lives in dashboard.lua
+    -- the sidebar is neo-tree for now (plugins/neo-tree.lua, util/explorer.lua);
+    -- set this back to true and vim.g.explorer = "snacks" to return
+    explorer = { enabled = false },
     -- j/k are swapped in this config (see config/keymaps.lua): every
     -- picker list and the terminal window nav follow suit
     picker = {

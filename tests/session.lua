@@ -25,7 +25,7 @@ vim.schedule(function()
       vim.cmd("edit main.go"); vim.cmd("edit main_test.go")
       -- quit with the explorer sidebar open, like :wqa with the project view
       -- up; persistence saves on VimLeavePre (that's where its hooks fire)
-      Snacks.explorer({ cwd = vim.fn.getcwd() }); vim.wait(1500, function() return require("util.explorer").get() ~= nil end, 50)
+      require("util.explorer").toggle(); vim.wait(3000, function() return require("util.explorer").get() ~= nil end, 50)
       check("pass 1: explorer open before quitting", require("util.explorer").get() ~= nil, true)
       vim.cmd("wqall")
       return
@@ -46,7 +46,7 @@ vim.schedule(function()
     end
     check("pass 2: no [No Name] buffer in the restored session", unnamed, 0)
     local plain = vim.tbl_filter(function(w)
-      return vim.api.nvim_win_get_config(w).relative == "" and vim.w[w].snacks_win == nil
+      return vim.api.nvim_win_get_config(w).relative == "" and not require("util.explorer").is_sidebar_buf(vim.api.nvim_win_get_buf(w))
     end, vim.api.nvim_list_wins())
     check("pass 2: no empty split left where the explorer was", #plain, 1)
     vim.wait(3000, function() return require("util.explorer").get() ~= nil end, 50)
@@ -54,6 +54,7 @@ vim.schedule(function()
     check("pass 2: editor window keeps focus", vim.bo.filetype, "go")
     -- the tabline section above the sidebar must match the bar, not the
     -- explorer window's opaque SnacksNormal
+    vim.cmd("redrawtabline")
     local r = vim.api.nvim_eval_statusline(vim.o.tabline, { use_tabline = true, highlights = true })
     local last = r.highlights[#r.highlights]
     check("pass 2: tabline offset above the sidebar uses the bar's fill", last and last.group, "BufferLineFill")

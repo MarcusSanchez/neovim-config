@@ -65,7 +65,7 @@ function M.setup()
       for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
         if
           vim.api.nvim_win_get_config(win).relative == ""
-          and vim.bo[vim.api.nvim_win_get_buf(win)].filetype:find("^snacks_")
+          and require("util.explorer").is_sidebar_buf(vim.api.nvim_win_get_buf(win))
         then
           had = true
           pcall(vim.api.nvim_win_close, win, true)
@@ -100,18 +100,7 @@ function M.setup()
       end
       if vim.g.SessionExplorer == 1 then
         vim.schedule(function()
-          if not require("util.explorer").get() then
-            Snacks.explorer({
-              cwd = LazyVim.root(),
-              -- the picker shows asynchronously; hand focus back to the
-              -- editor window it was opened from once it's up
-              on_show = function(picker)
-                if picker.main and vim.api.nvim_win_is_valid(picker.main) then
-                  vim.api.nvim_set_current_win(picker.main)
-                end
-              end,
-            })
-          end
+          require("util.explorer").open_unfocused()
         end)
       end
     end,
