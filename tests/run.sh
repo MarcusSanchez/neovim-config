@@ -3,7 +3,7 @@
 # Needs gopls, rust-analyzer and buf on PATH (mason installs them).
 #
 #   tests/run.sh          # everything
-#   tests/run.sh go       # one suite: go | rust | session | proto | scroll | keys | folds
+#   tests/run.sh go       # one suite: go | rust | session | copilot | proto | scroll | keys | folds
 #
 # Each suite drives a real nvim with this config against a fixture project
 # and prints PASS/FAIL lines. Fixtures are copied to a temp dir first: the
@@ -46,6 +46,31 @@ if [[ $want == all || $want == session ]]; then
   SESSION_PASS=2 run session "$work/go" "" "$here/session.lua" "$work/go/result.log"
   unset SESSION_PASS
   export XDG_STATE_HOME="$work/state"
+fi
+if [[ $want == all || $want == copilot ]]; then
+  # a fake orphaned server (argv carries the server path; its parent exits so
+  # launchd adopts it) for the startup reaper; then the real nvim is SIGKILLed
+  # and the real server must die with it
+  ( bash -c 'exec -a "FAKE-ORPHAN '"$here"'/../x/copilot.lua/copilot/js/language-server.js" sleep 300' >/dev/null 2>&1 & )
+  sleep 1
+  rm -f "$work/go/ready" "$work/go/server.pid" "$work/go/nvim.pid" "$work/go/result.log"
+  (cd "$work/go" && nvim --headless main.go -c "luafile $here/copilot.lua" >/dev/null 2>&1) &
+  subshell=$!
+  for _ in $(seq 1 90); do [[ -f $work/go/ready ]] && break; sleep 1; done
+  echo "== copilot"
+  if [[ -f $work/go/result.log ]]; then cat "$work/go/result.log"; else echo "no result written"; status=1; fi
+  nvpid=$(cat "$work/go/nvim.pid" 2>/dev/null)
+  kill -9 "${nvpid:-$subshell}" 2>/dev/null; wait "$subshell" 2>/dev/null
+  srv=$(cat "$work/go/server.pid" 2>/dev/null)
+  if [[ -n $srv ]]; then
+    gone=""
+    for i in $(seq 1 15); do kill -0 "$srv" 2>/dev/null || { gone=$i; break; }; sleep 1; done
+    if [[ -n $gone ]]; then echo "PASS server died after nvim was SIGKILLed (~${gone}s)"; else echo "FAIL server SURVIVED nvim's SIGKILL"; status=1; kill -9 "$srv"; fi
+  else
+    echo "FAIL no server pid recorded"; status=1
+  fi
+  pkill -f 'FAKE-ORPHAN' 2>/dev/null
+  grep -q '^FAIL\|ERROR\|TIMEOUT' "$work/go/result.log" 2>/dev/null && status=1
 fi
 [[ $want == all || $want == proto ]] && run proto "$work/proto" acme/v1/user.proto "$here/proto.lua" "$work/proto/result.log"
 if [[ $want == all || $want == scroll || $want == keys || $want == folds ]]; then

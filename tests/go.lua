@@ -123,6 +123,12 @@ vim.schedule(function()
     vim.cmd("normal! zR")
     -- explorer helpers
     local ex = require("util.explorer"); check("explorer closed -> nil", ex.get(), nil)
+    local wins = {}
+    for _, w in ipairs(vim.api.nvim_list_wins()) do
+      local b = vim.api.nvim_win_get_buf(w)
+      wins[#wins + 1] = ("%s%s[%s]"):format(vim.api.nvim_win_get_config(w).relative ~= "" and "float:" or "", vim.fn.fnamemodify(vim.api.nvim_buf_get_name(b), ":t"), vim.bo[b].filetype)
+    end
+    log("  windows: " .. table.concat(wins, " "))
     check("real window count", ex.real_window_count(), 1)
   end)
   log(ok and "DONE" or ("ERROR: " .. tostring(err)))

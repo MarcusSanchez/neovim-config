@@ -3,6 +3,9 @@ return {
   cmd = "Copilot",
   build = ":Copilot auth",
   event = "BufReadPost",
+  init = function()
+    require("util.copilot").setup() -- reap servers orphaned by earlier sessions
+  end,
   opts = {
     suggestion = {
       enabled = true, -- Enable inline ghost text
@@ -30,7 +33,13 @@ return {
       cvs = false,
       ["."] = false,
     },
-    copilot_node_command = "node", -- Make sure your node version is >= 20
-    server_opts_overrides = {},
+    -- node >= 20, launched through a watchdog wrapper so the server can't
+    -- outlive nvim (lua/util/copilot.lua)
+    copilot_node_command = require("util.copilot").node_command(),
+    server_opts_overrides = {
+      -- a normal quit waits up to this long for the polite shutdown, then
+      -- force-stops the server (nvim's default is to not wait at all)
+      exit_timeout = 1000,
+    },
   },
 }
