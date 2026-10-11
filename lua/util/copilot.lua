@@ -10,7 +10,8 @@
 --      watchdog kills it as soon as nvim's pid is gone, however nvim went
 --   2. the client gets an exit_timeout, so a normal quit waits briefly for
 --      the polite shutdown and force-stops the server if it stalls
---   3. at startup, any server already orphaned (parent = launchd) is reaped
+--   3. at startup, any server already orphaned (parent = launchd) is
+--      reaped, silently
 local M = {}
 
 M.server = "copilot.lua/copilot/js/language-server.js"
