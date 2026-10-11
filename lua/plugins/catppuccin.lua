@@ -109,6 +109,13 @@ return {
 
             -- rust
             ["@lsp.type.macro.rust"] = { fg = colors.blue },
+            -- treesitter captures every path qualifier as @module, so a type
+            -- used as one (`Dongle::open()`) inherited the namespace italic
+            -- even under rust-analyzer's struct token (attributes combine;
+            -- a token can't un-italic). Keep the capture upright and let
+            -- the semantic token say which qualifiers are real modules.
+            ["@module.rust"] = { fg = colors.subtext1, style = {} },
+            ["@lsp.type.namespace.rust"] = { fg = colors.subtext1, style = { "italic" } },
 
             -- zig
             ["@keyword.import.zig"] = { fg = colors.blue },

@@ -22,6 +22,27 @@ vim.schedule(function()
     vim.wait(10000, function() return not p.finder:running() and p:count() > 0 end, 100); vim.wait(500, function() return false end)
     log("gs 'foobar' -> " .. table.concat(vim.tbl_map(function(i) return i.name .. "@" .. i.pos[1] end, p:items()), ", ") .. "  (want only foobar@1)")
     p:close()
+    -- a type used as a path qualifier is upright; a module qualifier is italic
+    local function resolved(name)
+      local n = name
+      for _ = 1, 20 do
+        local h = vim.api.nvim_get_hl(0, { name = n })
+        if h.link then n = h.link elseif next(h) == nil and n:find("%.") then n = n:gsub("%.[^.]+$", "") else break end
+      end
+      return vim.api.nvim_get_hl(0, { name = n, link = false }).italic == true
+    end
+    local function italic_at(row, col)
+      local info = vim.inspect_pos(0, row, col)
+      for _, c in ipairs(info.treesitter) do if resolved(c.hl_group) then return true end end
+      for _, t in ipairs(info.semantic_tokens) do if resolved(t.opts.hl_group) then return true end end
+      return false
+    end
+    local t = vim.fn.searchpos("Dongle::open()", "nw") -- the usage in use_it
+    local m = vim.fn.searchpos("dongle::Error> { Dongle", "nw")
+    local trow, tcol, mrow, mcol = t[1] - 1, t[2] - 1, m[1] - 1, m[2] - 1
+    vim.wait(20000, function() return #vim.lsp.semantic_tokens.get_at_pos(0, trow, tcol) > 0 end, 250)
+    log(("%s type as path qualifier (`Dongle::open`) upright: %s (want false)"):format(italic_at(trow, tcol) == false and "PASS" or "FAIL", tostring(italic_at(trow, tcol))))
+    log(("%s module qualifier (`dongle::Error`) italic: %s (want true)"):format(italic_at(mrow, mcol) and "PASS" or "FAIL", tostring(italic_at(mrow, mcol))))
   end)
   log(ok and "DONE" or ("ERROR: " .. tostring(err)))
   vim.cmd("qall!")

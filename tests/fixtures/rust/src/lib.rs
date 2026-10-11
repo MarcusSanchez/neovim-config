@@ -15,3 +15,8 @@ mod tests {
         assert_eq!(foobar(), 1);
     }
 }
+
+pub mod dongle { pub struct Error; }
+pub struct Dongle;
+impl Dongle { pub fn open() -> Result<Dongle, dongle::Error> { Ok(Dongle) } }
+pub fn use_it() -> Result<Dongle, dongle::Error> { Dongle::open() }
