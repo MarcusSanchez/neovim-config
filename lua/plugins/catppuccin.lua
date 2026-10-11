@@ -114,8 +114,8 @@ return {
             -- even under rust-analyzer's struct token (attributes combine;
             -- a token can't un-italic). Keep the capture upright and let
             -- the semantic token say which qualifiers are real modules.
-            ["@module.rust"] = { fg = colors.subtext1, style = {} },
-            ["@lsp.type.namespace.rust"] = { fg = colors.subtext1, style = { "italic" } },
+            ["@module.rust"] = { fg = colors.yellow, style = {} },
+            ["@lsp.type.namespace.rust"] = { fg = colors.yellow, style = { "italic" } },
 
             -- zig
             ["@keyword.import.zig"] = { fg = colors.blue },
