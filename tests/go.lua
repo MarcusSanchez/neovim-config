@@ -142,14 +142,23 @@ vim.schedule(function()
     vim.fn.writefile({ "package main", "", "func h(", "\ta int,", "\tb int,", ") int {", "\treturn a + b", "}" }, "sig.go")
     vim.cmd("edit sig.go")
     local gb = vim.api.nvim_get_current_buf()
-    vim.wait(5000, function() return vim.fn.foldlevel(4) > 0 end, 50); wait(500)
+    vim.wait(5000, function() return vim.fn.foldlevel(4) > 1 end, 50); wait(500)
+    -- the parameter list is its own fold: zc on `func h(` folds just it
+    -- (it ends the line before `) int {`: that line also starts the body
+    -- fold, and a fold expression marks one fold per line, so the closing
+    -- line stays visible right under the fold)
     vim.cmd("normal! 3Gzc")
-    check("wrapped signature fold line", vim.fn.foldtextresult(3), "func h( ... ) int { ... }")
-    chunks = nil
-    vim.wo.foldtext = "v:lua.__fold_probe()"; vim.fn.foldtextresult(3); vim.wo.foldtext = ft
-    local dims = {}
-    for _, c in ipairs(chunks) do if c[2] == "FoldEllipsis" then dims[#dims + 1] = c[1] end end
-    check("hidden brackets and dots dim, signature text not", table.concat(dims, "|"), "(| ... |)|{| ... |}")
+    check("zc on the signature folds the parameters only", vim.fn.foldclosed(3) .. ".." .. vim.fn.foldclosedend(3), "3..5")
+    check("parameters fold line", vim.fn.foldtextresult(3), "func h( ...")
+    check("the closing line stays visible below it", vim.fn.foldclosed(6), -1)
+    -- a second zc folds the whole function
+    vim.cmd("normal! 3Gzc")
+    check("second zc folds the whole function", vim.fn.foldclosed(3) .. ".." .. vim.fn.foldclosedend(3), "3..8")
+    check("whole-function fold line", vim.fn.foldtextresult(3), "func h( ... ) int { ... }")
+    -- the body folds on its own from its opening line
+    vim.cmd("normal! zR"); vim.cmd("normal! 6Gzc")
+    check("zc on the body line folds the body only", vim.fn.foldclosed(6) .. ".." .. vim.fn.foldclosedend(6), "6..8")
+    check("body fold line", vim.fn.foldtextresult(6), ") int { ... }")
     vim.cmd("normal! zR"); vim.cmd("buffer main.go"); vim.api.nvim_buf_delete(gb, { force = true }); vim.fn.delete("sig.go")
     -- a folded multi-line string closes its quote on the fold line
     vim.fn.writefile({ "package main", "", "var q = `", "select 1", "`", "", "var r = []string{`", "a", "`, \"b\"}" }, "str.go")

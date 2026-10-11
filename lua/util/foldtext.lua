@@ -98,11 +98,19 @@ local function unmatched_openers(line)
   return stack
 end
 
---- Closing punctuation at the end of the fold (`}`, `)`, `]`, `},`, `});`,
---- a string's closing quote, rust's `"#`…), or nil when the last line is
---- more than that.
+--- The fold's last line split into its leading closers (`}`, `)`, `]`, a
+--- string's closing quote, rust's `"#`, with a trailing `,`/`;`) and the
+--- rest — `) -> Result<(), Error> {` is closers `)` plus the rest. Nil
+--- closers when the line doesn't start with one.
 local function closer(last)
-  return last:match("^%s*([%)%]}\"'`#]+[,;]?)%s*$")
+  local closers, rest = last:match("^%s*([%)%]}\"'`#]+[,;]?)(.*)$")
+  if not closers then
+    return nil, nil
+  end
+  if rest:match("^[,;]?%s*$") then
+    return closers .. rest:gsub("%s+$", ""), ""
+  end
+  return closers, rest
 end
 
 --- Columns of the trailing opening brackets on a line (`func h(`, `x := {`).
@@ -230,10 +238,12 @@ function M.text()
     break
   end
 
-  -- the tail: ` ... ` and the last line's closers, each coloured like the
-  -- opener it pairs with on the head line (dim when that opener is hidden)
+  -- the tail: ` ... ` and the last line's leading closers, each coloured
+  -- like the opener it pairs with on the head line (dim when that opener is
+  -- hidden), then whatever follows them on that line — so a parameters-only
+  -- fold reads `fn send( ... ) -> Result<(), Error> {`
   local last = line_at(last_lnum)
-  local tail = closer(last)
+  local tail, rest = closer(last)
   local _, hl = highlighted(buf, lnum, line)
   local dim_from = select(2, trailing_openers(line))
   chunks[#chunks + 1] = { tail and " ... " or " ...", "FoldEllipsis" }
@@ -249,6 +259,20 @@ function M.text()
         end
       end
       chunks[#chunks + 1] = { ch, group }
+    end
+    if rest and rest ~= "" then
+      -- the remainder of the last line, highlighted in place
+      local indent = last:match("^%s*")
+      local seg = highlighted(buf, last_lnum, last, trailing_openers(last))
+      local skip = #indent + #tail -- bytes already rendered (indent + closers)
+      local pos = 0
+      for _, c in ipairs(seg) do
+        local text = c[1]
+        if pos + #text > skip then
+          chunks[#chunks + 1] = { text:sub(math.max(skip - pos + 1, 1)), c[2] }
+        end
+        pos = pos + #text
+      end
     end
   end
   return chunks

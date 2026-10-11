@@ -27,6 +27,7 @@ lua/util/                feature logic, one module per feature
 lua/plugins/             one lazy.nvim spec per plugin (LazyVim merges them)
 lua/benched/             shelved specs (neo-tree) — not imported, see its README
 queries/<lang>/context.scm   treesitter-context: pin declarations only, not loops/ifs
+queries/<lang>/folds.scm     parameter lists fold on their own (zc on `fn f(` folds the params; again, the function)
 tests/                   headless regression suite — tests/run.sh
 ```
 
