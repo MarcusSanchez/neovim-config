@@ -5,6 +5,10 @@
 -- bracket are only drawn — the real lines are untouched.
 local M = {}
 
+-- closer -> opener; quotes close themselves (multi-line strings fold too)
+local pairs_of = { [")"] = "(", ["]"] = "[", ["}"] = "{", ['"'] = '"', ["'"] = "'", ["`"] = "`" }
+local OPENERS = "[%({%[\"'`]"
+
 --- The fold's first line as highlighted chunks, from the buffer's treesitter
 --- highlights query (per-column, last capture wins, like the highlighter).
 ---@param dim_from? integer 1-based column from which trailing opening brackets are drawn dim
@@ -64,7 +68,7 @@ local function highlighted(buf, lnum, line, dim_from)
   -- ` ... }` tail, so they take its colour rather than a rainbow one
   if dim_from then
     for col = dim_from, #line do
-      if line:sub(col, col):match("[%({%[]") then
+      if line:sub(col, col):match(OPENERS) then
         hl[col] = "FoldEllipsis"
       end
     end
@@ -82,34 +86,34 @@ local function highlighted(buf, lnum, line, dim_from)
   return chunks, hl
 end
 
-local pairs_of = { [")"] = "(", ["]"] = "[", ["}"] = "{" }
-
 --- Columns of the first line's openers still unmatched at its end, bottom
 --- to top. The fold's closers on the last line pop these in order.
 local function unmatched_openers(line)
   local stack = {}
   for col = 1, #line do
     local ch = line:sub(col, col)
-    if ch:match("[%({%[]") then
+    local top = stack[#stack] and line:sub(stack[#stack], stack[#stack])
+    if pairs_of[ch] and top == pairs_of[ch] then
+      stack[#stack] = nil -- closes the innermost opener (a quote closes itself)
+    elseif ch:match(OPENERS) then
       stack[#stack + 1] = col
-    elseif pairs_of[ch] and stack[#stack] and line:sub(stack[#stack], stack[#stack]) == pairs_of[ch] then
-      stack[#stack] = nil
     end
   end
   return stack
 end
 
---- Closing punctuation at the end of the fold (`}`, `)`, `]`, `},`, `});`…),
---- or nil when the last line is more than that.
+--- Closing punctuation at the end of the fold (`}`, `)`, `]`, `},`, `});`,
+--- a string's closing quote, rust's `"#`…), or nil when the last line is
+--- more than that.
 local function closer(last)
-  return last:match("^%s*([%)%]}]+[,;]?)%s*$")
+  return last:match("^%s*([%)%]}\"'`#]+[,;]?)%s*$")
 end
 
 function M.text()
   local buf = vim.api.nvim_get_current_buf()
   local first = vim.api.nvim_buf_get_lines(buf, vim.v.foldstart - 1, vim.v.foldstart, false)[1] or ""
   local last = vim.api.nvim_buf_get_lines(buf, vim.v.foldend - 1, vim.v.foldend, false)[1] or ""
-  local dim_from = first:find("[%({%[]+%s*$")
+  local dim_from = first:find(OPENERS .. "+%s*$")
   local chunks, hl = highlighted(buf, vim.v.foldstart, first, dim_from)
   local tail = closer(last)
   chunks[#chunks + 1] = { tail and " ... " or " ...", "FoldEllipsis" }
