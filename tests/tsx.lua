@@ -41,7 +41,7 @@ vim.schedule(function()
     fold(9)
     check("a class folds through its brace", shape(9), "8..14 export class Store { ... }")
     fold(26)
-    check("an element folds through its closing tag", shape(26), "19..27 <header ... </header>")
+    check("an element folds through its closing tag", shape(26), "19..27 <header ... > ... </header>")
     fold(19)
     check("a wrapped opening tag folds its attributes through >", shape(19), "19..25 <header ... >")
     fold(21)
@@ -51,7 +51,7 @@ vim.schedule(function()
     fold(33)
     check("a self-closing tag the server skips (treesitter knows it)", shape(33), "32..35 <script ... />")
     fold(41)
-    check("an element with wrapped attributes, from its text", shape(41), "37..42 <a ... </a>")
+    check("an element with wrapped attributes, from its text", shape(41), "37..42 <a ... > ... </a>")
     fold(38)
     check("its attribute list on its own", shape(38), "37..40 <a ... >")
     fold(46)
@@ -81,9 +81,9 @@ vim.schedule(function()
     vim.fn.foldtextresult(18)
     vim.wo.foldtext = ft
     check(
-      "closing tag dim on the fold line",
+      "closing tag keeps its colours on the fold line",
       _G.__chunks[#_G.__chunks][1] .. "=" .. _G.__chunks[#_G.__chunks][2],
-      "</main>=FoldEllipsis"
+      ">=@tag.delimiter.tsx"
     )
     -- every visible chunk has a colour of its own: attribute names and tag
     -- names must not fall back to Folded (helper captures carry no colour)

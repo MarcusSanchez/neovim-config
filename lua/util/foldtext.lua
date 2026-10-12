@@ -162,6 +162,29 @@ local function opening_line(buf, lnum, col)
   return node:start() + 1
 end
 
+--- For a line that starts an opening tag whose attributes wrap (`<a`
+--- without its `>`): the line the tag ends on, via treesitter.
+local function tag_end_line(buf, lnum, line)
+  local col = #line:match("^%s*") + 1
+  if not line:match("^%s*<[%w%.%-_]*") or line:find(">", col, true) then
+    return
+  end
+  local ok, node =
+    pcall(vim.treesitter.get_node, { bufnr = buf, pos = { lnum - 1, col - 1 }, ignore_injections = true })
+  if not ok or not node then
+    return
+  end
+  local tags =
+    { jsx_opening_element = true, jsx_self_closing_element = true, start_tag = true, self_closing_tag = true }
+  while node and not tags[node:type()] do
+    node = node:parent()
+  end
+  if not node then
+    return
+  end
+  return node:end_() + 1
+end
+
 local function closing_line(buf, lnum, col)
   local ok, node =
     pcall(vim.treesitter.get_node, { bufnr = buf, pos = { lnum - 1, col - 1 }, ignore_injections = true })
@@ -250,6 +273,21 @@ function M.text()
     end
     vim.list_extend(chunks, (highlighted(buf, lnum, line, dim)))
     if not from then
+      -- an opening tag whose attributes wrap: elide them up to its `>`, so
+      -- `<a` … `>` … `</a>` reads `<a ... > ... </a>`
+      local tag_end = tag_end_line(buf, lnum, line)
+      if tag_end and tag_end > lnum and tag_end < last_lnum then
+        chunks[#chunks + 1] = { " ... ", "FoldEllipsis" }
+        local raw = line_at(tag_end)
+        local seg = highlighted(buf, tag_end, raw)
+        if seg[1] and seg[1][1]:match("^%s+$") then
+          table.remove(seg, 1)
+        elseif seg[1] then
+          seg[1][1] = seg[1][1]:gsub("^%s+", "")
+        end
+        vim.list_extend(chunks, seg)
+        lnum, line = tag_end, raw
+      end
       break
     end
     local close = closing_line(buf, lnum, #line:gsub("%s+$", ""))
@@ -345,7 +383,16 @@ function M.text()
   local dim_from = select(2, trailing_openers(line))
   chunks[#chunks + 1] = { tail and " ... " or " ...", "FoldEllipsis" }
   if tail and tail:match("^[</>]") then
-    chunks[#chunks + 1] = { tail, "FoldEllipsis" } -- a closing tag the fold hides behind: dim, like `}`
+    -- a closing tag keeps its own colours (the one closer that isn't dim:
+    -- `</main>` reads as the tag it is, not as punctuation)
+    local indent, pos = #last:match("^%s*"), 0
+    for _, c in ipairs((highlighted(buf, last_lnum, last))) do
+      local text = c[1]
+      if pos + #text > indent and pos < indent + #tail then
+        chunks[#chunks + 1] = { text:sub(math.max(indent - pos + 1, 1), indent + #tail - pos), c[2] }
+      end
+      pos = pos + #text
+    end
   elseif tail then
     local openers = unmatched_openers(line)
     for i = 1, #tail do
