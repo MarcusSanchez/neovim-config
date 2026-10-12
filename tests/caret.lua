@@ -99,12 +99,68 @@ lib.suite("gopls", function(t)
   key("h")
   t.check("h from `)` onto the dots opens the fold", vim.fn.foldclosed(5), -1)
   t.check("cursor at the end of the last hidden line", cursor(), "7:6")
-  -- an edit drops the caret
+  -- Vim's cursor is hidden (a beam in the line's colour) while the caret shows
   t.fold(6)
   key("$")
   t.check("caret back", caret(), "{")
+  t.check("the cursor is hidden while the caret shows", vim.o.guicursor:match("n:ver1%-FoldHiddenCursor$") ~= nil, true)
+  local hl = vim.api.nvim_get_hl(0, { name = "FoldHiddenCursor" })
+  t.check("in the cursor line's colour", hl.bg ~= nil and hl.bg == hl.fg, true)
+  vim.cmd("normal! k")
+  vim.api.nvim_exec_autocmds("CursorMoved", { buffer = buf })
+  t.check("moving off the fold restores the cursor", vim.o.guicursor:find("FoldHiddenCursor") == nil, true)
+  t.check("restored to the value from before", FC.hidden(), nil)
+  vim.cmd("normal! j")
+  key("$")
+  -- an edit drops the caret
+  t.check("caret back", caret(), "{")
   vim.api.nvim_buf_set_lines(buf, 9, 10, false, { "}", "" })
   t.check("an edit drops the caret", caret(), "none")
+  vim.api.nvim_exec_autocmds("TextChanged", { buffer = buf })
+  t.check("and shows the cursor", vim.o.guicursor:find("FoldHiddenCursor") == nil, true)
+  -- a line with two ` ... `: each opens only what it hides
+  vim.api.nvim_buf_set_lines(buf, 9, 11, false, { "}" }) -- the edit undone; gopls answers again
+  vim.wait(10000, function()
+    for _, r in ipairs(FR.ranges(buf) or {}) do
+      if r[1] == 5 and r[2] == 10 then
+        return true
+      end
+    end
+    return false
+  end, 50)
+  t.wait(300)
+  vim.cmd("normal! zR")
+  t.fold(6) -- parameters
+  t.fold(9) -- body, over the folded parameters: the whole function
+  t.check(
+    "the whole function is folded",
+    t.span(5) .. " " .. vim.fn.foldtextresult(5),
+    "5..10 func h( ... ) (int, error) { ... }"
+  )
+  vim.api.nvim_win_set_cursor(win, { 5, 6 }) -- `(`
+  key("l")
+  t.check("onto the first dots: the parameters open", vim.fn.foldclosed(6), -1)
+  t.check("the body stays folded", t.span(9), "8..10")
+  t.check("cursor on the first parameter", cursor(), "6:1")
+  vim.cmd("normal! zR")
+  t.fold(6)
+  t.fold(9)
+  vim.api.nvim_win_set_cursor(win, { 8, 15 }) -- `{`
+  key("l")
+  t.check("onto the second dots: the body opens", vim.fn.foldclosed(9), -1)
+  t.check("the parameters stay folded", t.span(6), "5..8")
+  t.check("cursor on the first body line", cursor(), "9:1")
+  vim.cmd("normal! zR")
+  t.fold(6)
+  t.fold(9)
+  vim.api.nvim_win_set_cursor(win, { 10, 0 }) -- the `}` after the second dots
+  key("h")
+  t.check(
+    "back onto the second dots: the body opens, parameters folded",
+    vim.fn.foldclosed(9) .. " " .. t.span(6),
+    "-1 5..8"
+  )
+  t.check("cursor at the end of the last body line", cursor(), "9:29")
   -- off a fold the motions are as before: the config's w goes backwards
   vim.cmd("normal! zR")
   vim.api.nvim_win_set_cursor(win, { 9, 10 })

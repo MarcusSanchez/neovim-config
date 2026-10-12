@@ -97,17 +97,119 @@ local function word_motion(buf, run, text, col, above, below)
   return c[1], c[2]
 end
 
---- Open the closed fold at the cursor and put the cursor where the hidden
---- text begins (`dir` 1: the line after the cell `from` stands for) or
---- ends (`dir` -1: the line before it).
-local function open_into(win, from, dir)
+---@class util.foldcursor.Segment a ` ... ` of the fold line and what it hides
+---@field from integer first cell of the drawn run
+---@field to integer last cell of it
+---@field first integer first hidden buffer line
+---@field last integer last hidden buffer line
+---@field fold_s integer the fold hiding them runs from this line…
+---@field fold_e integer …to this one (the visible lines either side)
+
+--- The fold line's hidden runs, each with the lines it stands for: the
+--- lines between the visible cells either side of it (the fold's edges
+--- when there's none).
+---@return util.foldcursor.Segment[]
+local function segments(cells, start, stop)
+  local out, i = {}, 1
+  while i <= #cells do
+    if visible(cells[i]) then
+      i = i + 1
+    else
+      local j = i
+      while cells[j + 1] and not visible(cells[j + 1]) do
+        j = j + 1
+      end
+      local before, after = cells[i - 1], cells[j + 1]
+      out[#out + 1] = {
+        from = i,
+        to = j,
+        first = before and before.lnum + 1 or start,
+        last = after and after.lnum - 1 or stop,
+        fold_s = before and before.lnum or start,
+        fold_e = after and after.lnum or stop,
+      }
+      i = j + 1
+    end
+  end
+  return out
+end
+
+--- Stepping onto a ` ... `: open what it hides and nothing else. The
+--- closed fold opens; of the line's other hidden runs each gets its own
+--- fold closed again (`fn f( ... ) -> R { ... }` onto the first dots
+--- shows the parameters with the body still folded); folds inside the
+--- revealed lines stay as they were. The cursor lands where the hidden
+--- text begins (`dir` 1) or ends (`dir` -1).
+local function open_segment(win, buf, start, stop, cells, target, dir)
+  local segs = segments(cells, start, stop)
+  local mine
+  for _, seg in ipairs(segs) do
+    if target >= seg.from and target <= seg.to then
+      mine = seg
+    end
+  end
+  if not mine then
+    return
+  end
   api.nvim_win_call(win, function()
     vim.cmd("normal! zo")
-    local lnum = from.lnum + dir
+    -- the fold hiding this run, if still closed inside (not deeper ones)
+    for _ = 1, 10 do
+      local closed = vim.fn.foldclosed(mine.first)
+      if closed == -1 or closed > mine.fold_s then
+        break
+      end
+      vim.cmd(("silent! %dfoldopen"):format(mine.first))
+    end
+    local FR, folds = require("util.foldranges"), require("util.folds")
+    for _, seg in ipairs(segs) do
+      local closed = vim.fn.foldclosed(seg.first)
+      if seg ~= mine and (closed == -1 or closed > seg.fold_s) then
+        local s, e = FR.fold(buf, win, seg.fold_s - 1, seg.fold_e - 1)
+        if s then
+          folds.close_exact(s, e)
+        end
+      end
+    end
+    local lnum = dir > 0 and mine.first or mine.last
     local line = vim.fn.getline(lnum)
     local col = dir > 0 and #line:match("^%s*") or math.max(#line - 1, 0)
     api.nvim_win_set_cursor(win, { lnum, col })
   end)
+end
+
+-- Vim's own cursor sits in the fold line's first column whatever the
+-- caret does; while the caret is drawn it's a beam in the line's colour.
+local shown_as ---@type string? 'guicursor' before the cursor was hidden
+
+local function hide_cursor(win)
+  local function bg(group)
+    local ok, hl = pcall(api.nvim_get_hl, 0, { name = group, link = false })
+    return ok and hl.bg or nil
+  end
+  local color = (vim.wo[win].cursorline and bg("CursorLine")) or bg("Folded") or bg("Normal")
+  if not color then
+    return
+  end
+  api.nvim_set_hl(0, "FoldHiddenCursor", { fg = color, bg = color })
+  if not shown_as then
+    shown_as = vim.o.guicursor
+    vim.o.guicursor = shown_as .. ",n:ver1-FoldHiddenCursor"
+  end
+end
+
+local function show_cursor()
+  if shown_as then
+    vim.o.guicursor = shown_as
+    shown_as = nil
+  end
+end
+
+--- Whether the current window's cursor is on a caret it drew.
+local function on_caret()
+  local win, buf = api.nvim_get_current_win(), api.nvim_get_current_buf()
+  local start = vim.fn.foldclosed(api.nvim_win_get_cursor(win)[1])
+  return start ~= -1 and M.cell_at(win, buf, start) ~= nil
 end
 
 --- Run a motion with the pending count: as it is unless the cursor is on
@@ -179,14 +281,7 @@ function M.motion(key, run)
   end
   local cell = cells[target]
   if not visible(cell) then
-    -- onto the ` ... `: open the fold where the hidden text starts
-    local dir = target >= at and 1 or -1
-    local edge = nearest(cells, target, -dir)
-    if edge then
-      open_into(win, cells[edge], dir)
-    else
-      vim.cmd("normal! zo")
-    end
+    open_segment(win, buf, start, stop, cells, target, target >= at and 1 or -1)
     return
   end
   api.nvim_win_set_cursor(win, { cell.lnum, cell.col })
@@ -198,16 +293,34 @@ function M.motion(key, run)
     col = cell.col,
     tick = api.nvim_buf_get_changedtick(buf),
   }
+  hide_cursor(win)
   pcall(api.nvim__redraw, { win = win, range = { start - 1, stop }, valid = false })
+end
+
+--- The hidden-cursor state, for tests: the 'guicursor' value it will go
+--- back to, nil while shown.
+function M.hidden()
+  return shown_as
 end
 
 function M.setup()
   vim.opt.foldopen:remove("hor") -- the caret walks the fold line instead
   api.nvim_set_hl(0, "FoldCursor", { reverse = true, default = true })
+  local group = api.nvim_create_augroup("fold_cursor", { clear = true })
   api.nvim_create_autocmd("WinClosed", {
-    group = api.nvim_create_augroup("fold_cursor", { clear = true }),
+    group = group,
     callback = function(ev)
       states[tonumber(ev.match)] = nil
+    end,
+  })
+  -- the cursor comes back as soon as the caret is gone: moved off, the
+  -- text edited, the window or mode left
+  api.nvim_create_autocmd({ "CursorMoved", "TextChanged", "InsertEnter", "WinLeave", "BufLeave", "ModeChanged" }, {
+    group = group,
+    callback = function()
+      if shown_as and not on_caret() then
+        show_cursor()
+      end
     end,
   })
 end

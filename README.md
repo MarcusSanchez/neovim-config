@@ -108,9 +108,12 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
   `^` `$` on a folded line walk the line as drawn —
   `fn send( ... ) -> Result<(), Error> {` — and the real cursor sits on
   the buffer position the caret's character stands for, so `gk`, `ge`
-  and `gd` on `Error` act on it with the fold closed. Stepping onto the
-  ` ... ` opens the fold where the hidden text begins. Word motions keep
-  this config's meaning (`w` back, `b`/`e` forward, punctuation skipped).
+  and `gd` on `Error` act on it with the fold closed; Vim's own cursor,
+  stuck in the first column, is hidden meanwhile. Stepping onto a ` ... `
+  opens what it hides and nothing else: on `fn f( ... ) -> R { ... }` the
+  first dots show the parameters with the body still folded. Word motions
+  keep this config's meaning (`w` back, `b`/`e` forward, punctuation
+  skipped).
 - **Searching doesn't unfold**: a match inside a closed fold opens that
   fold only while the cursor is in it (`/`, `n`, `*`, `#`); step out and
   it closes again, unless you edited inside. Folds a search merely passed
