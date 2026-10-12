@@ -23,11 +23,11 @@ lua/util/                feature logic, one module per feature
   scroll.lua             'scrolloff' holds past the end of the buffer
   folds.lua              folds persist across sessions, anchored to the text they hide
   session.lua            a bare `nvim` restores the directory's session instead of the dashboard
+  foldranges.lua         the fold expression: the language server's ranges (normalised), treesitter's until then
   foldtext.lua           closed folds read `func main() { ... }`, first line highlighted
 lua/plugins/             one lazy.nvim spec per plugin (LazyVim merges them)
 lua/benched/             shelved specs (neo-tree) — not imported, see its README
 queries/<lang>/context.scm   treesitter-context: pin declarations only, not loops/ifs
-queries/<lang>/folds.scm     parameter lists fold on their own: `fn f( ... ) -> R {` (zc again: the function)
 tests/                   headless regression suite — tests/run.sh
 ```
 
@@ -74,13 +74,17 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
 - **Protobuf**: `buf lsp serve` gives compile errors, buf lint (per the
   module's `buf.yaml`), navigation, rename and completion. Breaking-change
   checks aren't exposed over LSP — run `buf breaking`.
-- **Folds are treesitter's** everywhere (LazyVim's LSP folding is off): a
-  folded `{ }` block hides its closing brace in every language, instead of
-  gopls/typescript leaving a `}` line behind. A closed fold is drawn as its
-  first line (highlighted) plus ` ... }`, IntelliJ-style; the dots and the
-  bracket are only drawn. A wrapped parameter list folds on its own: `zc` on
-  `fn send(` reads `fn send( ... ) -> R {` with the body still open, and a
-  second `zc` (or one anywhere in the body) folds the whole function.
+- **Folds are the language server's** (rust-analyzer, gopls, vtsls… fold
+  every bracket region: a struct literal inside a closure, wrapped
+  arguments, each branch of an if/else), normalised so a closed fold hides
+  its closing bracket the way IntelliJ does — servers stop a line short and
+  leave `}` / `});` / `}, log)` visible. Treesitter's folds serve until the
+  server answers and where none does; indentation folds files with no
+  parser. A closed fold is drawn as its first line (highlighted) plus
+  ` ... }`; the dots and the bracket are only drawn. A wrapped parameter
+  list folds on its own through its `) -> R {` (`zc` again, or inside the
+  body: the whole function); an if branch folds short of its `} else {`,
+  whose branch is its own fold.
 - **Sessions**: a bare `nvim` in a directory you've worked in restores that
   session (persistence.nvim) instead of showing the dashboard; the dashboard
   appears only when there's nothing to restore.

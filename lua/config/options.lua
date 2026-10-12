@@ -18,6 +18,13 @@ vim.opt.whichwrap:append("h,l")
 -- (frontend/, mobile/, ...) even when editing backend/main.go.
 vim.g.root_spec = { "cwd" }
 
+-- Folds: one fold expression everywhere (lua/util/foldranges.lua) — the
+-- language server's folding ranges, treesitter's until they arrive,
+-- indentation without a parser. LazyVim's own switches (treesitter folds
+-- in plugins/treesitter.lua, LSP folds in plugins/lsp.lua) are off so
+-- nothing swaps the expression out from under it.
+vim.opt.foldmethod = "expr"
+vim.opt.foldexpr = "v:lua.require('util.foldranges').foldexpr()"
 -- Sessions don't record fold options or folds: a window's 'foldmethod' is
 -- decided when its file opens (LazyVim's treesitter switch), and replaying a
 -- stale "setlocal foldmethod=…" from a session would override that for good

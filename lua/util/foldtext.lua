@@ -264,16 +264,22 @@ function M.text()
       -- the remainder of the last line, highlighted in place; an opener it
       -- ends with (the `{` of `) -> R {`) starts something visible below
       -- the fold, so it keeps its colour
-      local indent = last:match("^%s*")
+      -- (chunks come with tabs expanded, so drop the indent by stripping
+      -- leading blanks rather than counting its bytes)
       local seg = highlighted(buf, last_lnum, last, {})
-      local skip = #indent + #tail -- bytes already rendered (indent + closers)
-      local pos = 0
+      local skip, pos, started = #tail, 0, false -- the closers are already rendered
       for _, c in ipairs(seg) do
         local text = c[1]
-        if pos + #text > skip then
-          chunks[#chunks + 1] = { text:sub(math.max(skip - pos + 1, 1)), c[2] }
+        if not started then
+          text = text:gsub("^%s+", "")
+          started = text ~= ""
         end
-        pos = pos + #text
+        if started then
+          if pos + #text > skip then
+            chunks[#chunks + 1] = { text:sub(math.max(skip - pos + 1, 1)), c[2] }
+          end
+          pos = pos + #text
+        end
       end
     end
   end

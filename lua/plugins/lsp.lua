@@ -4,11 +4,10 @@ return {
   "neovim/nvim-lspconfig",
   opts = {
     inlay_hints = { enabled = false },
-    -- LazyVim swaps in the language server's folding ranges once a server
-    -- attaches; those differ per server (rust-analyzer folds through the
-    -- closing brace, gopls and the typescript server stop a line short so
-    -- `}` stays visible — a two-line "empty block"). Treesitter folds hide the
-    -- brace in every language, so keep them.
+    -- LazyVim would swap the fold expression for vim.lsp.foldexpr() as a
+    -- server attaches; lua/util/foldranges.lua takes the server's ranges
+    -- itself (normalised so a fold hides its closing bracket) behind one
+    -- expression set in config/options.lua
     folds = { enabled = false },
     diagnostics = {
       -- only errors get virtual text; warnings and info keep their sign

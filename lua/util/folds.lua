@@ -1,5 +1,5 @@
 -- Folds persist across sessions, like IntelliJ — but only when they'd still
--- cover the same code. Each closed fold is saved with a fingerprint of the
+-- cover the same code. (Where folds come from is util/foldranges.lua.) Each closed fold is saved with a fingerprint of the
 -- text it hides; on reopen it's closed again only if that exact text is
 -- still there, at the same lines or wherever it moved to. Edited or gone,
 -- the fold stays open rather than hiding the wrong lines.
@@ -27,6 +27,9 @@ end
 -- windows whose saved folds have been applied; a window still waiting on
 -- fold structure must not write state (it would record "nothing closed")
 local ready = {} ---@type table<integer, boolean>
+-- the folds restored into each window, and which of them found a fold to
+-- close: the rest wait for the language server's folds (util/foldranges.lua)
+local restored = {} ---@type table<integer, { folds: util.folds.Fold[], applied: table<integer, boolean> }>
 -- windows being watched after a restore: treesitter's early fold passes can
 -- rebuild the window's folds (which reopens everything); a rebuild changes
 -- the fold *levels*, which a user's zo never does, so that's the signal to
@@ -119,26 +122,24 @@ local function close_exact(start, stop)
   return false
 end
 
---- Apply the saved folds that can be applied now. Returns the ones that
---- couldn't be because the window has no fold structure there yet.
+--- Apply the saved folds that can be applied now; `applied[i]` records the
+--- ones that found their fold. With `only_pending`, skip those already
+--- applied once (the user may have opened them since).
 ---@param folds util.folds.Fold[]
----@return util.folds.Fold[] pending
-local function apply(buf, win, folds)
+---@param applied? table<integer, boolean>
+local function apply(buf, win, folds, applied, only_pending)
   local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
-  local pending = {}
+  applied = applied or {}
   vim.api.nvim_win_call(win, function()
-    for _, fold in ipairs(folds) do
-      local at = locate(fold, lines)
-      if at then
-        if vim.fn.foldlevel(at) == 0 then
-          pending[#pending + 1] = fold
-        else
-          close_exact(at, at + fold.stop - fold.start)
+    for i, fold in ipairs(folds) do
+      if not (only_pending and applied[i]) then
+        local at = locate(fold, lines)
+        if at and vim.fn.foldlevel(at) > 0 and close_exact(at, at + fold.stop - fold.start) then
+          applied[i] = true
         end
       end
     end
   end)
-  return pending
 end
 
 --- The fold levels over every line a saved fold would cover, as one string.
@@ -170,7 +171,7 @@ function M.save(buf, win)
   -- restore, put the saved ones back before reading the window's state
   local w = watching[win]
   if w and signature(buf, win, w.folds) ~= w.signature then
-    apply(buf, win, w.folds)
+    apply(buf, win, w.folds, restored[win] and restored[win].applied)
   end
   local folds = closed_folds(win)
   local file = state_file(buf)
@@ -184,7 +185,7 @@ end
 
 function M.load(buf, win)
   win = win or vim.api.nvim_get_current_win()
-  ready[win], watching[win] = nil, nil
+  ready[win], watching[win], restored[win] = nil, nil, nil
   local token = {}
   cycles[win] = token
   if not real_file(buf) or not real_window(win) then
@@ -206,6 +207,7 @@ function M.load(buf, win)
     ready[win] = true -- nothing to restore; the window's state is the user's from the start
     return
   end
+  restored[win] = { folds = folds, applied = {} }
   local deadline = vim.uv.now() + 10000
   local checks = { 500, 1000, 2000 } -- after applying: watch at these offsets
   local function alive()
@@ -217,7 +219,7 @@ function M.load(buf, win)
         return
       end
       if signature(buf, win, folds) ~= watching[win].signature then
-        apply(buf, win, folds) -- rebuilt: put them back, keep watching
+        apply(buf, win, folds, restored[win].applied) -- rebuilt: put them back, keep watching
         watching[win].signature = signature(buf, win, folds)
         return watch(1)
       end
@@ -232,7 +234,7 @@ function M.load(buf, win)
       return
     end
     if signature(buf, win, folds):find("[1-9]") then
-      apply(buf, win, folds)
+      apply(buf, win, folds, restored[win].applied)
       ready[win] = true
       watching[win] = { folds = folds, signature = signature(buf, win, folds) }
       return watch(1)
@@ -244,6 +246,46 @@ function M.load(buf, win)
     end
   end
   settle()
+end
+
+--- The closed folds in every real window showing the buffer, to put back
+--- after its fold structure is rebuilt (util/foldranges.lua).
+---@return table<integer, util.folds.Fold[]>
+function M.snapshot(buf)
+  local out = {}
+  for _, win in ipairs(vim.fn.win_findbuf(buf)) do
+    if real_window(win) then
+      out[win] = closed_folds(win)
+    end
+  end
+  return out
+end
+
+--- Close again what `snapshot` found closed, where the new structure has
+--- the same fold.
+---@param closed table<integer, util.folds.Fold[]>
+function M.restore(buf, closed)
+  for win, folds in pairs(closed or {}) do
+    if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == buf then
+      vim.api.nvim_win_call(win, function()
+        for _, fold in ipairs(folds) do
+          close_exact(fold.start, fold.stop)
+        end
+      end)
+    end
+  end
+end
+
+--- The buffer's folds were rebuilt from a new source: apply the saved
+--- folds that found nothing to close before (a parameter list, a struct
+--- literal — regions only the language server folds).
+function M.rebuilt(buf)
+  for _, win in ipairs(vim.fn.win_findbuf(buf)) do
+    local r = restored[win]
+    if r and real_window(win) then
+      apply(buf, win, r.folds, r.applied, true)
+    end
+  end
 end
 
 function M.setup()
@@ -264,7 +306,7 @@ function M.setup()
     group = group,
     callback = function(ev)
       local win = tonumber(ev.match)
-      ready[win], watching[win], cycles[win] = nil, nil, nil
+      ready[win], watching[win], cycles[win], restored[win] = nil, nil, nil, nil
     end,
   })
 end
