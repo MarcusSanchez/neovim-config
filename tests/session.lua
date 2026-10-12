@@ -59,6 +59,46 @@ vim.schedule(function()
     check("pass 2: dashboard disabled", Snacks.config.dashboard.enabled, false)
     check("pass 2: stock intro hidden (I in shortmess)", vim.o.shortmess:find("I", 1, true) ~= nil, true)
     check("pass 2: buffers restored", listed(), "main.go,main_test.go")
+    -- a session saved with no file window focused has `badd` lines but no
+    -- `edit`: the window stays on the empty start buffer, which the load
+    -- hook wipes, and Vim loads the next listed file into it. That load
+    -- must still detect the filetype (treesitter, LSP hang off it).
+    vim.fn.writefile({
+      "let SessionLoad = 1",
+      "silent only",
+      "silent tabonly",
+      "enew",
+      "if expand('%') == '' && !&modified && line('$') <= 1 && getline(1) == ''",
+      "  let s:wipebuf = bufnr('%')",
+      "endif",
+      "set shortmess+=aoO",
+      "badd +9 main.go",
+      "%argdel",
+      "if exists('s:wipebuf') && len(win_findbuf(s:wipebuf)) == 0",
+      "  silent exe 'bwipe ' . s:wipebuf",
+      "endif",
+      "unlet! s:wipebuf",
+      "let SessionLoad = 0",
+    }, require("util.session").file())
+    vim.cmd("%bwipeout!")
+    require("persistence").load()
+    vim.wait(2000, function()
+      return vim.bo.filetype == "go"
+    end, 50)
+    check(
+      "pass 2: a session with no file window still gets its filetype",
+      vim.fn.expand("%:t") .. ":" .. vim.bo.filetype,
+      "main.go:go"
+    )
+    vim.wait(15000, function()
+      return #vim.lsp.get_clients({ bufnr = 0, name = "gopls" }) > 0
+    end, 100)
+    check("pass 2: ...and its LSP", #vim.lsp.get_clients({ bufnr = 0, name = "gopls" }) > 0, true)
+    check(
+      "pass 2: ...and treesitter highlighting",
+      vim.treesitter.highlighter.active[vim.api.nvim_get_current_buf()] ~= nil,
+      true
+    )
     check("pass 2: a real file is current", vim.fn.expand("%:t") ~= "", true)
     local unnamed = 0
     for _, b in ipairs(vim.api.nvim_list_bufs()) do

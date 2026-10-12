@@ -83,6 +83,12 @@ function M.setup()
   vim.api.nvim_create_autocmd("User", {
     group = group,
     pattern = "PersistenceLoadPost",
+    -- nested: wiping the empty buffer a window is on makes Vim load the
+    -- next listed file into it, and that load's BufRead/FileType events
+    -- (filetype, treesitter, LSP) only fire from inside an autocmd when
+    -- it's nested. A session saved with no file window focused restores
+    -- exactly this way, and came back as a file with no highlighting or LSP.
+    nested = true,
     callback = function()
       -- anything the layout left behind as an empty unnamed buffer
       for _, b in ipairs(vim.api.nvim_list_bufs()) do
