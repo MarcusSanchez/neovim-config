@@ -8,33 +8,37 @@
 -- over never open at all.
 local M = {}
 
----@class util.searchfolds.Visit the fold a search motion opened in a window
+---@class util.searchfolds.Visit the folds a search motion opened in a window
 ---@field buf integer
----@field start integer
----@field stop integer
----@field tick integer changedtick when it was opened
+---@field folds { start: integer, stop: integer }[] outermost first, as opened
+---@field tick integer changedtick when they were opened
 
 local visits = {} ---@type table<integer, util.searchfolds.Visit>
 
---- After a search motion: the closed fold the cursor landed in, if any,
---- opens for the visit.
+--- After a search motion: the closed folds the cursor landed in, if any,
+--- open for the visit — one level at a time, so each is known and can be
+--- put back exactly (opening all at once would leave inner folds open
+--- behind a re-closed outer one).
 local function reveal()
   local win = vim.api.nvim_get_current_win()
   local lnum = vim.api.nvim_win_get_cursor(win)[1]
-  local start = vim.fn.foldclosed(lnum)
-  if start == -1 then
+  if vim.fn.foldclosed(lnum) == -1 then
     return
   end
-  visits[win] = {
-    buf = vim.api.nvim_get_current_buf(),
-    start = start,
-    stop = vim.fn.foldclosedend(lnum),
-    tick = vim.api.nvim_buf_get_changedtick(0),
-  }
-  vim.cmd("normal! zv")
+  local v = { buf = vim.api.nvim_get_current_buf(), folds = {}, tick = vim.api.nvim_buf_get_changedtick(0) }
+  for _ = 1, 20 do -- one nesting level per zo
+    local start = vim.fn.foldclosed(lnum)
+    if start == -1 then
+      break
+    end
+    v.folds[#v.folds + 1] = { start = start, stop = vim.fn.foldclosedend(lnum) }
+    vim.cmd("silent! normal! zo")
+  end
+  visits[win] = v
 end
 
---- On every cursor move: a visited fold the cursor has left closes again.
+--- On every cursor move: a visited fold the cursor has left closes again,
+--- innermost first, unless the text was edited meanwhile.
 local function leave()
   local win = vim.api.nvim_get_current_win()
   local v = visits[win]
@@ -42,13 +46,29 @@ local function leave()
     return
   end
   local lnum = vim.api.nvim_win_get_cursor(win)[1]
-  if vim.api.nvim_get_current_buf() == v.buf and lnum >= v.start and lnum <= v.stop then
+  local outer = v.folds[1]
+  if vim.api.nvim_get_current_buf() == v.buf and lnum >= outer.start and lnum <= outer.stop then
     return
   end
   visits[win] = nil
   if vim.api.nvim_get_current_buf() == v.buf and vim.api.nvim_buf_get_changedtick(0) == v.tick then
-    require("util.folds").close_exact(v.start, v.stop)
+    local close = require("util.folds").close_exact
+    for i = #v.folds, 1, -1 do
+      close(v.folds[i].start, v.folds[i].stop)
+    end
   end
+end
+
+--- The folds a search opened for the current visit in the window, if the
+--- text is unchanged since: they count as closed (util/folds.lua saves
+--- them that way).
+---@return { start: integer, stop: integer }[]
+function M.visiting(win)
+  local v = visits[win]
+  if not v or vim.api.nvim_win_get_buf(win) ~= v.buf or vim.api.nvim_buf_get_changedtick(v.buf) ~= v.tick then
+    return {}
+  end
+  return v.folds
 end
 
 --- Run a search motion (`n`, `N`, `*`, `#`…) and reveal where it lands.

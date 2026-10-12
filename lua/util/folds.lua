@@ -48,20 +48,28 @@ end
 ---@field head string first line's text (for relocation)
 ---@field hash string sha256 of the folded lines
 
---- Closed folds in the window, outermost first.
+---@return util.folds.Fold
+local function fold_entry(start, stop)
+  local lines = vim.api.nvim_buf_get_lines(0, start - 1, stop, false)
+  return { start = start, stop = stop, head = lines[1], hash = vim.fn.sha256(table.concat(lines, "\n")) }
+end
+
+--- Closed folds in the window, outermost first — counting a fold a search
+--- has opened for the moment (util/searchfolds.lua) as closed.
 ---@return util.folds.Fold[]
 local function closed_folds(win)
   local folds = {}
   vim.api.nvim_win_call(win, function()
+    local visiting = require("util.searchfolds").visiting(win)[1]
     local last, line = vim.fn.line("$"), 1
     while line <= last do
       local start = vim.fn.foldclosed(line)
       if start ~= -1 then
-        local stop = vim.fn.foldclosedend(line)
-        local lines = vim.api.nvim_buf_get_lines(0, start - 1, stop, false)
-        folds[#folds + 1] =
-          { start = start, stop = stop, head = lines[1], hash = vim.fn.sha256(table.concat(lines, "\n")) }
-        line = stop + 1
+        folds[#folds + 1] = fold_entry(start, vim.fn.foldclosedend(line))
+        line = vim.fn.foldclosedend(line) + 1
+      elseif visiting and line == visiting.start then
+        folds[#folds + 1] = fold_entry(visiting.start, visiting.stop)
+        line = visiting.stop + 1
       else
         line = line + 1
       end

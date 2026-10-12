@@ -25,6 +25,8 @@ vim.schedule(function()
     vim.fn.writefile({
       "block one",
       "    one line 1",
+      "        one deep 1",
+      "        one deep 2",
       "    one line 2",
       "block two",
       "    two line 1",
@@ -38,33 +40,49 @@ vim.schedule(function()
     local function type_keys(k)
       vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(k, true, false, true), "x", false)
     end
+    vim.api.nvim_win_set_cursor(0, { 3, 0 })
+    type_keys(",d") -- the inner block, then the outer around it
     vim.api.nvim_win_set_cursor(0, { 2, 0 })
     type_keys(",d")
-    vim.api.nvim_win_set_cursor(0, { 8, 0 })
+    vim.api.nvim_win_set_cursor(0, { 10, 0 })
     type_keys(",d")
-    check("search: two indent folds closed", vim.fn.foldclosed(2) .. " " .. vim.fn.foldclosed(8), "2 8")
+    check(
+      "search: indent folds closed (outer hides inner)",
+      vim.fn.foldclosed(2) .. " " .. vim.fn.foldclosed(10),
+      "2 10"
+    )
     vim.api.nvim_win_set_cursor(0, { 1, 0 })
-    type_keys("/line 2<CR>")
+    type_keys("/2$<CR>") -- matches: one deep 2, one line 2, two line 2, three line 2
     vim.wait(200, function()
-      return vim.fn.foldclosed(3) == -1
+      return vim.fn.foldclosed(4) == -1
     end, 10)
-    check("search: cursor on the match inside the fold", vim.api.nvim_win_get_cursor(0)[1], 3)
-    check("search: the fold the match is in opens", vim.fn.foldclosed(3), -1)
-    check("search: the fold it passed over stays closed", vim.fn.foldclosed(8), 8)
+    check("search: cursor on the match inside the nested fold", vim.api.nvim_win_get_cursor(0)[1], 4)
+    check("search: both levels open for the visit", vim.fn.foldclosed(4) .. " " .. vim.fn.foldclosed(2), "-1 -1")
+    check("search: the fold it passed over stays closed", vim.fn.foldclosed(10), 10)
+    -- a save during the visit still records the fold as closed
+    require("util.folds").save(0, vim.api.nvim_get_current_win())
+    local state = vim.fn.stdpath("state") .. "/folds/" .. vim.api.nvim_buf_get_name(0):gsub("[/\\:]", "%%") .. ".json"
+    local saved = vim.fn.filereadable(state) == 1 and table.concat(vim.fn.readfile(state), "") or ""
+    check("search: saving mid-visit keeps the visited fold", saved:find('"start":2', 1, true) ~= nil, true)
+    type_keys("n") -- `one line 2`: still inside the outer fold
+    check("search: a match in the same fold keeps it open", vim.fn.foldclosed(5), -1)
     type_keys("n") -- `two line 2`, outside any fold
-    check("search: n moves on", vim.api.nvim_win_get_cursor(0)[1], 6)
+    check("search: n moves on", vim.api.nvim_win_get_cursor(0)[1], 8)
     check("search: the fold left behind closes again", vim.fn.foldclosed(2), 2)
+    vim.cmd("normal! 2Gzo")
+    check("search: its inner fold is closed again too", vim.fn.foldclosed(3), 3)
+    vim.cmd("normal! 2Gzc8G")
     type_keys("n") -- `three line 2`, inside the last fold
-    check("search: n into a fold opens it", vim.fn.foldclosed(9), -1)
+    check("search: n into a fold opens it", vim.fn.foldclosed(11), -1)
     type_keys("gg")
     vim.api.nvim_exec_autocmds("CursorMoved", {}) -- fed keys don't reach the main loop that fires it
-    check("search: leaving closes it again", vim.fn.foldclosed(8), 8)
+    check("search: leaving closes it again", vim.fn.foldclosed(10), 10)
     type_keys("G")
-    type_keys("n") -- wraps to `one line 2`
+    type_keys("n") -- wraps to `one deep 2`
     vim.cmd("normal! A!") -- an edit inside the visited fold
     type_keys("gg")
     vim.api.nvim_exec_autocmds("CursorMoved", {})
-    check("search: an edited fold stays open", vim.fn.foldclosed(3), -1)
+    check("search: an edited fold stays open", vim.fn.foldclosed(4), -1)
     check("search: 'foldopen' no longer opens on search", vim.opt.foldopen:get().search, nil)
     vim.cmd("buffer long.txt")
     vim.api.nvim_buf_delete(sb, { force = true })
