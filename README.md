@@ -27,6 +27,7 @@ lua/util/                feature logic, one module per feature
   folds.lua              folds persist across sessions, anchored to the text they hide
   foldtext.lua           closed folds read `func main() { ... }`, first line highlighted
   searchfolds.lua        a search doesn't unfold what it passes through
+  foldcursor.lua         a caret walks a closed fold's line; the real cursor follows
   harpoon.lua            a harpoon jump from an empty buffer replaces it instead of adding a tab
   session.lua            a bare `nvim` restores the directory's session instead of the dashboard
 lua/plugins/             one lazy.nvim spec per plugin (LazyVim merges them)
@@ -103,6 +104,13 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
   that is still folded and the pair collapses to its chain,
   `if x { ... } else { ... }`. Nothing else closes a fold by itself: import
   blocks fold when a file opens, saved folds come back, and that is all.
+- **A closed fold has a caret**, as in JetBrains: `h` `l` `w` `b` `e`
+  `^` `$` on a folded line walk the line as drawn —
+  `fn send( ... ) -> Result<(), Error> {` — and the real cursor sits on
+  the buffer position the caret's character stands for, so `gk`, `ge`
+  and `gd` on `Error` act on it with the fold closed. Stepping onto the
+  ` ... ` opens the fold where the hidden text begins. Word motions keep
+  this config's meaning (`w` back, `b`/`e` forward, punctuation skipped).
 - **Searching doesn't unfold**: a match inside a closed fold opens that
   fold only while the cursor is in it (`/`, `n`, `*`, `#`); step out and
   it closes again, unless you edited inside. Folds a search merely passed
@@ -122,6 +130,7 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
 `tests/run.sh` drives headless nvim against small Go, Rust, TSX, Zig,
 Gleam, C, C++ and protobuf fixtures and prints PASS/FAIL per behaviour. Suites:
 `go` (gd/gh, usages popup, autosave, popups, fold shapes with gopls),
+`caret` (the caret on a closed fold),
 `rust` (gs filtering, italics, fold shapes with rust-analyzer), `tsx` (JSX
 fold shapes with the typescript server), `zig` (fold shapes with zls:
 nested if/else chains, wrapped signatures), `gleam` (fold shapes with the

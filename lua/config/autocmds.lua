@@ -54,6 +54,7 @@ require("util.scroll").setup()
 require("util.foldranges").setup()
 require("util.folds").setup()
 require("util.searchfolds").setup()
+require("util.foldcursor").setup()
 
 -- a bare `nvim` in a project with a session restores it instead of the
 -- dashboard. Scheduled: this file runs inside LazyVim's VeryLazy handler,

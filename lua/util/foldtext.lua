@@ -5,6 +5,18 @@
 -- bracket are only drawn — the real lines are untouched.
 local M = {}
 
+---@class util.foldtext.Chunk
+---@field [1] string text as displayed (tabs expanded)
+---@field [2] string highlight group
+---@field [3] integer? buffer line the text comes from
+---@field [4] integer? 0-based byte column it starts at there
+---@field [5] string? the raw text there (tabs unexpanded)
+
+---@class util.foldtext.Cell
+---@field ch string
+---@field lnum integer? buffer line, nil for drawn text
+---@field col integer? 0-based byte column
+
 -- closer -> opener; quotes close themselves (multi-line strings fold too)
 local pairs_of = { [")"] = "(", ["]"] = "[", ["}"] = "{", ['"'] = '"', ["'"] = "'", ["`"] = "`" }
 local OPENERS = "[%({%[\"'`]"
@@ -82,11 +94,42 @@ local function highlighted(buf, lnum, line, dim)
   local chunks, from, cur = {}, 1, hl[1]
   for col = 2, #line + 1 do
     if hl[col] ~= cur or col == #line + 1 then
-      chunks[#chunks + 1] = { (line:sub(from, col - 1):gsub("\t", tab)), cur or "Folded" }
+      local raw = line:sub(from, col - 1)
+      chunks[#chunks + 1] = { (raw:gsub("\t", tab)), cur or "Folded", lnum, from - 1, raw }
       from, cur = col, hl[col]
     end
   end
   return chunks, hl
+end
+
+--- A chunk's text from expanded byte i to j (to its end without j), with
+--- its origin moved along: the raw text and its 0-based column, through
+--- the tabs the expansion widened.
+local function slice(c, i, j)
+  local text, raw = c[1], c[5]
+  j = j or #text
+  local out = { text:sub(i, j), c[2] }
+  if raw then
+    local ntabs = select(2, raw:gsub("\t", ""))
+    local width = ntabs > 0 and (#text - (#raw - ntabs)) / ntabs or 1
+    local map, e = {}, 0 -- expanded byte -> raw byte
+    for r = 1, #raw do
+      for _ = 1, raw:sub(r, r) == "\t" and width or 1 do
+        e = e + 1
+        map[e] = r
+      end
+    end
+    if map[i] then
+      out[3], out[4], out[5] = c[3], c[4] + map[i] - 1, raw:sub(map[i], map[j] or #raw)
+    end
+  end
+  return out
+end
+
+--- The chunk without its trailing blanks.
+local function rtrimmed(c)
+  local kept = #c[1]:gsub("%s+$", "")
+  return kept < #c[1] and slice(c, 1, kept) or c
 end
 
 --- Columns of the first line's openers still unmatched at its end, bottom
@@ -216,7 +259,7 @@ local function trimmed(chunks)
   if chunks[1] and chunks[1][1]:match("^%s+$") then
     table.remove(chunks, 1)
   elseif chunks[1] then
-    chunks[1][1] = chunks[1][1]:gsub("^%s+", "")
+    chunks[1] = slice(chunks[1], #chunks[1][1]:match("^%s*") + 1)
   end
   return chunks
 end
@@ -236,9 +279,13 @@ local function hidden_brackets(raw, with_leading)
   return dim
 end
 
-function M.text()
-  local buf = vim.api.nvim_get_current_buf()
-  local first_lnum, last_lnum = vim.v.foldstart, vim.v.foldend
+--- The fold line for lines first_lnum..last_lnum of the buffer, as
+--- chunks `{ text, group, lnum?, col?, raw? }`: text drawn from a buffer
+--- line carries that line and the 0-based byte column it starts at (its
+--- raw text too, tabs unexpanded); drawn text (` ... `, Go's
+--- `{ return err }`) carries none.
+---@return util.foldtext.Chunk[]
+function M.build(buf, first_lnum, last_lnum)
   local function line_at(lnum)
     return vim.api.nvim_buf_get_lines(buf, lnum - 1, lnum, false)[1] or ""
   end
@@ -262,10 +309,7 @@ function M.text()
           break
         end
         local text = c[1]
-        if pos + #text > want then
-          text = text:sub(1, want - pos)
-        end
-        chunks[#chunks + 1] = { text, c[2] }
+        chunks[#chunks + 1] = pos + #text > want and slice(c, 1, want - pos) or c
         pos = pos + #text
       end
       chunks[#chunks + 1] = { " ...", "FoldEllipsis" }
@@ -284,7 +328,7 @@ function M.text()
     for _, c in ipairs((highlighted(buf, last_lnum, last))) do
       local text = c[1]
       if pos + #text > close - 1 then
-        chunks[#chunks + 1] = { (text:sub(math.max(close - pos, 1)):gsub("%s+$", "")), c[2] }
+        chunks[#chunks + 1] = rtrimmed(slice(c, math.max(close - pos, 1)))
       end
       pos = pos + #text
     end
@@ -365,7 +409,7 @@ function M.text()
     for _, c in ipairs((highlighted(buf, last_lnum, last))) do
       local text = c[1]
       if pos + #text > indent and pos < indent + #tail then
-        chunks[#chunks + 1] = { text:sub(math.max(indent - pos + 1, 1), indent + #tail - pos), c[2] }
+        chunks[#chunks + 1] = slice(c, math.max(indent - pos + 1, 1), indent + #tail - pos)
       end
       pos = pos + #text
     end
@@ -374,6 +418,7 @@ function M.text()
   local _, hl = highlighted(buf, lnum, line)
   local dim_from = select(2, trailing_openers(line))
   local openers = unmatched_openers(line)
+  local indent = #last:match("^%s*")
   for i = 1, #tail do
     local ch = tail:sub(i, i)
     local group = "FoldEllipsis"
@@ -383,7 +428,7 @@ function M.text()
         group = hl[col] or "Folded"
       end
     end
-    chunks[#chunks + 1] = { ch, group }
+    chunks[#chunks + 1] = { ch, group, last_lnum, indent + i - 1, ch }
   end
   if rest and rest ~= "" then
     -- the remainder of the last line, highlighted in place; an opener it
@@ -392,20 +437,90 @@ function M.text()
     -- indent is dropped by stripping blanks, not by counting its bytes.
     local skip, pos, started = #tail, 0, false -- the closers are already rendered
     for _, c in ipairs((highlighted(buf, last_lnum, last, {}))) do
-      local text = c[1]
       if not started then
-        text = text:gsub("^%s+", "")
-        started = text ~= ""
+        c = slice(c, #c[1]:match("^%s*") + 1)
+        started = c[1] ~= ""
       end
       if started then
+        local text = c[1]
         if pos + #text > skip then
-          chunks[#chunks + 1] = { text:sub(math.max(skip - pos + 1, 1)), c[2] }
+          chunks[#chunks + 1] = pos < skip and slice(c, skip - pos + 1) or c
         end
         pos = pos + #text
       end
     end
   end
   return chunks
+end
+
+--- The fold line's cells, one per displayed character: `ch`, and for a
+--- character drawn from a buffer line the line and 0-based byte column it
+--- stands for (each space of an expanded tab stands for the tab).
+---@param chunks util.foldtext.Chunk[]
+---@return util.foldtext.Cell[]
+function M.cells(chunks)
+  local cells = {}
+  for _, c in ipairs(chunks) do
+    if c[3] then
+      local raw, text = c[5], c[1]
+      local ntabs = select(2, raw:gsub("\t", ""))
+      local width = ntabs > 0 and (#text - (#raw - ntabs)) / ntabs or 1
+      local starts = vim.str_utf_pos(raw)
+      for n, b in ipairs(starts) do
+        local ch = raw:sub(b, (starts[n + 1] or #raw + 1) - 1)
+        if ch == "\t" then
+          for _ = 1, width do
+            cells[#cells + 1] = { ch = " ", lnum = c[3], col = c[4] + b - 1 }
+          end
+        else
+          cells[#cells + 1] = { ch = ch, lnum = c[3], col = c[4] + b - 1 }
+        end
+      end
+    else
+      local text = c[1]
+      local starts = vim.str_utf_pos(text)
+      for n, b in ipairs(starts) do
+        cells[#cells + 1] = { ch = text:sub(b, (starts[n + 1] or #text + 1) - 1) }
+      end
+    end
+  end
+  return cells
+end
+
+--- The chunks as 'foldtext' takes them, `{ text, group }` only, with the
+--- cell at index `cursor` (if any) drawn as the caret.
+---@param chunks util.foldtext.Chunk[]
+---@param cursor integer?
+function M.render(chunks, cursor)
+  local out, seen = {}, 0
+  for _, c in ipairs(chunks) do
+    local text = c[1]
+    local n = vim.fn.strchars(text)
+    if cursor and cursor > seen and cursor <= seen + n then
+      local at = cursor - seen - 1 -- 0-based char index within the chunk
+      local before, caret, after =
+        vim.fn.strcharpart(text, 0, at), vim.fn.strcharpart(text, at, 1), vim.fn.strcharpart(text, at + 1)
+      if before ~= "" then
+        out[#out + 1] = { before, c[2] }
+      end
+      out[#out + 1] = { caret, "FoldCursor" }
+      if after ~= "" then
+        out[#out + 1] = { after, c[2] }
+      end
+    else
+      out[#out + 1] = { text, c[2] }
+    end
+    seen = seen + n
+  end
+  return out
+end
+
+--- 'foldtext': the fold line of the fold being drawn, with the fold
+--- caret where util/foldcursor.lua has one in this window.
+function M.text()
+  local buf, win = vim.api.nvim_get_current_buf(), vim.api.nvim_get_current_win()
+  local chunks = M.build(buf, vim.v.foldstart, vim.v.foldend)
+  return M.render(chunks, require("util.foldcursor").cell_at(win, buf, vim.v.foldstart))
 end
 
 return M

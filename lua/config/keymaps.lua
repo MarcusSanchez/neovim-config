@@ -21,8 +21,23 @@ end
 --------------------------------------------------------------------------------
 
 -- Jump to start/end of line with Shift+H/L
-map({ "n", "x" }, "<S-h>", "_", opts("Go to First Non-Blank Character"))
-map({ "n", "x" }, "<S-l>", "$", opts("Go to End of Line"))
+map("x", "<S-h>", "_", opts("Go to First Non-Blank Character"))
+map("x", "<S-l>", "$", opts("Go to End of Line"))
+-- on a closed fold these walk the drawn fold line (lua/util/foldcursor.lua)
+for key, desc in pairs({
+  h = "Left",
+  l = "Right",
+  ["^"] = "First Non-Blank Character",
+  ["_"] = "First Non-Blank Character",
+  ["$"] = "End of Line",
+  ["<S-h>"] = "Go to First Non-Blank Character",
+  ["<S-l>"] = "Go to End of Line",
+}) do
+  local motion = key == "<S-h>" and "_" or key == "<S-l>" and "$" or key
+  map("n", key, function()
+    require("util.foldcursor").motion(motion)
+  end, opts(desc))
+end
 
 -- Jump half page up/down with Shift+J/K
 -- (up/down follow the j/k swap below: Shift+J goes up, Shift+K goes down)
@@ -185,16 +200,29 @@ local word_motions = {
   e = { [[\w\+]], "", "Next Word Start (skip punctuation)" },
   b = { [[\w\+\>]], "e", "Next Word End (skip punctuation)" },
 }
+-- In normal mode they go through the fold caret: on a closed fold the
+-- same search runs over the drawn fold line (lua/util/foldcursor.lua).
 for lhs, motion in pairs(word_motions) do
-  map({ "n", "x" }, lhs, function()
+  local function run()
     vim.fn.search(motion[1], motion[2])
+  end
+  map("x", lhs, run, opts(motion[3]))
+  map("n", lhs, function()
+    require("util.foldcursor").motion(lhs, run)
   end, opts(motion[3]))
 end
 
--- Uppercase WORD movements
-map({ "n", "x" }, "W", "B", opts("Previous WORD Start"))
-map({ "n", "x" }, "E", "W", opts("Next WORD Start"))
-map({ "n", "x" }, "B", "E", opts("Next WORD End"))
+-- Uppercase WORD movements (through the fold caret in normal mode too)
+for lhs, motion in pairs({
+  W = { "B", "Previous WORD Start" },
+  E = { "W", "Next WORD Start" },
+  B = { "E", "Next WORD End" },
+}) do
+  map("x", lhs, motion[1], opts(motion[2]))
+  map("n", lhs, function()
+    require("util.foldcursor").motion(motion[1])
+  end, opts(motion[2]))
+end
 
 --------------------------------------------------------------------------------
 -- Miscellaneous Utility Keymaps

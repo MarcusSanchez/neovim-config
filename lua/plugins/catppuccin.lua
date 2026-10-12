@@ -57,6 +57,7 @@ return {
 
             -- the ` ... }` a closed fold shows (lua/util/foldtext.lua)
             FoldEllipsis = { fg = colors.overlay1 },
+            FoldCursor = { fg = colors.base, bg = colors.text }, -- the caret on a closed fold
 
             -- snacks picker / explorer
             -- transparent_background only covers Normal, not NormalFloat, so the
