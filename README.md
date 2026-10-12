@@ -27,7 +27,7 @@ lua/util/                feature logic, one module per feature
 lua/plugins/             one lazy.nvim spec per plugin (LazyVim merges them)
 lua/benched/             shelved specs (neo-tree) — not imported, see its README
 queries/<lang>/context.scm   treesitter-context: pin declarations only, not loops/ifs
-queries/<lang>/folds.scm     parameter lists fold on their own (zc on `fn f(` folds the params; again, the function)
+queries/<lang>/folds.scm     parameter lists fold on their own: `fn f( ... ) -> R {` (zc again: the function)
 tests/                   headless regression suite — tests/run.sh
 ```
 
@@ -78,7 +78,9 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
   folded `{ }` block hides its closing brace in every language, instead of
   gopls/typescript leaving a `}` line behind. A closed fold is drawn as its
   first line (highlighted) plus ` ... }`, IntelliJ-style; the dots and the
-  bracket are only drawn.
+  bracket are only drawn. A wrapped parameter list folds on its own: `zc` on
+  `fn send(` reads `fn send( ... ) -> R {` with the body still open, and a
+  second `zc` (or one anywhere in the body) folds the whole function.
 - **Sessions**: a bare `nvim` in a directory you've worked in restores that
   session (persistence.nvim) instead of showing the dashboard; the dashboard
   appears only when there's nothing to restore.
