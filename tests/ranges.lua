@@ -557,6 +557,23 @@ local ok, err = pcall(function()
     }, gleam),
     "1..11 1..4 4..11 5..10 7..9"
   )
+  -- clangd: an if / else if / else chain. Each link, the whole chain and
+  -- the chain of the last two links — never an if + else-if "head", which
+  -- would overlap that one
+  local chain3 = {
+    "    if (*head == NULL) {",
+    "        *head = n;",
+    "    } else if (value < (*head)->value) {",
+    "        n->next = *head;",
+    "    } else {",
+    "        n->next = (*head)->next;",
+    "    }",
+  }
+  check(
+    "a three-link chain has no overlapping ranges",
+    shapes({ { startLine = 0, endLine = 1 }, { startLine = 2, endLine = 3 }, { startLine = 4, endLine = 5 } }, chain3),
+    "1..7 1..3 3..7 3..5 5..7"
+  )
   -- a block that already ends on its closer is left alone even when the
   -- next line is the parent's closer
   local nested = { "let x = [", "    || {", "        a", "    }", "];" }

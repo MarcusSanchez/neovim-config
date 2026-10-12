@@ -149,7 +149,7 @@ local function grow(list, lines)
   end
 end
 
---- Stage 2: one range per chain of neighbours sharing a line.
+--- Stage 3: one range per chain of neighbours sharing a line.
 local function chains(list)
   local starts = index_by(list, "s")
   local function chain_end(r, seen)
@@ -172,7 +172,7 @@ local function chains(list)
   return out
 end
 
---- Stage 3: the wrapped head of a statement whose body ends with it
+--- Stage 2: the wrapped head of a statement whose body ends with it
 --- (`if self` … `{`), and the body of a range whose head is its own range
 --- from the same line (`>` … `</a>`), each through the line they share.
 local function heads_and_bodies(list)
@@ -207,8 +207,11 @@ function M.normalize(ranges, lines)
     end
   end
   grow(list, lines)
-  vim.list_extend(list, chains(list))
+  -- heads and bodies before chains: derived from a chain, a "head" would
+  -- be its first links (`if … } else if … {`), which overlaps the chain
+  -- of its last links, and Vim can't hold overlapping folds
   vim.list_extend(list, heads_and_bodies(list))
+  vim.list_extend(list, chains(list))
   local out, seen = {}, {}
   for _, r in ipairs(list) do
     local key = r.s .. ":" .. r.e
@@ -643,8 +646,13 @@ function M.fold(buf, win, s, e)
   api.nvim_win_call(win, function()
     for row in pairs(shared) do
       local closed = vim.fn.foldclosed(row + 1)
-      if closed ~= -1 and not (closed - 1 <= r.s and vim.fn.foldclosedend(row + 1) - 1 >= r.e) then
-        blocked = true -- the neighbour holding that row is closed
+      if closed ~= -1 then
+        -- a closed fold that neither contains the range nor lies inside
+        -- it (a chain's own first link, closed) is the neighbour holding
+        -- that row
+        local cs, ce = closed - 1, vim.fn.foldclosedend(row + 1) - 1
+        local contains, inside = cs <= r.s and ce >= r.e, cs >= r.s and ce <= r.e
+        blocked = blocked or not (contains or inside)
       end
     end
   end)
