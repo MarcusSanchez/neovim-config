@@ -36,6 +36,7 @@ end
 ---@field applied table<integer, boolean> which of them found a fold to close; the rest wait for the server's folds
 ---@field signature string? set while watching for treesitter rebuilding the folds (which reopens everything):
 --- a rebuild changes the fold *levels*, which a user's zo never does, so that's the signal to re-apply on
+---@field tick integer? changedtick at the restore; an edit ends the watching
 local windows = {} ---@type table<integer, util.folds.Window>
 
 local function state_file(buf)
@@ -189,8 +190,13 @@ function M.save(buf, win)
     return
   end
   -- leaving while still watching: if treesitter rebuilt the folds since the
-  -- restore, put the saved ones back before reading the window's state
-  if w.signature and signature(buf, win, w.folds) ~= w.signature then
+  -- restore, put the saved ones back before reading the window's state —
+  -- never after an edit, whose own fold changes are the user's
+  if
+    w.signature
+    and w.tick == vim.api.nvim_buf_get_changedtick(buf)
+    and signature(buf, win, w.folds) ~= w.signature
+  then
     apply(buf, win, w.folds, w.applied)
   end
   local folds = closed_folds(win)
@@ -235,6 +241,10 @@ function M.load(buf, win)
       if not alive() or not w.signature then
         return
       end
+      if w.tick ~= vim.api.nvim_buf_get_changedtick(buf) then
+        w.signature = nil -- edited since the restore: the user's folds rule
+        return
+      end
       if signature(buf, win, w.folds) ~= w.signature then
         apply(buf, win, w.folds, w.applied) -- rebuilt: put them back, keep watching
         w.signature = signature(buf, win, w.folds)
@@ -254,6 +264,7 @@ function M.load(buf, win)
       apply(buf, win, w.folds, w.applied)
       w.ready = true
       w.signature = signature(buf, win, w.folds)
+      w.tick = vim.api.nvim_buf_get_changedtick(buf)
       return watch(1)
     end
     if vim.uv.now() < deadline then

@@ -54,6 +54,12 @@ vim.schedule(function()
       end
     end
     check("pass 2: zo on a restored fold is not undone", refolded, nil)
+    -- nor is it re-closed by a save after an edit (the watch ends at the
+    -- first edit; the autosave's write used to put saved folds back)
+    vim.cmd("normal! Ax")
+    require("util.folds").save(0, vim.api.nvim_get_current_win())
+    check("pass 2: a save after an edit doesn't re-close it", vim.fn.foldclosed(mod), -1)
+    vim.cmd("normal! Ax") -- the restore's text differs now: the save recorded nothing for it
     vim.cmd(("normal! %dGzc"):format(mod))
     -- a picker-style preview (the real buffer in a float, no folds closed)
     -- coming and going must not wipe the saved state
