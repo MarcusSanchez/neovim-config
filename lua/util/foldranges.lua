@@ -1,25 +1,34 @@
--- One fold expression for every buffer, IntelliJ-shaped.
+-- One fold expression for every buffer, JetBrains-shaped.
 --
 -- Folds come from the language server's folding ranges once it has
 -- answered (rust-analyzer, gopls, vtsls… know every bracket region: a
 -- struct literal inside a closure, a wrapped argument list, an if/else
 -- chain), from treesitter's fold queries until then or where no server
--- folds, and from indentation in files with no parser.
+-- folds, and from indentation in files with no parser. For JSX, treesitter
+-- supplements the server, which reports elements inconsistently.
 --
--- Server ranges are normalised first. Servers follow VS Code's convention
--- and stop a range one line short so the closing bracket stays visible
--- (`}`, `});`, `}, log)` …); IntelliJ, and the fold line
--- `func main() { ... }`, want the closer inside the fold. So a range still
--- missing a closer grows onto the next line when that line starts with one.
+-- Server ranges are normalised (M.normalize) in stages:
+--  1. grow: servers follow VS Code's convention and stop a range one line
+--     short so the closing bracket stays visible (`}`, `});`, `}, log)`,
+--     `</div>`); the closer joins the fold. An opening tag's attribute
+--     list grows into the tag itself (`<Hero` … `/>`).
+--  2. chains: neighbours that share a line (if / else if / else,
+--     parameters / body) also get one range covering all of them.
+--  3. heads and bodies: a statement whose body starts lines later gets a
+--     range for its wrapped head (`if self` … `{`); a range whose head is
+--     its own range gets one for the body (`>` … `</a>`, `) -> R {` … `}`).
 --
--- That leaves lines two regions share: `) -> R {` ends the parameters and
--- opens the body, `} else {` ends one branch and opens the next. Vim gives
--- a line to one fold, so the shared line's owner is decided when a fold is
--- made (M.fold, behind ,d): fold the if branch and it reads
--- `if x { ... } else {`; fold the else branch instead and it reads
--- `} else { ... }` with the if body open. When the neighbour is already
--- closed, the fold grows to the chain both belong to:
+-- Neighbours then share lines (`) -> R {`, `} else {`, `>`), and Vim gives
+-- a line to one fold. The owner is decided when a fold is made (M.fold,
+-- behind ,d): fold the if branch and it reads `if x { ... } else {`; fold
+-- the else branch instead and it reads `} else { ... }` with the if body
+-- open. When the neighbour is already closed, the fold grows to the chain:
 -- `if x { ... } else { ... }`, `fn f( ... ) -> R { ... }`.
+--
+-- Beyond that nothing closes a fold by itself: imports close when a file
+-- opens (JetBrains does the same), util/folds.lua restores saved ones, and
+-- a fold Vim creates closed after an edit — it does, whenever another
+-- fold is closed — is opened again.
 local M = {}
 
 local api = vim.api
@@ -99,41 +108,35 @@ local function by_start(a, b)
   return a.e > b.e
 end
 
---- Server folding ranges, normalised: each one runs through its closing
---- bracket, so neighbours like an if and its else share that line; a chain
---- of such neighbours also gets one range covering all of it.
----@param ranges lsp.FoldingRange[]
----@param lines string[] the buffer's lines
----@return util.foldranges.Range[]
-function M.normalize(ranges, lines)
-  local list = {}
-  for _, r in ipairs(ranges) do
-    if r.endLine > r.startLine then
-      list[#list + 1] = { s = r.startLine, e = r.endLine, kind = r.kind }
-    end
-  end
-  local starts = {} ---@type table<integer, util.foldranges.Range[]>
+--- Ranges indexed by one of their rows ("s" or "e").
+local function index_by(list, field)
+  local by = {} ---@type table<integer, util.foldranges.Range[]>
   for _, r in ipairs(list) do
-    starts[r.s] = starts[r.s] or {}
-    table.insert(starts[r.s], r)
+    by[r[field]] = by[r[field]] or {}
+    table.insert(by[r[field]], r)
   end
+  return by
+end
+
+--- Stage 1: a range that stops short of its closer grows onto the closer's
+--- line; the attribute list of a wrapped opening tag grows into the tag.
+local function grow(list, lines)
   for _, r in ipairs(list) do
     local n = r.e + 1
-    local text = lines[n + 1]
+    local text = lines[n + 1] -- nil past the last line: nothing to grow onto
+    local head = lines[r.s + 1] or ""
     local grows = false
     if text and leading_closer(text) and balance(lines, r.s, r.e) > 0 then
       grows = true -- `}`, `});`, `}, log)`, `).bar()`: the closer joins the fold
     elseif text and closing_tag(text) then
       -- `</div>` after an element that opened on the range's first line,
       -- `/>` after a self-closing one, `</>` after a fragment
-      local opened = opening_tag(lines[r.s + 1] or "")
       local closed = closing_tag(text)
-      grows = opened ~= nil and (closed == "" or closed == opened)
+      grows = opening_tag(head) ~= nil and (closed == "" or closed == opening_tag(head))
     end
-    if text and tag_end(text) and not opening_tag(lines[r.s + 1] or "") and r.s > 0 then
-      -- the attribute list of an opening tag that wrapped (`<Hero` / attrs /
-      -- `/>`): the server folds the attributes alone; fold the tag instead,
-      -- from `<Hero` through its `/>` or `>`
+    if text and tag_end(text) and not opening_tag(head) and r.s > 0 then
+      -- `<Hero` / attrs / `/>`: the server folds the attributes alone; fold
+      -- the tag instead, from `<Hero` through its `/>` or `>`
       local above = lines[r.s] or ""
       if opening_tag(above) and not above:find(">", 1, true) then
         r.s = r.s - 1
@@ -144,12 +147,11 @@ function M.normalize(ranges, lines)
       r.e = n
     end
   end
-  -- a chain (if / else if / else; parameters / body) folds as one too
-  starts = {}
-  for _, r in ipairs(list) do
-    starts[r.s] = starts[r.s] or {}
-    table.insert(starts[r.s], r)
-  end
+end
+
+--- Stage 2: one range per chain of neighbours sharing a line.
+local function chains(list)
+  local starts = index_by(list, "s")
   local function chain_end(r, seen)
     local e = r.e
     for _, b in ipairs(starts[r.e] or {}) do
@@ -160,40 +162,53 @@ function M.normalize(ranges, lines)
     end
     return e
   end
-  local unions = {}
+  local out = {}
   for _, r in ipairs(list) do
     local e = chain_end(r, { [r] = true })
     if e > r.e then
-      unions[#unions + 1] = { s = r.s, e = e }
+      out[#out + 1] = { s = r.s, e = e }
     end
   end
-  vim.list_extend(list, unions)
-  -- a statement whose body starts lines after it and ends with it (`if self`
-  -- / `.is_some_and(…)` / `{` … `}`) has a head the server never folds: the
-  -- condition, wrapped. It gets a range through the `{` line, sharing that
-  -- line with the body the way wrapped parameters share `) -> R {`.
-  local heads = {}
+  return out
+end
+
+--- Stage 3: the wrapped head of a statement whose body ends with it
+--- (`if self` … `{`), and the body of a range whose head is its own range
+--- from the same line (`>` … `</a>`), each through the line they share.
+local function heads_and_bodies(list)
+  local out = {}
+  local ends, starts = index_by(list, "e"), index_by(list, "s")
   for _, r in ipairs(list) do
-    for _, b in ipairs(list) do
-      if b ~= r and b.e == r.e and b.s >= r.s + 2 then
-        heads[#heads + 1] = { s = r.s, e = b.s }
+    for _, b in ipairs(ends[r.e]) do
+      if b ~= r and b.s >= r.s + 2 then
+        out[#out + 1] = { s = r.s, e = b.s }
+      end
+    end
+    for _, t in ipairs(starts[r.s]) do
+      if t ~= r and t.e < r.e and t.e > t.s then
+        out[#out + 1] = { s = t.e, e = r.e }
       end
     end
   end
-  vim.list_extend(list, heads)
-  -- and the mirror: something whose head is a range of its own from the
-  -- same line (an element after its wrapped opening tag, a function after
-  -- its parameters) has a body from the head's last line through the end,
-  -- sharing that line: `>` … `</a>` folds with the attributes still open.
-  local bodies = {}
-  for _, r in ipairs(list) do
-    for _, t in ipairs(list) do
-      if t ~= r and t.s == r.s and t.e < r.e and t.e > t.s then
-        bodies[#bodies + 1] = { s = t.e, e = r.e }
-      end
+  return out
+end
+
+--- Server folding ranges, normalised (see the stages above): each runs
+--- through its closer, chains and wrapped heads/bodies have ranges of
+--- their own, neighbours may share a line. Sorted, no duplicates.
+---@param ranges lsp.FoldingRange[]
+---@param lines string[] the buffer's lines
+---@return util.foldranges.Range[]
+function M.normalize(ranges, lines)
+  local list = {}
+  for _, r in ipairs(ranges) do
+    if r.endLine > r.startLine then
+      list[#list + 1] = { s = r.startLine, e = r.endLine, kind = r.kind }
     end
   end
-  vim.list_extend(list, bodies)
+  grow(list, lines)
+  vim.list_extend(list, chains(list))
+  vim.list_extend(list, heads_and_bodies(list))
   local out, seen = {}, {}
   for _, r in ipairs(list) do
     local key = r.s .. ":" .. r.e
@@ -301,10 +316,18 @@ function M.foldexpr(lnum)
   return indent_level(lnum)
 end
 
+--- The buffer's state, 0 meaning the current buffer.
+local function state_of(buf)
+  if not buf or buf == 0 then
+    buf = api.nvim_get_current_buf()
+  end
+  return states[buf]
+end
+
 --- The buffer's normalised server ranges, 1-based `{ start, stop }` pairs
 --- (for tests and :lua inspection); nil without server folds.
 function M.ranges(buf)
-  local st = states[buf == 0 and api.nvim_get_current_buf() or buf]
+  local st = state_of(buf)
   if not (st and st.ranges) then
     return nil
   end
@@ -316,7 +339,7 @@ end
 --- The server's fold kind ("imports", "comment", "region") for the fold
 --- spanning exactly these 1-based lines, if it has one.
 function M.kind(buf, start, stop)
-  local st = states[buf == 0 and api.nvim_get_current_buf() or buf]
+  local st = state_of(buf)
   if not (st and st.ranges) then
     return nil
   end
@@ -329,10 +352,7 @@ end
 
 --- Whether the buffer's folds come from its language server.
 function M.has(buf)
-  if not buf or buf == 0 then
-    buf = api.nvim_get_current_buf()
-  end
-  local st = states[buf]
+  local st = state_of(buf)
   return st ~= nil and st.levels ~= nil
 end
 
@@ -581,7 +601,7 @@ function M.fold(buf, win, s, e)
   if buf == 0 then
     buf = api.nvim_get_current_buf()
   end
-  local st = states[buf]
+  local st = state_of(buf)
   if not (st and st.levels) then
     return
   end

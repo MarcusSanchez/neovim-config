@@ -83,28 +83,27 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
 - **Folds are the language server's** (rust-analyzer, gopls, vtsls… fold
   every bracket region: a struct literal inside a closure, wrapped
   arguments, each branch of an if/else), normalised so a closed fold hides
-  its closing bracket the way IntelliJ does — servers stop a line short and
-  leave `}` / `});` / `}, log)` visible. Treesitter's folds serve until the
-  server answers and where none does; indentation folds files with no
-  parser. A closed fold is drawn as its first line (highlighted) plus
-  ` ... }`; the dots and the bracket are only drawn. `,d` folds the region
-  at the cursor the way JetBrains does, each on its own: wrapped parameters
-  read `fn f( ... ) -> R {`, an if branch `if x { ... } else {`, an else
-  branch `} else { ... }` — the line two regions share goes to the one
-  being folded. Fold the other one while that is still folded and the pair
-  collapses to its chain: `if x { ... } else { ... }`. Import blocks are
-  folded when a file opens, as JetBrains does (the server's `imports` fold
-  kind: gopls' `import (…)`, rust-analyzer's run of `use` items, a run of
-  TypeScript imports), and a run of them reads `import ...` / `use ...`.
-  JSX and HTML elements fold through their closing tag
-  (`<main className="x"> ... </main>`, `<> ... </>`), a wrapped opening
-  tag through its `/>` or `>` (`<Hero ... />`, `<header ... >` — the
-  attribute list on its own), a class through its brace, a block comment
-  through its `*/`.
+  its closing bracket the way JetBrains does — servers stop a line short
+  and leave `}` / `});` / `}, log)` / `</div>` visible. Treesitter's folds
+  serve until the server answers and where none does, and supplement the
+  server for JSX; indentation folds files with no parser.
+- **Fold lines read like the code**: the first line highlighted, then
+  ` ... ` and the closer — `func main() { ... }`, `fn f( ... ) -> R { ... }`,
+  `<main className="x"> ... </main>`, `<a ... > ... </a>`, `/** ... */`;
+  a run of imports is `import ...` / `use ...`. The dots and the closer are
+  only drawn.
+- **`,d` folds one region**, the way JetBrains does: wrapped parameters
+  read `fn f( ... ) -> R {`, a wrapped condition `if self ... {`, an if
+  branch `if x { ... } else {`, an else branch `} else { ... }`, an
+  element's attributes `<a ... >` and its content `> ... </a>` — the line
+  two regions share goes to the one being folded. Fold the other while
+  that is still folded and the pair collapses to its chain,
+  `if x { ... } else { ... }`. Nothing else closes a fold by itself: import
+  blocks fold when a file opens, saved folds come back, and that is all.
 - **Searching doesn't unfold**: a match inside a closed fold opens that
-  fold only while the cursor is in it (`/`, `n`, `N`, `*`, `#`); step out
-  and it closes again, unless you edited inside. Folds a search merely
-  passed over never open.
+  fold only while the cursor is in it (`/`, `n`, `*`, `#`); step out and
+  it closes again, unless you edited inside. Folds a search merely passed
+  over never open.
 - **Sessions**: a bare `nvim` in a directory you've worked in restores that
   session (persistence.nvim) instead of showing the dashboard; the dashboard
   appears only when there's nothing to restore. Quitting with no file open
