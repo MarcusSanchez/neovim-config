@@ -1,0 +1,18 @@
+# a comment
+# spanning lines
+name: x
+server:
+  host: localhost
+  ports:
+    - 80
+    - 443
+  tls:
+    enabled: true
+    cert: |
+      multi
+      line
+items:
+  - name: a
+    value: 1
+  - name: b
+    value: 2

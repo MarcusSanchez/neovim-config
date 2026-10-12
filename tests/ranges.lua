@@ -17,9 +17,9 @@ vim.defer_fn(function()
   vim.cmd("qall!")
 end, 30000)
 local N = require("util.foldranges").normalize
-local function shapes(ranges, lines)
+local function shapes(ranges, lines, filetype)
   local out = {}
-  for _, r in ipairs(N(ranges, lines)) do
+  for _, r in ipairs(N(ranges, lines, filetype)) do
     out[#out + 1] = (r.s + 1) .. ".." .. (r.e + 1)
   end
   return table.concat(out, " ")
@@ -582,6 +582,64 @@ local ok, err = pcall(function()
     "a three-link chain has no overlapping ranges",
     shapes({ { startLine = 0, endLine = 1 }, { startLine = 2, endLine = 3 }, { startLine = 4, endLine = 5 } }, chain3),
     "1..7 1..3 3..7 3..5 5..7"
+  )
+  -- lua_ls (captured 2026-10-12): keyword blocks. A function stops a
+  -- line short of its `end` like gopls; branches stop before `elseif` /
+  -- `else` / `end`, which close them the way `} else {` does
+  local lua = {
+    "function M.run(a, b)",
+    "  if a > b then",
+    "    return a",
+    "  elseif a == b then",
+    "    return 0",
+    "  else",
+    "    return b",
+    "  end",
+    "end",
+    "",
+    "local function each(list)",
+    "  repeat",
+    "    list = nil",
+    "  until true",
+    "end",
+  }
+  check(
+    "lua_ls ranges normalised with keyword closers",
+    shapes({
+      { startLine = 0, endLine = 7 },
+      { startLine = 1, endLine = 2 },
+      { startLine = 3, endLine = 4 },
+      { startLine = 5, endLine = 6 },
+      { startLine = 10, endLine = 13 },
+      { startLine = 11, endLine = 12 },
+    }, lua, "lua"),
+    "1..9 2..8 2..4 4..8 4..6 6..8 11..15 12..14"
+  )
+  check("without the filetype the keywords aren't closers", shapes({ { startLine = 1, endLine = 2 } }, lua), "2..3")
+  -- yamlls (captured 2026-10-12): a block ends on its last child's last
+  -- line, which is no closer's line, so no "head" is derived from it
+  local yaml = {
+    "name: x",
+    "server:",
+    "  host: localhost",
+    "  ports:",
+    "    - 80",
+    "    - 443",
+    "  tls:",
+    "    enabled: true",
+    "    cert: |",
+    "      multi",
+    "      line",
+  }
+  check(
+    "yamlls ranges: nested blocks, no heads",
+    shapes({
+      { startLine = 1, endLine = 10 },
+      { startLine = 3, endLine = 5 },
+      { startLine = 6, endLine = 10 },
+      { startLine = 8, endLine = 10 },
+    }, yaml, "yaml"),
+    "2..11 4..6 7..11 9..11"
   )
   -- a block that already ends on its closer is left alone even when the
   -- next line is the parent's closer

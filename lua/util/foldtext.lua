@@ -153,12 +153,19 @@ end
 --- string's closing quote, rust's `"#`, with a trailing `,`/`;`) and the
 --- rest — `) -> Result<(), Error> {` is closers `)` plus the rest. Nil
 --- closers when the line doesn't start with one.
-local function closer(last)
+local function closer(last, filetype)
   -- a closing tag closes an element the way `}` closes a block (a `>>`
   -- closes a bit array, not a tag)
   local tag = last:match("^%s*(</[%w%.%-_]*>)") or (not last:match("^%s*>>") and last:match("^%s*(/?>)"))
   if tag then
     return tag, last:sub(#last:match("^%s*") + #tag + 1)
+  end
+  -- so does a closing keyword (`end`, `fi`, an `elseif`) in the languages
+  -- that have them (util/foldranges.lua's table)
+  local kw = require("util.foldranges").keywords[filetype]
+  local word = kw and last:match("^%s*(%a+)%f[%A]")
+  if word and vim.tbl_contains(kw.lead, word) then
+    return word, last:sub(#last:match("^%s*") + #word + 1)
   end
   local closers, rest = last:match("^%s*([%)%]}>\"'`#]+[,;]?)(.*)$")
   if not closers then
@@ -301,7 +308,27 @@ function M.build(buf, first_lnum, last_lnum)
   -- / `#include ...`, as JetBrains collapses it: no one line stands for
   -- the whole run. Bracketed forms (`import (` … `)`) keep the usual shape.
   local head, last = line_at(first_lnum), line_at(last_lnum)
-  if require("util.foldranges").kind(buf, first_lnum, last_lnum) == "imports" then
+  local function import_run()
+    -- without a server kind (treesitter's fold): a run of import lines,
+    -- a wrapped one's closer included, from the first line's keyword
+    local function is_import(line)
+      return line:match("^%s*import%f[%W]") ~= nil or line:match("^%s*from%f[%W]") ~= nil
+    end
+    if not is_import(head) then
+      return false
+    end
+    local statements = 1
+    for lnum = first_lnum + 1, last_lnum do
+      local line = line_at(lnum)
+      if is_import(line) then
+        statements = statements + 1
+      elseif not (line:match("^%s*[%)}]") or line:match("^%s+%S")) then
+        return false
+      end
+    end
+    return statements > 1 -- one wrapped import keeps its `( ... )` shape
+  end
+  if require("util.foldranges").kind(buf, first_lnum, last_lnum) == "imports" or import_run() then
     local keyword = head:match("^%s*(#?%a+)")
     if keyword and not select(2, trailing_openers(head)) then
       local pos, want = 0, #head:match("^%s*") + #keyword
@@ -355,7 +382,26 @@ function M.build(buf, first_lnum, last_lnum)
   -- dim: the trailing openers, and the leading closers of a continuation.
   local lnum, line = first_lnum, head
   vim.list_extend(chunks, (highlighted(buf, lnum, line, (trailing_openers(line)))))
-  for _ = 1, 4 do
+  local kw = require("util.foldranges").keywords[vim.bo[buf].filetype]
+  --- The line, at the same indent, that closes the keyword block this
+  --- line opens (`if … then` → its `elseif` / `else` / `end`), if it
+  --- comes before the fold's last line.
+  local function keyword_closing_line(l, text)
+    if not kw or require("util.foldranges").balance({ text }, 0, 0, kw) <= 0 then
+      return
+    end
+    local indent = text:match("^%s*")
+    for n = l + 1, last_lnum - 1 do
+      local candidate = line_at(n)
+      if candidate:match("^%s*") == indent then
+        local word = candidate:match("^%s*(%a+)%f[%A]")
+        if word and vim.tbl_contains(kw.lead, word) then
+          return n
+        end
+      end
+    end
+  end
+  for _ = 1, 6 do
     if not select(2, trailing_openers(line)) then
       -- an opening tag whose attributes wrap: elide them up to its `>`, so
       -- `<a` … `>` … `</a>` reads `<a ... > ... </a>`
@@ -363,18 +409,28 @@ function M.build(buf, first_lnum, last_lnum)
       if tag_end and tag_end > lnum and tag_end < last_lnum then
         continue_with(tag_end, {})
         lnum, line = tag_end, line_at(tag_end)
+        break
       end
-      break
+      -- a keyword block closed before the fold's end (`if … then` up to
+      -- its `elseif`): the fold line goes on with the line that closes
+      -- it, so a Lua if reads `if x then ... elseif y then ... else ... end`
+      local closes = keyword_closing_line(lnum, line)
+      if not closes then
+        break
+      end
+      continue_with(closes, {})
+      lnum, line = closes, line_at(closes)
+    else
+      local closes = closing_line(buf, lnum, #line:gsub("%s+$", ""))
+      if not closes or closes >= last_lnum or closes <= lnum then
+        break
+      end
+      continue_with(closes, hidden_brackets(line_at(closes), true))
+      lnum, line = closes, line_at(closes)
     end
-    local closes = closing_line(buf, lnum, #line:gsub("%s+$", ""))
-    if not closes or closes >= last_lnum or closes <= lnum then
-      break
-    end
-    continue_with(closes, hidden_brackets(line_at(closes), true))
-    lnum, line = closes, line_at(closes)
   end
 
-  local tail, rest = closer(last)
+  local tail, rest = closer(last, vim.bo[buf].filetype)
 
   -- a head that opens nothing the last line closes — a condition wrapped
   -- over lines before its `{` — is followed by the line that does open it,

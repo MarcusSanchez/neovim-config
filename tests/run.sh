@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Headless regression suite for the custom behaviour in this config.
-# Needs gopls, rust-analyzer, vtsls, zls, clangd, gleam and buf on PATH
-# (mason installs all but gleam, which comes with its compiler).
+# Needs gopls, rust-analyzer, vtsls, zls, clangd, gleam, buf, lua-language-server,
+# bash-language-server, the json/yaml servers, taplo, marksman, nil and ruff on
+# PATH (mason installs all but gleam, which comes with its compiler).
 #
 #   tests/run.sh          # everything
-#   tests/run.sh go       # one suite: go | caret | rust | tsx | zig | gleam | c | cpp | session | copilot | proto | scroll | keys | comment | ranges | folds
+#   tests/run.sh go       # one suite: go | caret | rust | tsx | zig | gleam | c | cpp | lua | sh | json | yaml | toml | markdown | nix | python | protofold | session | copilot | proto | scroll | keys | comment | ranges | folds
 #
 # Each suite drives a real nvim with this config against a fixture project
 # and prints PASS/FAIL lines. Fixtures are copied to a temp dir first: the
@@ -46,6 +47,15 @@ want=${1:-all}
 [[ $want == all || $want == gleam ]] && run gleam "$work/gleam" src/probe.gleam "$here/gleam.lua" "$work/gleam/src/result.log"
 [[ $want == all || $want == c ]] && run c "$work/c" main.c "$here/c.lua" "$work/c/result.log"
 [[ $want == all || $want == cpp ]] && run cpp "$work/cpp" main.cpp "$here/cpp.lua" "$work/cpp/result.log"
+[[ $want == all || $want == lua ]] && run lua "$work/lua" main.lua "$here/lua.lua" "$work/lua/result.log"
+[[ $want == all || $want == sh ]] && run sh "$work/sh" script.sh "$here/sh.lua" "$work/sh/result.log"
+[[ $want == all || $want == json ]] && run json "$work/json" data.json "$here/json.lua" "$work/json/result.log"
+[[ $want == all || $want == yaml ]] && run yaml "$work/yaml" config.yaml "$here/yaml.lua" "$work/yaml/result.log"
+[[ $want == all || $want == toml ]] && run toml "$work/toml" config.toml "$here/toml.lua" "$work/toml/result.log"
+[[ $want == all || $want == markdown ]] && run markdown "$work/md" README.md "$here/markdown.lua" "$work/md/result.log"
+[[ $want == all || $want == nix ]] && run nix "$work/nix" pkgs.nix "$here/nix.lua" "$work/nix/result.log"
+[[ $want == all || $want == python ]] && run python "$work/py" main.py "$here/python.lua" "$work/py/result.log"
+[[ $want == all || $want == protofold ]] && run protofold "$work/proto" acme/v1/shapes.proto "$here/protofold.lua" "$work/proto/acme/v1/result.log"
 if [[ $want == all || $want == session ]]; then
   # its own state dir: other suites' exits save sessions for the fixture dirs
   export XDG_STATE_HOME="$work/state-session" SESSION_PASS=1

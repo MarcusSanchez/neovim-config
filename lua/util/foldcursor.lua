@@ -655,6 +655,9 @@ local function reclose_later(win, buf, r)
       api.nvim_win_call(win, function()
         for i = #r.folds, 1, -1 do
           local s, e = FR.fold(buf, win, r.folds[i][1] - 1, r.folds[i][2] + delta - 1)
+          if not s and not FR.has(buf) then
+            s, e = r.folds[i][1], r.folds[i][2] + delta -- treesitter's folds: no ownership to settle
+          end
           trace(("re-close: %d..%d -> %s..%s"):format(r.folds[i][1], r.folds[i][2] + delta, tostring(s), tostring(e)))
           if s then
             folds.close_exact(s, e)

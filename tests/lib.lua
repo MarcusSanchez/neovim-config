@@ -12,7 +12,10 @@ local M = {}
 ---@field span fun(l: integer): string "start..end" of the closed fold at l, "-1..-1" if open
 ---@field shape fun(l: integer, span: string, text: string) open all, ,d on l, check span and fold line
 
-function M.suite(server, body)
+---@param server string the language server to wait for
+---@param body fun(t: tests.Suite)
+---@param opts? { treesitter: boolean } the language's folds are treesitter's (no server ranges)
+function M.suite(server, body, opts)
   local logf = io.open(vim.fn.expand("%:p:h") .. "/result.log", "w")
   local t = {} ---@type tests.Suite
   function t.log(s)
@@ -55,11 +58,17 @@ function M.suite(server, body)
       vim.wait(30000, function()
         return #vim.lsp.get_clients({ bufnr = 0, name = server }) > 0
       end, 100)
-      vim.wait(15000, function()
-        return FR.has(0)
-      end, 50)
-      t.wait(300)
-      t.check("folds come from " .. server, FR.has(0), true)
+      if opts and opts.treesitter then
+        t.wait(1500)
+        t.check("folds are treesitter's (no server ranges)", FR.has(0), false)
+        t.check("the fold expression is ours", vim.wo.foldexpr, "v:lua.require('util.foldranges').foldexpr()")
+      else
+        vim.wait(15000, function()
+          return FR.has(0)
+        end, 50)
+        t.wait(300)
+        t.check("folds come from " .. server, FR.has(0), true)
+      end
       body(t)
       vim.cmd("normal! zR")
     end)

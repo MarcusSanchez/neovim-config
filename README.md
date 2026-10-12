@@ -82,15 +82,20 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
 - **Protobuf**: `buf lsp serve` gives compile errors, buf lint (per the
   module's `buf.yaml`), navigation, rename and completion. Breaking-change
   checks aren't exposed over LSP — run `buf breaking`.
-- **Folds are the language server's** (rust-analyzer, gopls, vtsls… fold
-  every bracket region: a struct literal inside a closure, wrapped
-  arguments, each branch of an if/else), normalised so a closed fold hides
-  its closing bracket the way JetBrains does — servers stop a line short
-  and leave `}` / `});` / `}, log)` / `</div>` visible. Treesitter's folds
-  serve until the server answers and where none does, and supplement the
-  server where it is thin (JSX elements, Gleam's blocks, cases and
+- **Folds are the language server's** (rust-analyzer, gopls, vtsls, zls,
+  clangd, lua_ls, the JSON and YAML servers, buf… fold every bracket
+  region: a struct literal inside a closure, wrapped arguments, each
+  branch of an if/else), normalised so a closed fold hides its closing
+  bracket the way JetBrains does — servers stop a line short and leave
+  `}` / `});` / `}, log)` / `</div>` visible. Keyword blocks close the
+  same way: Lua's `function … end`, `if … then … elseif … then … else
+  … end`, `repeat … until`; a shell's `if … then … fi`, `do … done`,
+  `case … esac`. Treesitter's folds serve until the server answers and
+  where none does (Python, shell, TOML, Markdown, Nix), and supplement
+  the server where it is thin (JSX elements, Gleam's blocks, cases and
   literals, C's `#include` runs and `#ifdef` regions); indentation folds
-  files with no parser.
+  files with no parser. A run of imports reads `import ...` whether the
+  server says so or treesitter found it.
 - **Fold lines read like the code**: the first line highlighted, then
   ` ... ` and the closer — `func main() { ... }`, `fn f( ... ) -> R { ... }`,
   `<main className="x"> ... </main>`, `<a ... > ... </a>`, `/** ... */`;
@@ -150,17 +155,20 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
 
 ## Tests
 
-`tests/run.sh` drives headless nvim against small Go, Rust, TSX, Zig,
-Gleam, C, C++ and protobuf fixtures and prints PASS/FAIL per behaviour. Suites:
-`go` (gd/gh, usages popup, autosave, popups, fold shapes with gopls),
-`caret` (the caret on a closed fold), `comment` (block comments on a selection),
-`rust` (gs filtering, italics, fold shapes with rust-analyzer), `tsx` (JSX
-fold shapes with the typescript server), `zig` (fold shapes with zls:
-nested if/else chains, wrapped signatures), `gleam` (fold shapes with the
-gleam server plus treesitter's), `c` and `cpp` (fold shapes with clangd:
-if/else-if chains, `#include` runs, block comments, lambdas), `session`,
-`copilot`, `proto`,
-`scroll`, `keys` (j/k swaps), `ranges` (the fold-range normaliser against
-captured server output, no server needed) and `folds` (persistence across
-two runs, plain text and treesitter/LSP). Needs gopls, rust-analyzer,
-vtsls, zls, clangd, gleam and buf.
+`tests/run.sh` drives headless nvim against small fixtures in each
+language and prints PASS/FAIL per behaviour. Suites: `go` (gd/gh, usages
+popup, autosave, popups, fold shapes with gopls), `caret` (the caret on
+a closed fold), `comment` (block comments on a selection), `rust` (gs
+filtering, italics, fold shapes with rust-analyzer), `tsx` (JSX fold
+shapes with the typescript server), `zig` (fold shapes with zls: nested
+if/else chains, wrapped signatures), `gleam` (fold shapes with the gleam
+server plus treesitter's), `c` and `cpp` (fold shapes with clangd:
+if/else-if chains, `#include` runs, block comments, lambdas), `lua`
+(keyword blocks with lua_ls), `json`, `yaml`, `protofold` (buf), `sh`,
+`toml`, `markdown`, `nix`, `python` (treesitter's folds, no server
+ranges), `session`, `copilot`, `proto`, `scroll`, `keys` (j/k swaps),
+`ranges` (the fold-range normaliser against captured server output, no
+server needed) and `folds` (persistence across two runs, plain text and
+treesitter/LSP). Needs gopls, rust-analyzer, vtsls, zls, clangd, gleam,
+buf, lua-language-server, bash-language-server, the JSON and YAML
+servers, taplo, marksman, nil and ruff.

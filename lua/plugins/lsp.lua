@@ -51,6 +51,7 @@ return {
       tailwindcss = {
         filetypes_include = { "tailwind.config.js" },
       },
+      bashls = {}, -- shell scripts (mason's bash-language-server)
       nil_ls = {
         settings = {
           -- fetch flake inputs into the store automatically instead of asking

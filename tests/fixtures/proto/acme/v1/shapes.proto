@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package acme.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+// A comment
+// spanning lines
+message Account {
+  string id = 1;
+  string name = 2;
+  message Address {
+    string city = 1;
+  }
+  Address address = 3;
+  repeated string tags = 4;
+}
+
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  ROLE_ADMIN = 1;
+}
+
+service AccountService {
+  rpc GetAccount(GetAccountRequest) returns (Account) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc DeleteAccount(GetAccountRequest) returns (google.protobuf.Empty);
+}
+
+message GetAccountRequest {
+  string id = 1;
+}

@@ -1,0 +1,11 @@
+-- fold shapes: Nix with treesitter (tests/fixtures/nix): nil has no folding ranges.
+local lib = dofile(debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") .. "/lib.lua")
+lib.suite("nil_ls", function(t)
+  t.shape(5, "4..6", "  inputs = { ... };")
+  t.shape(11, "10..12", "      pkgs = import nixpkgs { ... };")
+  t.shape(14, "13..16", "      names = [ ... ];")
+  t.shape(18, "17..20", "      script = '' ... '';")
+  t.shape(23, "22..24", "        if x > 1 ...")
+  t.shape(27, "26..29", "    { ... };")
+  t.shape(2, "1..30", "{ ... }")
+end, { treesitter = true })

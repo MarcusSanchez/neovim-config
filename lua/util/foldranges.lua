@@ -54,9 +54,34 @@ local function code(text)
   return (text:gsub("//.*$", ""))
 end
 
---- The closing bracket a line starts with, if any.
-local function leading_closer(text)
-  return text:match("^%s*([%)%]}])")
+--- Blocks delimited by keywords, per filetype: `open` and `close` count
+--- toward a range's balance the way brackets do, and a line starting
+--- with one of `lead` closes the region above it the way a `}` line does
+--- (`end`, `fi`; `else` and `elseif` close a branch and open the next).
+local keywords = {
+  lua = {
+    open = { "function", "then", "do", "repeat", "else" },
+    close = { "end", "until" },
+    lead = { "end", "until", "else", "elseif" },
+  },
+  sh = {
+    open = { "then", "do", "case", "else", "elif" },
+    close = { "fi", "done", "esac" },
+    lead = { "fi", "done", "esac", "else", "elif" },
+  },
+}
+keywords.bash, keywords.zsh = keywords.sh, keywords.sh
+M.keywords = keywords
+
+--- The closing bracket a line starts with, if any — or the closing
+--- keyword (`end`, `elseif`) of the filetype's blocks.
+local function leading_closer(text, kw)
+  local bracket = text:match("^%s*([%)%]}])")
+  if bracket or not kw then
+    return bracket
+  end
+  local word = text:match("^%s*(%a+)%f[%A]")
+  return word and vim.tbl_contains(kw.lead, word) and word or nil
 end
 
 --- The tag a line closes, if it starts with one: the name for `</div>`,
@@ -85,7 +110,7 @@ end
 --- Openers minus closers over the range's lines (0-based rows), ignoring
 --- closers before the first opener on the first line (`} else {`,
 --- `}).catch(() => {`): positive means the range hasn't closed yet.
-local function balance(lines, first, last)
+local function balance(lines, first, last, kw)
   local net = 0
   for row = first, last do
     local text = code(lines[row + 1] or "")
@@ -97,9 +122,20 @@ local function balance(lines, first, last)
     for ch in text:gmatch("[%(%[{%)%]}]") do
       net = net + ((ch == "(" or ch == "[" or ch == "{") and 1 or -1)
     end
+    if kw then
+      for word in text:gmatch("%f[%a]%a+%f[%A]") do
+        if vim.tbl_contains(kw.open, word) then
+          net = net + 1
+        elseif vim.tbl_contains(kw.close, word) then
+          net = net - 1
+        end
+      end
+    end
   end
   return net
 end
+
+M.balance = balance
 
 local function by_start(a, b)
   if a.s ~= b.s then
@@ -120,13 +156,13 @@ end
 
 --- Stage 1: a range that stops short of its closer grows onto the closer's
 --- line; the attribute list of a wrapped opening tag grows into the tag.
-local function grow(list, lines)
+local function grow(list, lines, kw)
   for _, r in ipairs(list) do
     local n = r.e + 1
     local text = lines[n + 1] -- nil past the last line: nothing to grow onto
     local head = lines[r.s + 1] or ""
     local grows = false
-    if text and leading_closer(text) and balance(lines, r.s, r.e) > 0 then
+    if text and leading_closer(text, kw) and balance(lines, r.s, r.e, kw) > 0 then
       grows = true -- `}`, `});`, `}, log)`, `).bar()`: the closer joins the fold
     elseif text and r.kind == "comment" and text:match("^%s*%*/") and head:match("^%s*/%*") then
       grows = true -- clangd stops a block comment short of its ` */`
@@ -177,13 +213,18 @@ end
 --- Stage 2: the wrapped head of a statement whose body ends with it
 --- (`if self` … `{`), and the body of a range whose head is its own range
 --- from the same line (`>` … `</a>`), each through the line they share.
-local function heads_and_bodies(list)
+local function heads_and_bodies(list, lines, kw)
   local out = {}
   local ends, starts = index_by(list, "e"), index_by(list, "s")
   for _, r in ipairs(list) do
-    for _, b in ipairs(ends[r.e]) do
-      if b ~= r and b.s >= r.s + 2 then
-        out[#out + 1] = { s = r.s, e = b.s }
+    -- a head exists only where the shared last line is a closer's (a
+    -- YAML block ending on its child's last line shares nothing)
+    local last = lines[r.e + 1] or ""
+    if leading_closer(last, kw) or closing_tag(last) then
+      for _, b in ipairs(ends[r.e]) do
+        if b ~= r and b.s >= r.s + 2 then
+          out[#out + 1] = { s = r.s, e = b.s }
+        end
       end
     end
     for _, t in ipairs(starts[r.s]) do
@@ -200,19 +241,21 @@ end
 --- their own, neighbours may share a line. Sorted, no duplicates.
 ---@param ranges lsp.FoldingRange[]
 ---@param lines string[] the buffer's lines
+---@param filetype? string for the keyword-delimited languages
 ---@return util.foldranges.Range[]
-function M.normalize(ranges, lines)
+function M.normalize(ranges, lines, filetype)
+  local kw = filetype and keywords[filetype] or nil
   local list = {}
   for _, r in ipairs(ranges) do
     if r.endLine > r.startLine then
       list[#list + 1] = { s = r.startLine, e = r.endLine, kind = r.kind }
     end
   end
-  grow(list, lines)
+  grow(list, lines, kw)
   -- heads and bodies before chains: derived from a chain, a "head" would
   -- be its first links (`if … } else if … {`), which overlaps the chain
   -- of its last links, and Vim can't hold overlapping folds
-  vim.list_extend(list, heads_and_bodies(list))
+  vim.list_extend(list, heads_and_bodies(list, lines, kw))
   vim.list_extend(list, chains(list))
   local out, seen = {}, {}
   for _, r in ipairs(list) do
@@ -620,6 +663,9 @@ local function request(buf)
       end
     end
     vim.list_extend(ranges, treesitter_ranges(buf))
+    if #ranges == 0 and st.levels == nil then
+      return -- nothing from the server (taplo answers so): treesitter's folds stay
+    end
     local lines = api.nvim_buf_get_lines(buf, 0, -1, false)
     local first = st.levels == nil
     local folds = require("util.folds")
@@ -627,7 +673,7 @@ local function request(buf)
     -- what's closed across the rebuild, then apply saved folds that had no
     -- matching fold until now
     local closed = first and folds.snapshot(buf) or nil
-    st.ranges = M.normalize(ranges, lines)
+    st.ranges = M.normalize(ranges, lines, vim.bo[buf].filetype)
     relevel(st)
     update(buf)
     if first then
@@ -764,6 +810,17 @@ local function supports(client, buf)
 end
 
 function M.setup()
+  -- a runtime ftplugin (lua's sets treesitter's) swaps the window's fold
+  -- expression; ours, set in config/options.lua, is the buffer's
+  api.nvim_create_autocmd("FileType", {
+    group = api.nvim_create_augroup("fold_expression", { clear = true }),
+    callback = function()
+      local ours = vim.go.foldexpr
+      if ours:find("util.foldranges", 1, true) and vim.wo.foldexpr ~= ours then
+        vim.wo[0][0].foldexpr = ours
+      end
+    end,
+  })
   local group = api.nvim_create_augroup("fold_ranges", { clear = true })
   api.nvim_create_autocmd("LspAttach", {
     group = group,

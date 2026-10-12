@@ -1,0 +1,10 @@
+-- fold shapes: YAML with yaml-language-server (tests/fixtures/yaml): blocks end on their last child, no closer line, the fold line is the key.
+local lib = dofile(debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") .. "/lib.lua")
+lib.suite("yamlls", function(t)
+  t.shape(5, "4..13", "server: ...")
+  t.shape(7, "6..8", "  ports: ...")
+  t.shape(10, "9..13", "  tls: ...")
+  t.shape(12, "11..13", "    cert: | ...")
+  t.shape(16, "15..16", "  - name: a ...")
+  t.shape(18, "17..18", "  - name: b ...")
+end)

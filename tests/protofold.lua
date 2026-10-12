@@ -1,0 +1,11 @@
+-- fold shapes: Protobuf with buf (tests/fixtures/proto/acme/v1/shapes.proto): imports fold on open, messages, enums, services.
+local lib = dofile(debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") .. "/lib.lua")
+lib.suite("buf_ls", function(t)
+  t.check("imports fold on open", t.span(5) .. " " .. vim.fn.foldtextresult(5), "5..6 import ...")
+  t.shape(9, "8..9", "// A comment ...")
+  t.shape(11, "10..18", "message Account { ... }")
+  t.shape(14, "13..15", "  message Address { ... }")
+  t.shape(21, "20..23", "enum Role { ... }")
+  t.shape(25, "25..30", "service AccountService { ... }")
+  t.shape(27, "26..28", "  rpc GetAccount(GetAccountRequest) returns (Account) { ... }")
+end)

@@ -1,0 +1,11 @@
+-- fold shapes: shell with treesitter (tests/fixtures/sh): bash-language-server has no folding ranges; `fi`, `done`, `esac` close the fold line.
+local lib = dofile(debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") .. "/lib.lua")
+lib.suite("bashls", function(t)
+  t.shape(7, "6..9", "usage() { ... }")
+  t.shape(14, "13..19", "  if [[ -d $dir ]]; then ... elif [[ -f $dir ]]; then ... else ... fi")
+  t.shape(21, "20..22", '  for f in "$dir"/*; do ... done')
+  t.shape(24, "23..25", "  while read -r line; do ... done < /dev/null")
+  t.shape(27, "26..33", "  case $dir in ... esac")
+  t.shape(35, "34..37", "  cat <<EOT ...")
+  t.shape(12, "11..41", "main() { ... }")
+end, { treesitter = true })

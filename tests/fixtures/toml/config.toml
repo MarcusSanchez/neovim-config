@@ -1,0 +1,20 @@
+# a comment
+# spanning lines
+title = "x"
+
+[server]
+host = "localhost"
+ports = [
+  80,
+  443,
+]
+
+[server.tls]
+enabled = true
+
+[[items]]
+name = "a"
+
+[[items]]
+name = "b"
+point = { x = 1, y = 2 }
