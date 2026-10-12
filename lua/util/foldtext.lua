@@ -290,6 +290,18 @@ function M.text()
     return chunks
   end
 
+  -- Go's error check, folded, reads as the one-liner it is:
+  -- `if err != nil { return err }`, the `{ return err }` dim as one piece
+  if vim.bo[buf].filetype == "go" and last_lnum == first_lnum + 2 then
+    local brace = head:find("{%s*$")
+    local ret = line_at(first_lnum + 1):match("^%s*(return%s+.-)%s*$")
+    if brace and ret and ret:find("%f[%w]err%f[%W]") and last:match("^%s*}%s*$") then
+      vim.list_extend(chunks, (highlighted(buf, first_lnum, head:sub(1, brace - 1))))
+      chunks[#chunks + 1] = { "{ " .. ret .. " }", "FoldEllipsis" }
+      return chunks
+    end
+  end
+
   -- Walk the fold: a line whose trailing opener closes *before* the fold's
   -- last line (a wrapped parameter list, a call spanning lines) is followed
   -- by ` ... ` and the line that closes it, so `fn send(` … `) -> R {` … `}`

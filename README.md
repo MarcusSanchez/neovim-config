@@ -90,8 +90,9 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
 - **Fold lines read like the code**: the first line highlighted, then
   ` ... ` and the closer — `func main() { ... }`, `fn f( ... ) -> R { ... }`,
   `<main className="x"> ... </main>`, `<a ... > ... </a>`, `/** ... */`;
-  a run of imports is `import ...` / `use ...`. The dots and the closer are
-  only drawn.
+  a run of imports is `import ...` / `use ...`, and Go's folded error check
+  is the one-liner it is, `if err != nil { return err }`. The dots and the
+  closer are only drawn.
 - **`,d` folds one region**, the way JetBrains does: wrapped parameters
   read `fn f( ... ) -> R {`, a wrapped condition `if self ... {`, an if
   branch `if x { ... } else {`, an else branch `} else { ... }`, an

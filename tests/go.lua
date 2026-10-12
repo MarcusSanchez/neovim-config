@@ -421,6 +421,54 @@ vim.schedule(function()
     vim.cmd("buffer main.go")
     vim.api.nvim_buf_delete(ib, { force = true })
     vim.fn.delete("imp.go")
+    -- a folded error check reads as a one-liner, `{ return err }` dim
+    vim.fn.writefile({
+      "package main",
+      "",
+      "func f() error {",
+      "\tif err := g(); err != nil {",
+      "\t\treturn err",
+      "\t}",
+      "\tif err := g(); err != nil {",
+      '\t\treturn fmt.Errorf("g: %w", err)',
+      "\t}",
+      "\tif true {",
+      "\t\treturn nil",
+      "\t}",
+      "\treturn nil",
+      "}",
+    }, "ret.go")
+    vim.cmd("edit ret.go")
+    local eb = vim.api.nvim_get_current_buf()
+    server_folds()
+    fold(5)
+    check(
+      "a folded `return err` check is a one-liner",
+      vim.fn.foldtextresult(4),
+      "    if err := g(); err != nil { return err }"
+    )
+    chunks = nil
+    vim.wo.foldtext = "v:lua.__fold_probe()"
+    vim.fn.foldtextresult(4)
+    vim.wo.foldtext = ft
+    check(
+      "`{ return err }` is one dim chunk",
+      chunks[#chunks][1] .. "=" .. chunks[#chunks][2],
+      "{ return err }=FoldEllipsis"
+    )
+    check("the condition keeps its colours", chunks[2][2] ~= "FoldEllipsis", true)
+    fold(8)
+    check(
+      "a wrapped error return inlines too",
+      vim.fn.foldtextresult(7),
+      '    if err := g(); err != nil { return fmt.Errorf("g: %w", err) }'
+    )
+    fold(11)
+    check("a body without err folds the usual way", vim.fn.foldtextresult(10), "    if true { ... }")
+    vim.cmd("normal! zR")
+    vim.cmd("buffer main.go")
+    vim.api.nvim_buf_delete(eb, { force = true })
+    vim.fn.delete("ret.go")
     -- a block comment folds with its closer: `/* ... */`
     vim.fn.writefile({ "package main", "", "/*", "Package doc", "spanning lines", "*/", "func f() {}" }, "blk.go")
     vim.cmd("edit blk.go")
