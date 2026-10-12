@@ -18,6 +18,10 @@ lib.suite("gopls", function(t)
     "}",
     "",
     "func g() {}",
+    "",
+    "// one",
+    "// two",
+    "var z = 1",
   }, "sig.go")
   vim.cmd("edit sig.go")
   vim.wait(15000, function()
@@ -212,6 +216,14 @@ lib.suite("gopls", function(t)
   t.check("l from there: onto the fold's first cell", cursor() .. " " .. caret(), "5:0 f")
   key("3h")
   t.check("a count past the start wraps too", cursor(), "4:0")
+  -- a fold line ending in dots (a comment run): h from below opens it
+  vim.cmd("normal! zR")
+  t.fold(15)
+  t.check("the comment run is folded", t.span(14) .. " " .. vim.fn.foldtextresult(14), "14..15 // one ...")
+  vim.api.nvim_win_set_cursor(win, { 16, 0 })
+  key("h")
+  t.check("h from below onto the dots opens the fold", vim.fn.foldclosed(14), -1)
+  t.check("at the end of its last line", cursor(), "15:5")
   vim.cmd("normal! zR")
   t.fold(6)
   t.fold(9) -- the whole function again

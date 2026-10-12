@@ -299,6 +299,13 @@ local function land(win, buf, lnum, edge)
   if fs ~= -1 then
     local fe = vim.fn.foldclosedend(lnum)
     local cells = cells_of(buf, fs, fe)
+    if edge < 0 and #cells > 0 and not visible(cells[#cells]) then
+      -- the line ends in a ` ... ` (`import ...`): stepping back onto it
+      -- is stepping onto the dots, so the fold opens at its end
+      api.nvim_win_set_cursor(win, { fs, 0 })
+      open_segment(win, buf, fs, fe, cells, #cells, -1)
+      return
+    end
     local target = edge < 0 and nearest(cells, #cells, -1) or nearest(cells, 1, 1)
     if target then
       place(win, buf, fs, fe, cells, target)
