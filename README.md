@@ -87,11 +87,12 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
   and leave `}` / `});` / `}, log)` / `</div>` visible. Treesitter's folds
   serve until the server answers and where none does, and supplement the
   server where it is thin (JSX elements, Gleam's blocks, cases and
-  literals); indentation folds files with no parser.
+  literals, C's `#include` runs and `#ifdef` regions); indentation folds
+  files with no parser.
 - **Fold lines read like the code**: the first line highlighted, then
   ` ... ` and the closer — `func main() { ... }`, `fn f( ... ) -> R { ... }`,
   `<main className="x"> ... </main>`, `<a ... > ... </a>`, `/** ... */`;
-  a run of imports is `import ...` / `use ...`, and Go's folded error check
+  a run of imports is `import ...` / `use ...` / `#include ...`, and Go's folded error check
   is the one-liner it is, `if err != nil { return err }`. The dots and the
   closer are only drawn.
 - **`,d` folds one region**, the way JetBrains does: wrapped parameters
@@ -119,13 +120,15 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
 ## Tests
 
 `tests/run.sh` drives headless nvim against small Go, Rust, TSX, Zig,
-Gleam and protobuf fixtures and prints PASS/FAIL per behaviour. Suites:
+Gleam, C, C++ and protobuf fixtures and prints PASS/FAIL per behaviour. Suites:
 `go` (gd/gh, usages popup, autosave, popups, fold shapes with gopls),
 `rust` (gs filtering, italics, fold shapes with rust-analyzer), `tsx` (JSX
 fold shapes with the typescript server), `zig` (fold shapes with zls:
 nested if/else chains, wrapped signatures), `gleam` (fold shapes with the
-gleam server plus treesitter's), `session`, `copilot`, `proto`,
+gleam server plus treesitter's), `c` and `cpp` (fold shapes with clangd:
+if/else-if chains, `#include` runs, block comments, lambdas), `session`,
+`copilot`, `proto`,
 `scroll`, `keys` (j/k swaps), `ranges` (the fold-range normaliser against
 captured server output, no server needed) and `folds` (persistence across
 two runs, plain text and treesitter/LSP). Needs gopls, rust-analyzer,
-vtsls, zls, gleam and buf.
+vtsls, zls, clangd, gleam and buf.

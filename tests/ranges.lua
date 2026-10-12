@@ -557,6 +557,15 @@ local ok, err = pcall(function()
     }, gleam),
     "1..11 1..4 4..11 5..10 7..9"
   )
+  -- clangd (captured 2026-10-12) stops a block comment a line short of
+  -- its ` */` like it does every bracket; the comment grows onto it
+  local c = { "/*", " * A block comment", " */", "int x;", "", "/* one line */", "int y;" }
+  check("a block comment grows onto its ` */`", shapes({ { startLine = 0, endLine = 1, kind = "comment" } }, c), "1..3")
+  check(
+    "a comment range not followed by ` */` is left alone",
+    shapes({ { startLine = 3, endLine = 4, kind = "comment" } }, c),
+    "4..5"
+  )
   -- clangd: an if / else if / else chain. Each link, the whole chain and
   -- the chain of the last two links — never an if + else-if "head", which
   -- would overlap that one

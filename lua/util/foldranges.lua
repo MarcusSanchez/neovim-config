@@ -128,6 +128,8 @@ local function grow(list, lines)
     local grows = false
     if text and leading_closer(text) and balance(lines, r.s, r.e) > 0 then
       grows = true -- `}`, `});`, `}, log)`, `).bar()`: the closer joins the fold
+    elseif text and r.kind == "comment" and text:match("^%s*%*/") and head:match("^%s*/%*") then
+      grows = true -- clangd stops a block comment short of its ` */`
     elseif text and closing_tag(text) then
       -- `</div>` after an element that opened on the range's first line,
       -- `/>` after a self-closing one, `</>` after a fragment
@@ -501,33 +503,41 @@ end
 --- per parser language. The typescript server reports JSX elements
 --- inconsistently (a `<Hero … />` gets a range, the `<script … />` beside
 --- it none); gleam's folds only top-level declarations, and a wrapped
---- signature from its `)` line. Treesitter's nodes already end on the
+--- signature from its `)` line; clangd has nothing for `#include` runs
+--- and preprocessor conditionals. Treesitter's nodes already end on the
 --- closer. A node sharing both lines with a server range is the same fold.
+--- `runs` names a node whose consecutive siblings fold as one range of
+--- the given kind (a run of `#include`s, like Go's import block).
+---@type table<string, { nodes?: string, runs?: { query: string, kind: string } }>
 local supplements = {
   -- elements, fragments (elements with an empty name), self-closing
   -- elements, and opening tags that wrap (the attribute list on its own)
-  tsx = "[(jsx_element) (jsx_self_closing_element) (jsx_opening_element)] @e",
-  javascript = "[(jsx_element) (jsx_self_closing_element) (jsx_opening_element)] @e",
+  tsx = { nodes = "[(jsx_element) (jsx_self_closing_element) (jsx_opening_element)] @e" },
+  javascript = { nodes = "[(jsx_element) (jsx_self_closing_element) (jsx_opening_element)] @e" },
   -- every bracketed region: the function (so a wrapped signature folds as
   -- parameters + body like Go's), blocks, case, literals, argument lists
-  gleam = "[(function) (function_parameters) (block) (case) (anonymous_function)"
-    .. " (arguments) (data_constructor_arguments) (record_update)"
-    .. " (list) (tuple) (bit_array) (unqualified_imports)] @e",
+  gleam = {
+    nodes = "[(function) (function_parameters) (block) (case) (anonymous_function)"
+      .. " (arguments) (data_constructor_arguments) (record_update)"
+      .. " (list) (tuple) (bit_array) (unqualified_imports)] @e",
+  },
+  c = {
+    nodes = "[(preproc_ifdef) (preproc_if)] @e",
+    runs = { query = "(preproc_include) @e", kind = "imports" },
+  },
+  cpp = {
+    nodes = "[(preproc_ifdef) (preproc_if)] @e",
+    runs = { query = "(preproc_include) @e", kind = "imports" },
+  },
 }
-local function treesitter_ranges(buf)
-  local ok, parser = pcall(vim.treesitter.get_parser, buf, nil, { error = false })
-  if not ok or not parser then
+
+--- The rows each capture of the query spans, 0-based, last row exclusive
+--- of a node ending at column 0.
+local function captured_rows(buf, parser, lang, query_text)
+  local ok, query = pcall(vim.treesitter.query.parse, lang, query_text)
+  if not ok then
     return {}
   end
-  local lang = parser:lang()
-  if not supplements[lang] then
-    return {}
-  end
-  local okq, query = pcall(vim.treesitter.query.parse, lang, supplements[lang])
-  if not okq then
-    return {}
-  end
-  parser:parse(true)
   local out = {}
   for _, tree in ipairs(parser:trees()) do
     for _, node in query:iter_captures(tree:root(), buf) do
@@ -535,8 +545,47 @@ local function treesitter_ranges(buf)
       if ecol == 0 then
         e = e - 1
       end
-      if e > s then
-        out[#out + 1] = { startLine = s, endLine = e }
+      out[#out + 1] = { s = s, e = e }
+    end
+  end
+  table.sort(out, function(a, b)
+    return a.s < b.s
+  end)
+  return out
+end
+
+local function treesitter_ranges(buf)
+  local ok, parser = pcall(vim.treesitter.get_parser, buf, nil, { error = false })
+  if not ok or not parser then
+    return {}
+  end
+  local lang = parser:lang()
+  local spec = supplements[lang]
+  if not spec then
+    return {}
+  end
+  parser:parse(true)
+  local out = {}
+  if spec.nodes then
+    for _, r in ipairs(captured_rows(buf, parser, lang, spec.nodes)) do
+      if r.e > r.s then
+        out[#out + 1] = { startLine = r.s, endLine = r.e }
+      end
+    end
+  end
+  if spec.runs then
+    local runs, run = {}, nil
+    for _, r in ipairs(captured_rows(buf, parser, lang, spec.runs.query)) do
+      if run and r.s == run.e + 1 then
+        run.e = r.e
+      else
+        run = { s = r.s, e = r.e }
+        runs[#runs + 1] = run
+      end
+    end
+    for _, r in ipairs(runs) do
+      if r.e > r.s then
+        out[#out + 1] = { startLine = r.s, endLine = r.e, kind = spec.runs.kind }
       end
     end
   end

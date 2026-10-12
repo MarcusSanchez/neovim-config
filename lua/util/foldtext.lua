@@ -249,12 +249,12 @@ function M.text()
     vim.list_extend(chunks, trimmed(highlighted(buf, lnum, line_at(lnum), dim)))
   end
 
-  -- a run of imports (the server says so) reads `import ...` / `use ...`,
-  -- as JetBrains collapses it: no one line stands for the whole run.
-  -- Bracketed forms (`import (` … `)`) keep the usual shape.
+  -- a run of imports (the server says so) reads `import ...` / `use ...`
+  -- / `#include ...`, as JetBrains collapses it: no one line stands for
+  -- the whole run. Bracketed forms (`import (` … `)`) keep the usual shape.
   local head, last = line_at(first_lnum), line_at(last_lnum)
   if require("util.foldranges").kind(buf, first_lnum, last_lnum) == "imports" then
-    local keyword = head:match("^%s*(%a+)")
+    local keyword = head:match("^%s*(#?%a+)")
     if keyword and not select(2, trailing_openers(head)) then
       local pos, want = 0, #head:match("^%s*") + #keyword
       for _, c in ipairs((highlighted(buf, first_lnum, head))) do

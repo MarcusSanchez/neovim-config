@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Headless regression suite for the custom behaviour in this config.
-# Needs gopls, rust-analyzer, vtsls, zls, gleam and buf on PATH (mason
-# installs the first four; zig and gleam come with their compilers).
+# Needs gopls, rust-analyzer, vtsls, zls, clangd, gleam and buf on PATH
+# (mason installs all but gleam, which comes with its compiler).
 #
 #   tests/run.sh          # everything
-#   tests/run.sh go       # one suite: go | rust | tsx | zig | gleam | session | copilot | proto | scroll | keys | ranges | folds
+#   tests/run.sh go       # one suite: go | rust | tsx | zig | gleam | c | cpp | session | copilot | proto | scroll | keys | ranges | folds
 #
 # Each suite drives a real nvim with this config against a fixture project
 # and prints PASS/FAIL lines. Fixtures are copied to a temp dir first: the
@@ -43,6 +43,8 @@ want=${1:-all}
 [[ $want == all || $want == tsx ]] && run tsx "$work/ts" page.tsx "$here/tsx.lua" "$work/ts/result.log"
 [[ $want == all || $want == zig ]] && run zig "$work/zig" src/main.zig "$here/zig.lua" "$work/zig/src/result.log"
 [[ $want == all || $want == gleam ]] && run gleam "$work/gleam" src/probe.gleam "$here/gleam.lua" "$work/gleam/src/result.log"
+[[ $want == all || $want == c ]] && run c "$work/c" main.c "$here/c.lua" "$work/c/result.log"
+[[ $want == all || $want == cpp ]] && run cpp "$work/cpp" main.cpp "$here/cpp.lua" "$work/cpp/result.log"
 if [[ $want == all || $want == session ]]; then
   # its own state dir: other suites' exits save sessions for the fixture dirs
   export XDG_STATE_HOME="$work/state-session" SESSION_PASS=1
