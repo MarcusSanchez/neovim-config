@@ -493,6 +493,42 @@ local ok, err = pcall(function()
     end
   end
   check("kinds survive", table.concat(kinds, " "), "3=imports 8=comment")
+  -- zls (captured 2026-10-12): if/else chains nested in both branches of
+  -- an if/else. The inner else's `}` ends the else and its chain at once:
+  -- the "<" there must name the chain's level, or Vim carries the chain on
+  -- to the outer `} else {`, which is marked itself
+  local zig = {
+    "fn insertNode(self: *Tree, node: *Node, value: i32) !*Node {",
+    "    if (value < node.value) {",
+    "        if (node.left) |left| {",
+    "            return self.insertNode(left, value);",
+    "        } else {",
+    "            node.left = try Node.init(self.allocator, value, node);",
+    "            return node.left.?;",
+    "        }",
+    "    } else {",
+    "        if (node.right) |right| {",
+    "            return self.insertNode(right, value);",
+    "        } else {",
+    "            node.right = try Node.init(self.allocator, value, node);",
+    "            return node.right.?;",
+    "        }",
+    "    }",
+    "}",
+  }
+  local zls = {
+    { startLine = 2, endLine = 3 },
+    { startLine = 4, endLine = 6 },
+    { startLine = 1, endLine = 7 },
+    { startLine = 9, endLine = 10 },
+    { startLine = 11, endLine = 13 },
+    { startLine = 8, endLine = 14 },
+    { startLine = 0, endLine = 15 },
+  }
+  check("zls ranges normalised", shapes(zls, zig), "1..17 2..16 2..9 3..8 3..5 5..8 9..16 10..15 10..12 12..15")
+  lv = L(R(N(zls, zig), {}))
+  check("a `}` ending an else and its chain is marked at the chain's level", marks(lv, { 8 }), "8=<4")
+  check("the outer `} else {` ends the if branch there", marks(lv, { 9, 10 }), "9=<3 10=>5")
   -- a block that already ends on its closer is left alone even when the
   -- next line is the parent's closer
   local nested = { "let x = [", "    || {", "        a", "    }", "];" }

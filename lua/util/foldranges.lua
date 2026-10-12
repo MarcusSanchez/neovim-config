@@ -261,23 +261,28 @@ end
 --- would drag an unmarked outer fold along.
 ---@param ranges util.foldranges.Range[] resolved: no two share a row
 function M.levels(ranges)
-  local levels, ends, last = {}, {}, 0
+  local levels, ending, last = {}, {}, 0
   for _, r in ipairs(ranges) do
     for row = r.s, r.e do
       local l = levels[row] or { 0 }
       l[1] = l[1] + 1
       levels[row] = l
     end
-    ends[r.e] = true
+    ending[r.e] = (ending[r.e] or 0) + 1
     last = math.max(last, r.e)
   end
   local next_marked = false
   for row = last, 0, -1 do
     local marked = false
-    if ends[row] then
+    if ending[row] then
+      -- a row ending several folds (`}` closing an else and its if/else
+      -- chain) is marked at the shallowest of them: a "<" ends every
+      -- deeper fold on the row too, and the row's level is that one's
+      local level = levels[row][1] - ending[row] + 1
       local next_row = levels[row + 1]
-      marked = next_marked or (next_row ~= nil and next_row[1] >= levels[row][1])
+      marked = next_marked or (next_row ~= nil and next_row[1] >= level)
       if marked then
+        levels[row][1] = level
         levels[row][2] = "<"
       end
     end
