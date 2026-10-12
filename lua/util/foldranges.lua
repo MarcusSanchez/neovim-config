@@ -338,10 +338,49 @@ end
 
 -- keeping the levels current ------------------------------------------------------
 
+--- The closed folds in a window, as "start:stop" keys.
+local function closed_set(win)
+  local set = {}
+  api.nvim_win_call(win, function()
+    local line, last = 1, vim.fn.line("$")
+    while line <= last do
+      local s = vim.fn.foldclosed(line)
+      if s ~= -1 then
+        local e = vim.fn.foldclosedend(line)
+        set[s .. ":" .. e] = true
+        line = e + 1
+      else
+        line = line + 1
+      end
+    end
+  end)
+  return set
+end
+
+--- Re-evaluate the folds in every window showing the buffer. Only what was
+--- closed before stays closed: Vim creates a fold that appears after an
+--- edit *closed* whenever any other fold in the buffer is closed (a plain
+--- Vim quirk — the auto-folded imports were enough), so anything newly
+--- closed by the update is opened again.
 local function foldupdate(buf)
   for _, win in ipairs(vim.fn.win_findbuf(buf)) do
     if vim.wo[win].foldmethod == "expr" and api.nvim_win_get_tabpage(win) == api.nvim_get_current_tabpage() then
+      local before = closed_set(win)
       pcall(vim._foldupdate, win, 0, api.nvim_buf_line_count(buf))
+      api.nvim_win_call(win, function()
+        for _ = 1, 10 do -- opening one may reveal another closed inside it
+          local opened = false
+          for key in pairs(closed_set(win)) do
+            if not before[key] then
+              vim.cmd(("silent! %sfoldopen"):format(key:match("^(%d+):")))
+              opened = true
+            end
+          end
+          if not opened then
+            break
+          end
+        end
+      end)
     end
   end
 end

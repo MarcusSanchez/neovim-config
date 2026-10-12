@@ -408,6 +408,15 @@ vim.schedule(function()
     check("imports fold on open", vim.fn.foldclosed(4) .. ".." .. vim.fn.foldclosedend(4), "3..6")
     check("imports fold line", vim.fn.foldtextresult(3), "import ( ... )")
     check("the rest of the file is open", vim.fn.foldclosed(8), -1)
+    -- a fold that appears after an edit must come out open: Vim creates it
+    -- closed while another fold (the imports) is closed
+    vim.fn.append(8, { "func g() {", "\tfmt.Print()", "}" })
+    vim.wait(5000, function()
+      return vim.fn.foldlevel(10) > 0
+    end, 50)
+    wait(300)
+    check("a region added by an edit is open", vim.fn.foldclosed(9), -1)
+    check("the imports stay folded", vim.fn.foldclosed(4) .. ".." .. vim.fn.foldclosedend(4), "3..6")
     vim.cmd("normal! zR")
     vim.cmd("buffer main.go")
     vim.api.nvim_buf_delete(ib, { force = true })
