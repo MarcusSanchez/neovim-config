@@ -205,6 +205,25 @@ function M.text()
     end
   end
 
+  -- a block comment closes with `*/` the way a block closes with `}`:
+  -- `/**` … `*/` reads `/** ... */`, `/* note` … `*/` reads `/* note ... */`
+  local head, last = line_at(first_lnum), line_at(last_lnum)
+  local open = head:find("/*", 1, true)
+  local close = last:find("%*/%s*$")
+  if open and not head:find("*/", open + 2, true) and close then
+    local chunks = highlighted(buf, first_lnum, head)
+    chunks[#chunks + 1] = { " ... ", "FoldEllipsis" }
+    local pos = 0
+    for _, c in ipairs((highlighted(buf, last_lnum, last))) do
+      local text = c[1]
+      if pos + #text > close - 1 then
+        chunks[#chunks + 1] = { (text:sub(math.max(close - pos, 1)):gsub("%s+$", "")), c[2] }
+      end
+      pos = pos + #text
+    end
+    return chunks
+  end
+
   -- Walk the fold: a line whose trailing opener closes *before* the fold's
   -- last line (a wrapped parameter list, a call spanning lines) is followed
   -- by ` ... ` and the line that closes it, so `fn send(` … `) -> R {` … `}`

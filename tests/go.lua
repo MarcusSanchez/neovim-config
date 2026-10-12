@@ -412,6 +412,18 @@ vim.schedule(function()
     vim.cmd("buffer main.go")
     vim.api.nvim_buf_delete(ib, { force = true })
     vim.fn.delete("imp.go")
+    -- a block comment folds with its closer: `/* ... */`
+    vim.fn.writefile({ "package main", "", "/*", "Package doc", "spanning lines", "*/", "func f() {}" }, "blk.go")
+    vim.cmd("edit blk.go")
+    local kb = vim.api.nvim_get_current_buf()
+    server_folds()
+    fold(4)
+    check("a block comment folds through its closer", vim.fn.foldclosed(4) .. ".." .. vim.fn.foldclosedend(4), "3..6")
+    check("block comment fold line", vim.fn.foldtextresult(3), "/* ... */")
+    vim.cmd("normal! zR")
+    vim.cmd("buffer main.go")
+    vim.api.nvim_buf_delete(kb, { force = true })
+    vim.fn.delete("blk.go")
     -- a folded multi-line string closes its quote on the fold line
     vim.fn.writefile(
       { "package main", "", "var q = `", "select 1", "`", "", "var r = []string{`", "a", '`, "b"}' },
