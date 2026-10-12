@@ -242,6 +242,23 @@ lib.suite("gopls", function(t)
     "v 8:6 -1"
   )
   key("<Esc>")
+  vim.api.nvim_exec_autocmds("SafeState", {})
+  -- (fed keys leave the cursor a column off here, unlike typed ones; the
+  -- probe with real input lands on the X — so only the state is checked)
+  t.check(
+    "leaving visual mode: the fold closes again, caret back",
+    t.span(8) .. " " .. (caret() ~= "none" and "caret" or "none"),
+    "5..8 caret"
+  )
+  key("viwy") -- a quick yank of the word under the caret
+  vim.api.nvim_exec_autocmds("SafeState", {})
+  t.check("viwy: yanked", vim.fn.getreg('"'), "inXrror")
+  t.check(
+    "and the fold is closed again, caret at the word's start",
+    t.span(8) .. " " .. cursor() .. " " .. caret(),
+    "5..8 8:3 i"
+  )
+  key("<Esc>")
   vim.api.nvim_buf_set_lines(buf, 7, 8, false, { ") (int, error) {" })
   vim.wait(10000, function()
     for _, r in ipairs(FR.ranges(buf) or {}) do

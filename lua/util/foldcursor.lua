@@ -604,24 +604,79 @@ function M.edit(key)
   end
 end
 
+---@class util.foldcursor.Reclose a fold opened for insert or visual mode, to close again after
+---@field buf integer
+---@field start integer
+---@field stop integer
+---@field lines integer the buffer's line count then (the fold's end moves with it)
+
+-- Insert mode opens the fold under the cursor (Vim does, on entering
+-- it), and v opens it to show the selection; a fold the caret was on
+-- closes again when that mode ends, with the caret back where the
+-- cursor is.
+local reclose = {} ---@type table<integer, util.foldcursor.Reclose> after insert mode
+local reclose_visual = {} ---@type table<integer, util.foldcursor.Reclose> after visual mode
+
+--- Close the fold again once Vim is idle: the keys a mapping still has
+--- queued (the config's stay-put Esc jumps to the `^ mark, and
+--- 'foldopen' has "mark") would reopen it if closed right away.
+local function reclose_later(win, buf, r)
+  api.nvim_create_autocmd("SafeState", {
+    once = true,
+    callback = function()
+      if not (api.nvim_win_is_valid(win) and api.nvim_win_get_buf(win) == buf) then
+        return
+      end
+      local stop = r.stop + api.nvim_buf_line_count(buf) - r.lines
+      local s, e = require("util.foldranges").fold(buf, win, r.start - 1, stop - 1)
+      local c = api.nvim_win_get_cursor(win)
+      trace(("re-close: cursor %d:%d fold %s..%s"):format(c[1], c[2], tostring(s), tostring(e)))
+      if s then
+        require("util.folds").close_exact(s, e)
+        caret_at_cursor(win, buf)
+      end
+    end,
+  })
+end
+
 --- v on a closed fold: the folds hiding the cursor's line open (the
 --- caret's character is where the selection starts) and visual mode
---- starts there; a selection can't be drawn on a fold line.
+--- starts there, since a selection can't be drawn on a fold line. The
+--- fold closes again when visual mode ends (`viwy` is a blink).
 function M.visual()
-  local lnum = api.nvim_win_get_cursor(0)[1]
-  for _ = 1, 10 do
-    if vim.fn.foldclosed(lnum) == -1 then
-      break
+  local win, buf = api.nvim_get_current_win(), api.nvim_get_current_buf()
+  local lnum = api.nvim_win_get_cursor(win)[1]
+  local start = vim.fn.foldclosed(lnum)
+  if start ~= -1 then
+    reclose_visual[win] =
+      { buf = buf, start = start, stop = vim.fn.foldclosedend(lnum), lines = api.nvim_buf_line_count(buf) }
+    for _ = 1, 10 do
+      if vim.fn.foldclosed(lnum) == -1 then
+        break
+      end
+      vim.cmd(("silent! %dfoldopen"):format(lnum))
     end
-    vim.cmd(("silent! %dfoldopen"):format(lnum))
   end
   vim.cmd("normal! v")
 end
 
--- Insert mode opens the fold under the cursor (Vim does, on entering
--- it); a fold the caret was on closes again when insert mode ends, with
--- the caret back on the edited line.
-local reclose = {} ---@type table<integer, { buf: integer, start: integer, stop: integer, lines: integer }>
+--- Visual mode ended: back in normal mode the fold closes again; into
+--- insert mode (`c`) it closes when that ends.
+local function visual_ended()
+  local win = api.nvim_get_current_win()
+  local r = reclose_visual[win]
+  if not r then
+    return
+  end
+  local mode = api.nvim_get_mode().mode
+  if mode:match("^i") then
+    reclose_visual[win] = nil
+    reclose[win] = r
+  elseif mode:match("^n") then
+    reclose_visual[win] = nil
+    reclose_later(win, api.nvim_get_current_buf(), r)
+  end
+end
 
 local function insert_enter()
   local win, buf = api.nvim_get_current_win(), api.nvim_get_current_buf()
@@ -645,25 +700,7 @@ local function insert_leave()
   if not r or r.buf ~= buf then
     return
   end
-  -- once Vim is idle: the keys an Esc mapping still has queued (the
-  -- config's stay-put Esc jumps to the `^ mark, and 'foldopen' has
-  -- "mark") would reopen the fold closed here
-  api.nvim_create_autocmd("SafeState", {
-    once = true,
-    callback = function()
-      if not (api.nvim_win_is_valid(win) and api.nvim_win_get_buf(win) == buf) then
-        return
-      end
-      local stop = r.stop + api.nvim_buf_line_count(buf) - r.lines
-      local s, e = require("util.foldranges").fold(buf, win, r.start - 1, stop - 1)
-      local c = api.nvim_win_get_cursor(win)
-      trace(("insert re-close: cursor %d:%d fold %s..%s"):format(c[1], c[2], tostring(s), tostring(e)))
-      if s then
-        require("util.folds").close_exact(s, e)
-        caret_at_cursor(win, buf)
-      end
-    end,
-  })
+  reclose_later(win, buf, r)
 end
 
 --- The caret for the cursor's position, when it's on a closed fold (after
@@ -698,6 +735,7 @@ function M.setup()
   -- text edited, the window or mode left
   api.nvim_create_autocmd("InsertEnter", { group = group, callback = insert_enter })
   api.nvim_create_autocmd("InsertLeave", { group = group, callback = insert_leave })
+  api.nvim_create_autocmd("ModeChanged", { group = group, pattern = "[vV\x16]*:*", callback = visual_ended })
   api.nvim_create_autocmd({ "CursorMoved", "TextChanged", "InsertEnter", "WinLeave", "BufLeave", "ModeChanged" }, {
     group = group,
     callback = function(ev)

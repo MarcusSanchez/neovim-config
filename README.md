@@ -124,7 +124,8 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
   closed. Insert mode opens the fold (Vim does that on entering it) and
   it closes again on leaving, the caret back on the edited line. `v`
   opens the fold and selects from the caret's character, since a
-  selection can't be drawn on a fold line. Word motions keep this config's
+  selection can't be drawn on a fold line, and the fold closes again
+  when visual mode ends: `viwy` is a blink. Word motions keep this config's
   meaning (`w` back, `b`/`e` forward, punctuation skipped) and treat a
   closed fold as its one drawn line: from below a folded function `w`
   lands on the line's last word, never inside the fold.
