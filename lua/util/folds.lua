@@ -1,8 +1,13 @@
 -- Folds persist across sessions, like IntelliJ — but only when they'd still
--- cover the same code. (Where folds come from is util/foldranges.lua.) Each closed fold is saved with a fingerprint of the
+-- cover the same code. Each closed fold is saved with a fingerprint of the
 -- text it hides; on reopen it's closed again only if that exact text is
 -- still there, at the same lines or wherever it moved to. Edited or gone,
 -- the fold stays open rather than hiding the wrong lines.
+--
+-- Restoring has to outlast two rebuilds of the window's folds: treesitter's
+-- first passes (levels arrive asynchronously and can reopen everything),
+-- and the language server's ranges replacing treesitter's structure a bit
+-- later (util/foldranges.lua calls `rebuilt` for that one).
 --
 -- State lives in stdpath("state")/folds/, one JSON file per path.
 local M = {}
@@ -24,20 +29,14 @@ local function real_window(win)
     and vim.wo[win].foldenable
 end
 
--- windows whose saved folds have been applied; a window still waiting on
--- fold structure must not write state (it would record "nothing closed")
-local ready = {} ---@type table<integer, boolean>
--- the folds restored into each window, and which of them found a fold to
--- close: the rest wait for the language server's folds (util/foldranges.lua)
-local restored = {} ---@type table<integer, { folds: util.folds.Fold[], applied: table<integer, boolean> }>
--- windows being watched after a restore: treesitter's early fold passes can
--- rebuild the window's folds (which reopens everything); a rebuild changes
--- the fold *levels*, which a user's zo never does, so that's the signal to
--- re-apply on — and the only one
-local watching = {} ---@type table<integer, { folds: util.folds.Fold[], signature: string }>
--- the current restore cycle per window; a new BufWinEnter starts a new one
--- and the old cycle's timers see a different token and stop
-local cycles = {} ---@type table<integer, table>
+---@class util.folds.Window a window's restore, from BufWinEnter to the next
+---@field token table this restore cycle; a new BufWinEnter starts another and the old one's timers stop
+---@field ready boolean saved folds applied (or none to apply): the window's state is the user's and may be saved
+---@field folds util.folds.Fold[] the folds being restored
+---@field applied table<integer, boolean> which of them found a fold to close; the rest wait for the server's folds
+---@field signature string? set while watching for treesitter rebuilding the folds (which reopens everything):
+--- a rebuild changes the fold *levels*, which a user's zo never does, so that's the signal to re-apply on
+local windows = {} ---@type table<integer, util.folds.Window>
 
 local function state_file(buf)
   return dir .. "/" .. vim.api.nvim_buf_get_name(buf):gsub("[/\\:]", "%%") .. ".json"
@@ -164,14 +163,14 @@ end
 
 function M.save(buf, win)
   win = win or vim.api.nvim_get_current_win()
-  if not real_file(buf) or not real_window(win) or not ready[win] then
+  local w = windows[win]
+  if not real_file(buf) or not real_window(win) or not (w and w.ready) then
     return
   end
   -- leaving while still watching: if treesitter rebuilt the folds since the
   -- restore, put the saved ones back before reading the window's state
-  local w = watching[win]
-  if w and signature(buf, win, w.folds) ~= w.signature then
-    apply(buf, win, w.folds, restored[win] and restored[win].applied)
+  if w.signature and signature(buf, win, w.folds) ~= w.signature then
+    apply(buf, win, w.folds, w.applied)
   end
   local folds = closed_folds(win)
   local file = state_file(buf)
@@ -185,17 +184,19 @@ end
 
 function M.load(buf, win)
   win = win or vim.api.nvim_get_current_win()
-  ready[win], watching[win], restored[win] = nil, nil, nil
-  local token = {}
-  cycles[win] = token
+  local w = { token = {}, ready = false, folds = {}, applied = {} }
+  windows[win] = w
   if not real_file(buf) or not real_window(win) then
     return
   end
   local file = state_file(buf)
-  local folds = {}
   if vim.fn.filereadable(file) == 1 then
     local ok, saved = pcall(vim.json.decode, table.concat(vim.fn.readfile(file), "\n"))
-    folds = ok and type(saved) == "table" and saved or {}
+    w.folds = ok and type(saved) == "table" and saved or {}
+  end
+  if #w.folds == 0 then
+    w.ready = true -- nothing to restore; the window's state is the user's from the start
+    return
   end
   -- Treesitter fold levels arrive asynchronously after the buffer opens
   -- (indent folds are there at once), and its first passes can rebuild the
@@ -203,46 +204,41 @@ function M.load(buf, win)
   -- the fold structure where the saved folds go exists, apply, then watch a
   -- little longer and re-apply only if the structure changes again. A fold
   -- the user opens meanwhile leaves the structure alone and so is left alone.
-  if #folds == 0 then
-    ready[win] = true -- nothing to restore; the window's state is the user's from the start
-    return
-  end
-  restored[win] = { folds = folds, applied = {} }
   local deadline = vim.uv.now() + 10000
   local checks = { 500, 1000, 2000 } -- after applying: watch at these offsets
   local function alive()
-    return cycles[win] == token and vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == buf
+    return windows[win] == w and vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == buf
   end
   local function watch(i)
     vim.defer_fn(function()
-      if not alive() or not watching[win] then
+      if not alive() or not w.signature then
         return
       end
-      if signature(buf, win, folds) ~= watching[win].signature then
-        apply(buf, win, folds, restored[win].applied) -- rebuilt: put them back, keep watching
-        watching[win].signature = signature(buf, win, folds)
+      if signature(buf, win, w.folds) ~= w.signature then
+        apply(buf, win, w.folds, w.applied) -- rebuilt: put them back, keep watching
+        w.signature = signature(buf, win, w.folds)
         return watch(1)
       end
       if checks[i + 1] then
         return watch(i + 1)
       end
-      watching[win] = nil
+      w.signature = nil
     end, i == 1 and checks[1] or checks[i] - checks[i - 1])
   end
   local function settle()
     if not alive() then
       return
     end
-    if signature(buf, win, folds):find("[1-9]") then
-      apply(buf, win, folds, restored[win].applied)
-      ready[win] = true
-      watching[win] = { folds = folds, signature = signature(buf, win, folds) }
+    if signature(buf, win, w.folds):find("[1-9]") then
+      apply(buf, win, w.folds, w.applied)
+      w.ready = true
+      w.signature = signature(buf, win, w.folds)
       return watch(1)
     end
     if vim.uv.now() < deadline then
       vim.defer_fn(settle, 250)
     else
-      ready[win] = true -- fold structure never came; the user's state rules
+      w.ready = true -- fold structure never came; the user's state rules
     end
   end
   settle()
@@ -281,9 +277,9 @@ end
 --- literal — regions only the language server folds).
 function M.rebuilt(buf)
   for _, win in ipairs(vim.fn.win_findbuf(buf)) do
-    local r = restored[win]
-    if r and real_window(win) then
-      apply(buf, win, r.folds, r.applied, true)
+    local w = windows[win]
+    if w and real_window(win) then
+      apply(buf, win, w.folds, w.applied, true)
     end
   end
 end
@@ -305,8 +301,7 @@ function M.setup()
   vim.api.nvim_create_autocmd("WinClosed", {
     group = group,
     callback = function(ev)
-      local win = tonumber(ev.match)
-      ready[win], watching[win], cycles[win], restored[win] = nil, nil, nil, nil
+      windows[tonumber(ev.match)] = nil
     end,
   })
 end

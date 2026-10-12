@@ -21,7 +21,6 @@ local api = vim.api
 
 ---@class util.foldranges.State
 ---@field levels table<integer, { [1]: integer, [2]: string? }>? row -> level, ">"/"<"
----@field tick integer? changedtick the levels were computed for
 
 local states = {} ---@type table<integer, util.foldranges.State>
 
@@ -119,16 +118,13 @@ function M.normalize(ranges, lines)
     add(m.s, m.e)
   end
   -- a line can start a fold or end another, not both: the ending one gives way
+  local opens = {} ---@type table<integer, true>
+  for _, r in ipairs(out) do
+    opens[r.startLine] = true
+  end
   local final = {}
   for _, r in ipairs(out) do
-    local other = false
-    for _, o in ipairs(out) do
-      if o.startLine == r.endLine and o.startLine ~= r.startLine then
-        other = true
-        break
-      end
-    end
-    if other then
+    if opens[r.endLine] and r.endLine ~= r.startLine then
       r.endLine = r.endLine - 1
     end
     if r.endLine > r.startLine then
@@ -283,7 +279,7 @@ local function request(buf)
     -- what's closed across the rebuild, then apply saved folds that had no
     -- matching fold until now
     local closed = first and folds.snapshot(buf) or nil
-    st.levels, st.tick = levels_of(M.normalize(ranges, lines)), tick
+    st.levels = levels_of(M.normalize(ranges, lines))
     update(buf)
     if first then
       folds.restore(buf, closed)
