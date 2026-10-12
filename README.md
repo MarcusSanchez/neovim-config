@@ -27,6 +27,7 @@ lua/util/                feature logic, one module per feature
   folds.lua              folds persist across sessions, anchored to the text they hide
   foldtext.lua           closed folds read `func main() { ... }`, first line highlighted
   searchfolds.lua        a search doesn't unfold what it passes through
+  harpoon.lua            a harpoon jump from an empty buffer replaces it instead of adding a tab
   session.lua            a bare `nvim` restores the directory's session instead of the dashboard
 lua/plugins/             one lazy.nvim spec per plugin (LazyVim merges them)
 lua/benched/             shelved specs (neo-tree) — not imported, see its README
