@@ -320,6 +320,28 @@ local function shift(st, start_row, old_rows, new_rows)
   st.levels, st.owners = levels, owners
 end
 
+-- fold kinds closed when a file opens, as JetBrains collapses imports
+local autofold_kinds = { imports = true }
+
+--- Close the auto-folded kinds in every window showing the buffer.
+local function autofold(buf)
+  local st = states[buf]
+  for _, win in ipairs(vim.fn.win_findbuf(buf)) do
+    if api.nvim_win_get_config(win).relative == "" then
+      api.nvim_win_call(win, function()
+        for _, r in ipairs(st.ranges) do
+          if r.kind and autofold_kinds[r.kind] then
+            local s, e = M.fold(buf, win, r.s, r.e)
+            if s then
+              require("util.folds").close_exact(s, e)
+            end
+          end
+        end
+      end)
+    end
+  end
+end
+
 local function request(buf)
   local st = states[buf]
   if not st or not api.nvim_buf_is_loaded(buf) then
@@ -353,6 +375,7 @@ local function request(buf)
     if first then
       folds.restore(buf, closed)
       folds.rebuilt(buf)
+      autofold(buf)
     end
   end)
 end

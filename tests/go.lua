@@ -397,6 +397,21 @@ vim.schedule(function()
     vim.cmd("buffer main.go")
     vim.api.nvim_buf_delete(ab, { force = true })
     vim.fn.delete("args.go")
+    -- an import block is folded when the file opens (gopls' imports kind)
+    vim.fn.writefile(
+      { "package main", "", "import (", '\t"context"', '\t"fmt"', ")", "", "var _ = fmt.Sprint(context.TODO())" },
+      "imp.go"
+    )
+    vim.cmd("edit imp.go")
+    local ib = vim.api.nvim_get_current_buf()
+    server_folds()
+    check("imports fold on open", vim.fn.foldclosed(4) .. ".." .. vim.fn.foldclosedend(4), "3..6")
+    check("imports fold line", vim.fn.foldtextresult(3), "import ( ... )")
+    check("the rest of the file is open", vim.fn.foldclosed(8), -1)
+    vim.cmd("normal! zR")
+    vim.cmd("buffer main.go")
+    vim.api.nvim_buf_delete(ib, { force = true })
+    vim.fn.delete("imp.go")
     -- a folded multi-line string closes its quote on the fold line
     vim.fn.writefile(
       { "package main", "", "var q = `", "select 1", "`", "", "var r = []string{`", "a", '`, "b"}' },
