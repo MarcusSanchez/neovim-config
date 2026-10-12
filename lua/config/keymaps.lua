@@ -51,35 +51,13 @@ map({ "n", "x", "o" }, "zk", "zj", opts("Next Fold Start (j/k swapped)"))
 -- Indentation & Tabs
 --------------------------------------------------------------------------------
 
--- Indent/dedent the selection while keeping it anchored to the same text.
--- Measures how much each endpoint's line actually shifted, so it works with
--- any shiftwidth and with partially-indented lines.
-local function shift_selection(op)
-  local cl, cc = vim.fn.line("."), vim.fn.col(".")
-  local al, ac = vim.fn.line("v"), vim.fn.col("v")
-  local cursor_first = cl < al or (cl == al and cc < ac)
-  local clen, alen = #vim.fn.getline(cl), #vim.fn.getline(al)
-  vim.cmd("normal! " .. op)
-  local cpos = { cl, math.max(cc + #vim.fn.getline(cl) - clen, 1) }
-  local apos = { al, math.max(ac + #vim.fn.getline(al) - alen, 1) }
-  local first, last = apos, cpos
-  if cursor_first then
-    first, last = cpos, apos
-  end
-  vim.fn.setpos("'<", { 0, first[1], first[2], 0 })
-  vim.fn.setpos("'>", { 0, last[1], last[2], 0 })
-  vim.cmd("normal! gv")
-  -- gv leaves the cursor on '>'; put it back on the end the user was on
-  if cursor_first then
-    vim.cmd("normal! o")
-  end
-end
-
+-- Indent/dedent the selection while keeping it selected and anchored to the
+-- same text (lua/util/editing.lua)
 map("x", "<Tab>", function()
-  shift_selection(">")
+  require("util.editing").shift_selection(">")
 end, opts("Indent Selection (keep selection)"))
 map("x", "<S-Tab>", function()
-  shift_selection("<")
+  require("util.editing").shift_selection("<")
 end, opts("Dedent Selection (keep selection)"))
 map("n", "<S-Tab>", "<<", opts("Dedent Line"))
 
@@ -90,14 +68,10 @@ map("n", "<Tab>", "i<tab>", opts("Insert Tab"))
 -- Insert Mode Enhancements
 --------------------------------------------------------------------------------
 
--- Leave insert mode where the insert ended instead of one column back (the
--- `^ mark is that spot; normal mode clamps it to the line's last character):
--- `a jj` repeated walks right one character at a time, `i jj` stays put.
--- Keeps LazyVim's insert-mode <Esc> extras (clear hlsearch, stop snippet).
+-- Leave insert mode where the insert ended instead of one column back
+-- (lua/util/editing.lua): `a jj` repeated walks right, `i jj` stays put
 local function leave_insert()
-  vim.cmd("noh")
-  LazyVim.cmp.actions.snippet_stop()
-  return "<Esc>`^"
+  return require("util.editing").leave_insert()
 end
 map("i", "<Esc>", leave_insert, { expr = true, desc = "Exit Insert Mode (stay put)" })
 map("i", "jj", leave_insert, { expr = true, desc = "Exit Insert Mode" })

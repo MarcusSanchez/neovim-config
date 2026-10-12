@@ -12,8 +12,10 @@ init.lua                 bootstrap
 lua/config/              LazyVim hooks — kept thin, they wire lua/util/ to events/keys
   options.lua            vim options, root detection (cwd), snacks globals
   keymaps.lua            every custom mapping, grouped and described
-  autocmds.lua           diagnostics tweaks, quit-with-explorer, autosave, scrolloff
+  autocmds.lua           wires diagnostics, quit-with-explorer, autosave, scrolloff, folds, sessions
 lua/util/                feature logic, one module per feature
+  editing.lua            indent a selection and keep it; leave insert mode without stepping back
+  diagnostics.lua        gopls' shadowed-variable diagnostics don't render (the colour already says it)
   goto.lua               gd (definition, else usages popup) and gh (tagstack pop)
   symbols.lua            gs workspace symbol search minus the noise
   noise.lua              what counts as test/generated code (paths + rust treesitter)
@@ -21,20 +23,22 @@ lua/util/                feature logic, one module per feature
   explorer.lua           sidebar open/focus/close helpers (snacks; a neo-tree backend is kept)
   autosave.lua           debounced normal-mode autosave, no formatting
   scroll.lua             'scrolloff' holds past the end of the buffer
-  folds.lua              folds persist across sessions, anchored to the text they hide
-  session.lua            a bare `nvim` restores the directory's session instead of the dashboard
   foldranges.lua         the fold expression: the language server's ranges (normalised), treesitter's until then
+  folds.lua              folds persist across sessions, anchored to the text they hide
   foldtext.lua           closed folds read `func main() { ... }`, first line highlighted
+  session.lua            a bare `nvim` restores the directory's session instead of the dashboard
 lua/plugins/             one lazy.nvim spec per plugin (LazyVim merges them)
 lua/benched/             shelved specs (neo-tree) — not imported, see its README
 queries/<lang>/context.scm   treesitter-context: pin declarations only, not loops/ifs
 tests/                   headless regression suite — tests/run.sh
 ```
 
-Conventions: `lua/config/*` and `lua/plugins/*` hold no logic beyond a few
-lines — anything with a function body lives in `lua/util/`. Every mapping has
-a `desc` (which-key and `<leader>sk` are the cheat sheet). Visual-mode maps
-use `x`, not `v`. Formatting is stylua (`stylua.toml`).
+Conventions: `lua/config/*` holds no logic — a mapping or autocmd calls into
+`lua/util/`, where every function with a body lives. `lua/plugins/*` is one
+lazy.nvim spec per plugin; a spec may build its own `opts`, but behaviour
+behind a key still goes through `lua/util/`. Every mapping has a `desc`
+(which-key and `<leader>sk` are the cheat sheet). Visual-mode maps use `x`,
+not `v`. Formatting is stylua (`stylua.toml`), tests included.
 
 ## Custom keys
 
@@ -95,7 +99,11 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
 
 ## Tests
 
-`tests/run.sh` drives headless nvim against small Go and Rust fixtures and
-prints PASS/FAIL per behaviour (gd/gh, usages popup, gs filtering, autosave,
-popups, scrolloff, j/k swaps, protobuf via buf). Needs gopls, rust-analyzer
-and buf.
+`tests/run.sh` drives headless nvim against small Go, Rust and protobuf
+fixtures and prints PASS/FAIL per behaviour. Suites: `go` (gd/gh, usages
+popup, autosave, popups, fold shapes with gopls), `rust` (gs filtering,
+italics, fold shapes with rust-analyzer), `session`, `copilot`, `proto`,
+`scroll`, `keys` (j/k swaps), `ranges` (the fold-range normaliser against
+captured server output, no server needed) and `folds` (persistence across
+two runs, plain text and treesitter/LSP). Needs gopls, rust-analyzer and
+buf.
