@@ -39,6 +39,9 @@ lib.suite("gopls", function(t)
     local c = vim.api.nvim_win_get_cursor(win)
     return c[1] .. ":" .. c[2]
   end
+  local function moved()
+    vim.api.nvim_exec_autocmds("CursorMoved", { buffer = buf })
+  end
   local function caret()
     local stop = vim.fn.foldclosedend(5) > 0 and vim.fn.foldclosedend(5) or 8
     for _, c in ipairs(FT.render(FT.build(buf, 5, stop), FC.cell_at(win, buf, 5))) do
@@ -197,6 +200,50 @@ lib.suite("gopls", function(t)
   t.check("E from above: the fold line's first WORD", cursor() .. " " .. caret(), "5:0 f")
   key("E")
   t.check("E again: its second WORD", cursor() .. " " .. caret(), "5:5 h")
+  -- x / X / r edit the caret's character with the fold closed; insert
+  -- mode opens the fold (Vim) and it closes again after; v opens it to select
+  vim.cmd("normal! zR")
+  t.fold(6)
+  vim.api.nvim_win_set_cursor(win, { 8, 5 }) -- the `t` of `(int, error)`
+  key("l")
+  t.check("caret on the comma", caret(), ",")
+  key("x")
+  t.check(
+    "x deletes it, fold closed, caret on the next character",
+    vim.fn.getline(8) .. " " .. t.span(8) .. " " .. caret(),
+    ") (int error) { 5..8  "
+  )
+  key("X")
+  t.check("X deletes the character before, caret stays", vim.fn.getline(8) .. " " .. caret(), ") (in error) {  ")
+  key("r,")
+  t.check("r replaces it", vim.fn.getline(8) .. " " .. caret() .. " " .. t.span(8), ") (in,error) { , 5..8")
+  key("2x")
+  t.check("a count", vim.fn.getline(8) .. " " .. caret(), ") (inrror) { r")
+  key("iX<Esc>") -- insert before the caret's `r`: `inXrror`, still parsing
+  moved() -- Esc here stays put, after the X (config/keymaps.lua)
+  t.check(
+    "insert at the caret, then the fold is closed again",
+    vim.fn.getline(8) .. " " .. t.span(8),
+    ") (inXrror) { 5..8"
+  )
+  t.check("caret back, after the inserted character (Esc stays put)", cursor() .. " " .. caret(), "8:6 r")
+  key("v")
+  t.check(
+    "v opens the fold and selects from the caret",
+    vim.api.nvim_get_mode().mode .. " " .. cursor() .. " " .. vim.fn.foldclosed(8),
+    "v 8:6 -1"
+  )
+  key("<Esc>")
+  vim.api.nvim_buf_set_lines(buf, 7, 8, false, { ") (int, error) {" })
+  vim.wait(10000, function()
+    for _, r in ipairs(FR.ranges(buf) or {}) do
+      if r[1] == 5 and r[2] == 8 then
+        return true
+      end
+    end
+    return false
+  end, 50)
+  t.wait(300)
   -- 'whichwrap' has h and l: off either end of the fold line they go to
   -- the line above / below, and from those lines back onto the fold's
   -- last / first drawn character
@@ -229,9 +276,6 @@ lib.suite("gopls", function(t)
   t.fold(9) -- the whole function again
   -- arriving from another line, the caret takes the column the cursor
   -- was heading for, and keeps it for the next vertical move
-  local function moved()
-    vim.api.nvim_exec_autocmds("CursorMoved", { buffer = buf })
-  end
   vim.api.nvim_win_set_cursor(win, { 3, 12 })
   moved()
   vim.cmd("normal! jj") -- Vim's own j: onto the fold

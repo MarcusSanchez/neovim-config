@@ -116,7 +116,12 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
   a folded line with `j`/`k` puts the caret at the column the cursor was
   heading for, and leaving keeps it. `h`/`l` wrap across the fold line
   as 'whichwrap' says: off its start to the line above, off its end to
-  the line below, and from those back onto its last or first character. Word motions keep this config's
+  the line below, and from those back onto its last or first character.
+  `x`, `X` and `r` edit the character under the caret with the fold
+  closed. Insert mode opens the fold (Vim does that on entering it) and
+  it closes again on leaving, the caret back on the edited line. `v`
+  opens the fold and selects from the caret's character, since a
+  selection can't be drawn on a fold line. Word motions keep this config's
   meaning (`w` back, `b`/`e` forward, punctuation skipped) and treat a
   closed fold as its one drawn line: from below a folded function `w`
   lands on the line's last word, never inside the fold.

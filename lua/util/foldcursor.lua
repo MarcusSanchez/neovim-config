@@ -15,6 +15,7 @@ local api = vim.api
 ---@class util.foldcursor.State the caret in a window
 ---@field buf integer
 ---@field start integer first line of the closed fold
+---@field stop integer its last line
 ---@field cell integer index into the fold line's cells
 ---@field lnum integer buffer position the cell stands for…
 ---@field col integer …and the real cursor was placed on
@@ -277,6 +278,7 @@ local function place(win, buf, start, stop, cells, target, curswant)
   states[win] = {
     buf = buf,
     start = start,
+    stop = stop,
     cell = target,
     lnum = cell.lnum,
     col = cell.col,
@@ -456,20 +458,149 @@ local function arrive()
     return
   end
   local win, buf = api.nvim_get_current_win(), api.nvim_get_current_buf()
-  local lnum = api.nvim_win_get_cursor(win)[1]
-  local start = vim.fn.foldclosed(lnum)
+  local cur = api.nvim_win_get_cursor(win)
+  local start = vim.fn.foldclosed(cur[1])
   if start == -1 or M.cell_at(win, buf, start) then
     return
   end
-  local stop = vim.fn.foldclosedend(lnum)
+  local stop = vim.fn.foldclosedend(cur[1])
   local cells = cells_of(buf, start, stop)
   if #cells == 0 then
     return
+  end
+  if cur[1] > start then
+    -- below the fold's first line only the caret's own placements put the
+    -- cursor (Esc moving it back a column after an insert there): the
+    -- cell standing for that position, when there is one
+    for i, c in ipairs(cells) do
+      if c.lnum == cur[1] and c.col == cur[2] then
+        place(win, buf, start, stop, cells, i)
+        return
+      end
+    end
   end
   local want = vim.fn.winsaveview().curswant + 1
   local target = nearest(cells, math.min(want, #cells), -1) or nearest(cells, 1, 1)
   if target then
     place(win, buf, start, stop, cells, target, want - 1)
+  end
+end
+
+--- The caret onto the cell standing for the real cursor's position (or
+--- the last one before it on that line) in the closed fold there.
+local function caret_at_cursor(win, buf)
+  local lnum = api.nvim_win_get_cursor(win)[1]
+  local start = vim.fn.foldclosed(lnum)
+  if start == -1 then
+    return
+  end
+  local stop = vim.fn.foldclosedend(lnum)
+  local cells = cells_of(buf, start, stop)
+  if #cells > 0 then
+    place(win, buf, start, stop, cells, current_cell(win, buf, start, cells))
+  end
+end
+
+--- x / X / r on a caret: the character it stands for is deleted (the
+--- count of them to the right / left, within the drawn text of that
+--- line) or replaced, the fold stays closed and the caret stays. Off a
+--- caret they are Vim's own.
+function M.edit(key)
+  local count = vim.v.count1
+  local win, buf = api.nvim_get_current_win(), api.nvim_get_current_buf()
+  local lnum = api.nvim_win_get_cursor(win)[1]
+  local start = vim.fn.foldclosed(lnum)
+  local ch
+  if key == "r" then
+    ch = vim.fn.getcharstr()
+    if ch == "\27" then
+      return
+    end
+  end
+  if start == -1 then
+    vim.cmd("normal! " .. count .. key .. (ch or ""))
+    return
+  end
+  local stop = vim.fn.foldclosedend(lnum)
+  local cells = cells_of(buf, start, stop)
+  local at = current_cell(win, buf, start, cells)
+  local cell = cells[at]
+  if not (cell and visible(cell)) then
+    return
+  end
+  local function same_line(i)
+    return cells[i] and visible(cells[i]) and cells[i].lnum == cell.lnum
+  end
+  local first, last = at, at
+  if key == "x" then
+    while last - first + 1 < count and same_line(last + 1) do
+      last = last + 1
+    end
+  elseif key == "X" then
+    if not same_line(at - 1) then
+      return
+    end
+    first, last = at - 1, at - 1
+    while last - first + 1 < count and same_line(first - 1) do
+      first = first - 1
+    end
+  end
+  local from, to = cells[first].col, cells[last].col + #cells[last].ch
+  local row = cell.lnum - 1
+  api.nvim_buf_set_text(buf, row, from, row, to, { key == "r" and ch:rep(last - first + 1) or "" })
+  cells = cells_of(buf, start, stop)
+  local target = nearest(cells, math.min(first, #cells), -1)
+  if target then
+    place(win, buf, start, stop, cells, target)
+  end
+end
+
+--- v on a closed fold: the folds hiding the cursor's line open (the
+--- caret's character is where the selection starts) and visual mode
+--- starts there; a selection can't be drawn on a fold line.
+function M.visual()
+  local lnum = api.nvim_win_get_cursor(0)[1]
+  for _ = 1, 10 do
+    if vim.fn.foldclosed(lnum) == -1 then
+      break
+    end
+    vim.cmd(("silent! %dfoldopen"):format(lnum))
+  end
+  vim.cmd("normal! v")
+end
+
+-- Insert mode opens the fold under the cursor (Vim does, on entering
+-- it); a fold the caret was on closes again when insert mode ends, with
+-- the caret back on the edited line.
+local reclose = {} ---@type table<integer, { buf: integer, start: integer, stop: integer, lines: integer }>
+
+local function insert_enter()
+  local win, buf = api.nvim_get_current_win(), api.nvim_get_current_buf()
+  local st = states[win]
+  local lnum = api.nvim_win_get_cursor(win)[1]
+  local start, stop = vim.fn.foldclosed(lnum), nil
+  if start ~= -1 then
+    stop = vim.fn.foldclosedend(lnum)
+  elseif st and st.buf == buf and lnum >= st.start and lnum <= st.stop then
+    start, stop = st.start, st.stop -- already opened for insert
+  end
+  if stop then
+    reclose[win] = { buf = buf, start = start, stop = stop, lines = api.nvim_buf_line_count(buf) }
+  end
+end
+
+local function insert_leave()
+  local win, buf = api.nvim_get_current_win(), api.nvim_get_current_buf()
+  local r = reclose[win]
+  reclose[win] = nil
+  if not r or r.buf ~= buf then
+    return
+  end
+  local stop = r.stop + api.nvim_buf_line_count(buf) - r.lines
+  local s, e = require("util.foldranges").fold(buf, win, r.start - 1, stop - 1)
+  if s then
+    require("util.folds").close_exact(s, e)
+    caret_at_cursor(win, buf) -- Esc may still move the cursor: arrive() follows it
   end
 end
 
@@ -491,6 +622,8 @@ function M.setup()
   })
   -- the cursor comes back as soon as the caret is gone: moved off, the
   -- text edited, the window or mode left
+  api.nvim_create_autocmd("InsertEnter", { group = group, callback = insert_enter })
+  api.nvim_create_autocmd("InsertLeave", { group = group, callback = insert_leave })
   api.nvim_create_autocmd({ "CursorMoved", "TextChanged", "InsertEnter", "WinLeave", "BufLeave", "ModeChanged" }, {
     group = group,
     callback = function(ev)

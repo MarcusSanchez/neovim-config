@@ -185,6 +185,17 @@ map("n", "D", [["_D]], opts("Delete to End of Line (No Yank)"))
 map("x", "p", [["_dP]], opts("Paste Over Selection (No Yank)"))
 map("x", "P", [["_dP]], opts("Paste Over Selection (No Yank)"))
 
+-- on a caret (a closed fold's line) x/X/r edit the character under it with
+-- the fold closed, and v opens the fold to select from it (lua/util/foldcursor.lua)
+for _, key in ipairs({ "x", "X", "r" }) do
+  map("n", key, function()
+    require("util.foldcursor").edit(key)
+  end, opts(({ x = "Delete Character", X = "Delete Character Before", r = "Replace Character" })[key]))
+end
+map("n", "v", function()
+  require("util.foldcursor").visual()
+end, opts("Visual Mode"))
+
 -- gc on a selection within a line: a block comment around it, IntelliJ
 -- style (lua/util/comment.lua); linewise selections stay line comments
 map("x", "gc", function()
