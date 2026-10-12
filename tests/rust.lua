@@ -164,6 +164,16 @@ vim.schedule(function()
       "    mac: u8,",
       "    online: bool,",
       "}",
+      "",
+      "fn cond(x: Option<u8>) -> u8 {",
+      "    if x",
+      "        .map(|v| v + 1)",
+      "        .is_some()",
+      "    {",
+      "        return 1;",
+      "    }",
+      "    0",
+      "}",
     }, dir .. "/src/probe.rs")
     vim.cmd("edit " .. dir .. "/src/probe.rs")
     local FR = require("util.foldranges")
@@ -213,6 +223,10 @@ vim.schedule(function()
     fold(43)
     check("wrapped macro arguments fold through `);`", range(43), "42..46")
     check("macro fold line", vim.fn.foldtextresult(42), "        println!( ... );")
+    vim.cmd("normal! zR")
+    fold(62) -- inside a condition wrapped over three lines before its `{`
+    check(",d in a wrapped condition folds the whole if", range(62), "61..66")
+    check("its fold line shows the condition elided, then the body", vim.fn.foldtextresult(61), "    if x ... { ... }")
     vim.cmd("normal! zR")
   end)
   log(ok and "DONE" or ("ERROR: " .. tostring(err)))

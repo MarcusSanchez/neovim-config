@@ -129,6 +129,27 @@ end
 --- The 1-based line where the bracket at (lnum, col) is closed, per the
 --- syntax tree: the bracket's parent node (parameters, arguments, block…)
 --- ends on that line. nil when treesitter can't say.
+--- The line holding the opener that the bracket at (lnum, col) closes,
+--- via the treesitter node ending at that bracket.
+local function opening_line(buf, lnum, col)
+  local ok, node =
+    pcall(vim.treesitter.get_node, { bufnr = buf, pos = { lnum - 1, col - 1 }, ignore_injections = true })
+  if not ok or not node then
+    return
+  end
+  while node do
+    local erow, ecol = node:end_()
+    if erow == lnum - 1 and ecol == col then
+      break
+    end
+    node = node:parent()
+  end
+  if not node then
+    return
+  end
+  return node:start() + 1
+end
+
 local function closing_line(buf, lnum, col)
   local ok, node =
     pcall(vim.treesitter.get_node, { bufnr = buf, pos = { lnum - 1, col - 1 }, ignore_injections = true })
@@ -238,12 +259,33 @@ function M.text()
     break
   end
 
+  local last = line_at(last_lnum)
+  local tail, rest = closer(last)
+
+  -- a head that opens nothing the last line closes — a condition wrapped
+  -- over lines before its `{` — is followed by the line that does open it,
+  -- so `if self` … `{` … `}` reads `if self ... { ... }`
+  if tail and #unmatched_openers(line) == 0 then
+    local ccol = last:find("[%)%]}]")
+    local open = ccol and opening_line(buf, last_lnum, ccol)
+    if open and open > lnum and open < last_lnum then
+      chunks[#chunks + 1] = { " ... ", "FoldEllipsis" }
+      local raw = line_at(open)
+      local seg = highlighted(buf, open, raw, (trailing_openers(raw)))
+      if seg[1] and seg[1][1]:match("^%s+$") then
+        table.remove(seg, 1)
+      elseif seg[1] then
+        seg[1][1] = seg[1][1]:gsub("^%s+", "")
+      end
+      vim.list_extend(chunks, seg)
+      lnum, line = open, raw
+    end
+  end
+
   -- the tail: ` ... ` and the last line's leading closers, each coloured
   -- like the opener it pairs with on the head line (dim when that opener is
   -- hidden), then whatever follows them on that line — so a parameters-only
   -- fold reads `fn send( ... ) -> Result<(), Error> {`
-  local last = line_at(last_lnum)
-  local tail, rest = closer(last)
   local _, hl = highlighted(buf, lnum, line)
   local dim_from = select(2, trailing_openers(line))
   chunks[#chunks + 1] = { tail and " ... " or " ...", "FoldEllipsis" }
