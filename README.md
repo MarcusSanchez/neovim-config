@@ -26,6 +26,7 @@ lua/util/                feature logic, one module per feature
   foldranges.lua         the fold expression: the language server's ranges (normalised), treesitter's until then
   folds.lua              folds persist across sessions, anchored to the text they hide
   foldtext.lua           closed folds read `func main() { ... }`, first line highlighted
+  searchfolds.lua        a search doesn't unfold what it passes through
   session.lua            a bare `nvim` restores the directory's session instead of the dashboard
 lua/plugins/             one lazy.nvim spec per plugin (LazyVim merges them)
 lua/benched/             shelved specs (neo-tree) — not imported, see its README
@@ -90,7 +91,13 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
   read `fn f( ... ) -> R {`, an if branch `if x { ... } else {`, an else
   branch `} else { ... }` — the line two regions share goes to the one
   being folded. Fold the other one while that is still folded and the pair
-  collapses to its chain: `if x { ... } else { ... }`.
+  collapses to its chain: `if x { ... } else { ... }`. Import blocks are
+  folded when a file opens, as JetBrains does (the server's `imports` fold
+  kind: gopls' `import (…)`, rust-analyzer's run of `use` items).
+- **Searching doesn't unfold**: a match inside a closed fold opens that
+  fold only while the cursor is in it (`/`, `n`, `N`, `*`, `#`); step out
+  and it closes again, unless you edited inside. Folds a search merely
+  passed over never open.
 - **Sessions**: a bare `nvim` in a directory you've worked in restores that
   session (persistence.nvim) instead of showing the dashboard; the dashboard
   appears only when there's nothing to restore.

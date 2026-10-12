@@ -20,6 +20,55 @@ vim.schedule(function()
   local ok, err = pcall(function()
     vim.api.nvim_exec_autocmds("User", { pattern = "VeryLazy" })
     vim.api.nvim_exec_autocmds("FileType", { buffer = 0 }) -- as LazyVim re-fires it after loading autocmds
+    -- a search doesn't unfold what it passes through: a match inside a
+    -- closed fold opens it for the visit only
+    vim.fn.writefile({
+      "block one",
+      "    one line 1",
+      "    one line 2",
+      "block two",
+      "    two line 1",
+      "    two line 2",
+      "block three",
+      "    three line 1",
+      "    three line 2",
+    }, "search.txt")
+    vim.cmd("edit search.txt")
+    local sb = vim.api.nvim_get_current_buf()
+    local function type_keys(k)
+      vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(k, true, false, true), "x", false)
+    end
+    vim.api.nvim_win_set_cursor(0, { 2, 0 })
+    type_keys(",d")
+    vim.api.nvim_win_set_cursor(0, { 8, 0 })
+    type_keys(",d")
+    check("search: two indent folds closed", vim.fn.foldclosed(2) .. " " .. vim.fn.foldclosed(8), "2 8")
+    vim.api.nvim_win_set_cursor(0, { 1, 0 })
+    type_keys("/line 2<CR>")
+    vim.wait(200, function()
+      return vim.fn.foldclosed(3) == -1
+    end, 10)
+    check("search: cursor on the match inside the fold", vim.api.nvim_win_get_cursor(0)[1], 3)
+    check("search: the fold the match is in opens", vim.fn.foldclosed(3), -1)
+    check("search: the fold it passed over stays closed", vim.fn.foldclosed(8), 8)
+    type_keys("n") -- `two line 2`, outside any fold
+    check("search: n moves on", vim.api.nvim_win_get_cursor(0)[1], 6)
+    check("search: the fold left behind closes again", vim.fn.foldclosed(2), 2)
+    type_keys("n") -- `three line 2`, inside the last fold
+    check("search: n into a fold opens it", vim.fn.foldclosed(9), -1)
+    type_keys("gg")
+    vim.api.nvim_exec_autocmds("CursorMoved", {}) -- fed keys don't reach the main loop that fires it
+    check("search: leaving closes it again", vim.fn.foldclosed(8), 8)
+    type_keys("G")
+    type_keys("n") -- wraps to `one line 2`
+    vim.cmd("normal! A!") -- an edit inside the visited fold
+    type_keys("gg")
+    vim.api.nvim_exec_autocmds("CursorMoved", {})
+    check("search: an edited fold stays open", vim.fn.foldclosed(3), -1)
+    check("search: 'foldopen' no longer opens on search", vim.opt.foldopen:get().search, nil)
+    vim.cmd("buffer long.txt")
+    vim.api.nvim_buf_delete(sb, { force = true })
+    vim.fn.delete("search.txt")
     check("text files: no spell squiggles", vim.wo.spell, false)
     check("text files: still wrap", vim.wo.wrap, true)
     -- leaving insert mode doesn't step the cursor back

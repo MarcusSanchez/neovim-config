@@ -48,10 +48,12 @@ require("util.autosave").setup({ delay = 300 })
 -- keep 'scrolloff' blank rows below the last line of the buffer
 require("util.scroll").setup()
 
--- folds: the language server's ranges feed the fold expression, and closed
--- folds survive closing the file and restarting nvim
+-- folds: the language server's ranges feed the fold expression, closed
+-- folds survive closing the file and restarting nvim, and a search doesn't
+-- unfold what it passes through
 require("util.foldranges").setup()
 require("util.folds").setup()
+require("util.searchfolds").setup()
 
 -- a bare `nvim` in a project with a session restores it instead of the
 -- dashboard. Scheduled: this file runs inside LazyVim's VeryLazy handler,

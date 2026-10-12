@@ -203,6 +203,21 @@ map({ "n", "x" }, "B", "E", opts("Next WORD End"))
 -- Shift+U to redo
 map("n", "<S-U>", "<C-R>", opts("Redo"))
 
+-- search motions reveal a match inside a closed fold only for the visit
+-- (lua/util/searchfolds.lua); n/N follow the search direction as in LazyVim
+for _, key in ipairs({ "n", "N", "*", "#" }) do
+  map("n", key, function()
+    require("util.searchfolds").motion(key)
+  end, {
+    desc = ({
+      n = "Next Search Match",
+      N = "Prev Search Match",
+      ["*"] = "Search Word Forward",
+      ["#"] = "Search Word Backward",
+    })[key],
+  })
+end
+
 -- ,d folds the region at the cursor the way JetBrains does (an if branch,
 -- its else, wrapped parameters: each on its own), or opens the fold there
 -- (lua/util/foldranges.lua)
