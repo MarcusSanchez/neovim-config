@@ -1,10 +1,21 @@
 -- j/k are swapped in this config; every place vim or a plugin spells
 -- "down" as j / "up" as k must follow. Opens long.txt.
 local logf = io.open(vim.fn.expand("%:p:h") .. "/result.log", "w")
-local function log(s) logf:write(s, "\n"); logf:flush() end
-local function check(name, got, want) log(("%s %s: %s (want %s)"):format(got == want and "PASS" or "FAIL", name, tostring(got), tostring(want))) end
-local function rhs(mode, lhs) local m = vim.fn.maparg(lhs, mode, false, true); return m.rhs or (m.callback and "<callback>") or nil end
-vim.defer_fn(function() log("TIMEOUT"); vim.cmd("qall!") end, 60000)
+local function log(s)
+  logf:write(s, "\n")
+  logf:flush()
+end
+local function check(name, got, want)
+  log(("%s %s: %s (want %s)"):format(got == want and "PASS" or "FAIL", name, tostring(got), tostring(want)))
+end
+local function rhs(mode, lhs)
+  local m = vim.fn.maparg(lhs, mode, false, true)
+  return m.rhs or (m.callback and "<callback>") or nil
+end
+vim.defer_fn(function()
+  log("TIMEOUT")
+  vim.cmd("qall!")
+end, 60000)
 vim.schedule(function()
   local ok, err = pcall(function()
     vim.api.nvim_exec_autocmds("User", { pattern = "VeryLazy" })
@@ -12,35 +23,51 @@ vim.schedule(function()
     check("text files: no spell squiggles", vim.wo.spell, false)
     check("text files: still wrap", vim.wo.wrap, true)
     -- leaving insert mode doesn't step the cursor back
-    local function keys(k) vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(k, true, false, true), "x", false) end
+    local function keys(k)
+      vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(k, true, false, true), "x", false)
+    end
     vim.api.nvim_win_set_cursor(0, { 50, 2 }) -- "line 50", on 'n'
-    keys("ajj"); keys("ajj"); keys("ajj")
+    keys("ajj")
+    keys("ajj")
+    keys("ajj")
     check("a jj x3 walks right three columns", vim.api.nvim_win_get_cursor(0)[2], 5)
-    keys("$"); keys("ajj"); keys("ajj")
+    keys("$")
+    keys("ajj")
+    keys("ajj")
     check("a jj at end of line stays on the last character", vim.api.nvim_win_get_cursor(0)[2], #vim.fn.getline(50) - 1)
     check("...and never wraps to a new line", vim.fn.line("."), 50)
     vim.api.nvim_win_set_cursor(0, { 50, 3 })
-    keys("ijj"); keys("ijj"); keys("ijj")
+    keys("ijj")
+    keys("ijj")
+    keys("ijj")
     check("i jj x3 stays put", vim.api.nvim_win_get_cursor(0)[2], 3)
     keys("i<Esc>")
     check("<Esc> behaves like jj", vim.api.nvim_win_get_cursor(0)[2], 3)
     check("buffer unchanged by the above", vim.fn.getline(50), "line 50")
     -- motions
     vim.api.nvim_win_set_cursor(0, { 50, 0 })
-    vim.cmd("normal j"); check("j goes up", vim.fn.line("."), 49)
-    vim.cmd("normal k"); check("k goes down", vim.fn.line("."), 50)
-    vim.cmd("normal dk"); check("dk deletes downward", vim.fn.getline(50), "line 52")
+    vim.cmd("normal j")
+    check("j goes up", vim.fn.line("."), 49)
+    vim.cmd("normal k")
+    check("k goes down", vim.fn.line("."), 50)
+    vim.cmd("normal dk")
+    check("dk deletes downward", vim.fn.getline(50), "line 52")
     vim.cmd("undo")
     -- windows
     check("<C-w>j goes up", rhs("n", "<C-w>j"), "<C-w>k")
     check("<C-w>k goes down", rhs("n", "<C-w>k"), "<C-w>j")
     check("<C-w>J moves window to top", rhs("n", "<C-w>J"), "<C-w>K")
     -- folds
-    vim.wo.foldmethod = "manual"; vim.cmd("10,20fold"); vim.cmd("30,40fold"); vim.cmd("normal! zR")
+    vim.wo.foldmethod = "manual"
+    vim.cmd("10,20fold")
+    vim.cmd("30,40fold")
+    vim.cmd("normal! zR")
     vim.api.nvim_win_set_cursor(0, { 25, 0 })
-    vim.cmd("normal zk"); check("zk goes to the next fold (down)", vim.fn.line("."), 30)
+    vim.cmd("normal zk")
+    check("zk goes to the next fold (down)", vim.fn.line("."), 30)
     vim.api.nvim_win_set_cursor(0, { 25, 0 })
-    vim.cmd("normal zj"); check("zj goes to the previous fold (up)", vim.fn.line("."), 20)
+    vim.cmd("normal zj")
+    check("zj goes to the previous fold (up)", vim.fn.line("."), 20)
     -- LazyVim's Alt-j/k line moves are gone in every mode
     check("<A-j> insert unmapped", vim.fn.maparg("<A-j>", "i"), "")
     check("<A-k> visual unmapped", vim.fn.maparg("<A-k>", "v"), "")
@@ -48,7 +75,9 @@ vim.schedule(function()
     local p = Snacks.picker.config.get({ source = "files" })
     local function keyspec(keys, lhs)
       for k, v in pairs(keys) do
-        if k:lower() == lhs then return type(v) == "table" and v[1] or v end
+        if k:lower() == lhs then
+          return type(v) == "table" and v[1] or v
+        end
       end
     end
     check("picker input <c-k> is list_down", keyspec(p.win.input.keys, "<c-k>"), "list_down")
@@ -58,15 +87,35 @@ vim.schedule(function()
     check("terminal <C-k> desc", t.nav_k.desc, "Go to Lower Window")
     -- oil and harpoon live alongside the snacks explorer
     check(",a is still the explorer", vim.fn.maparg(",a", "n", false, true).desc, "Toggle/Focus Explorer (Root Dir)")
-    check("- opens oil for the file's directory", vim.fn.maparg("-", "n", false, true).desc, "Open Parent Directory (Oil Float)")
-    check(",o opens oil at the project root", vim.fn.maparg(",o", "n", false, true).desc, "Open Project Root (Oil Float)")
+    check(
+      "- opens oil for the file's directory",
+      vim.fn.maparg("-", "n", false, true).desc,
+      "Open Parent Directory (Oil Float)"
+    )
+    check(
+      ",o opens oil at the project root",
+      vim.fn.maparg(",o", "n", false, true).desc,
+      "Open Project Root (Oil Float)"
+    )
     require("oil").open_float()
-    vim.wait(3000, function() return vim.bo.filetype == "oil" end, 50)
+    vim.wait(3000, function()
+      return vim.bo.filetype == "oil"
+    end, 50)
     check("oil float shows the directory as a buffer", vim.bo.filetype, "oil")
-    vim.wait(5000, function() return vim.fn.search("long.txt", "nw") > 0 end, 50) -- the listing fills in async
+    vim.wait(5000, function()
+      return vim.fn.search("long.txt", "nw") > 0
+    end, 50) -- the listing fills in async
     check("oil lists this file", vim.fn.search("long.txt", "nw") > 0, true)
     require("oil").close()
-    check("harpoon keys", vim.fn.maparg(",ha", "n", false, true).desc .. " / " .. vim.fn.maparg(",hl", "n", false, true).desc .. " / " .. vim.fn.maparg(",3", "n", false, true).desc, "Harpoon Add File / Harpoon Quick Menu / Harpoon File 3")
+    check(
+      "harpoon keys",
+      vim.fn.maparg(",ha", "n", false, true).desc
+        .. " / "
+        .. vim.fn.maparg(",hl", "n", false, true).desc
+        .. " / "
+        .. vim.fn.maparg(",3", "n", false, true).desc,
+      "Harpoon Add File / Harpoon Quick Menu / Harpoon File 3"
+    )
     require("harpoon"):list():clear()
     vim.fn.maparg(",ha", "n", false, true).callback()
     check("harpoon pins the current file", require("harpoon"):list():length(), 1)

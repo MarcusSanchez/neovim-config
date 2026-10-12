@@ -4,9 +4,17 @@
 -- inside block three. Pass 2 expects block one closed at its new place,
 -- block three open (its text changed), block two untouched.
 local logf = io.open(vim.fn.getcwd() .. "/result.log", vim.env.FOLD_PASS == "1" and "w" or "a")
-local function log(s) logf:write(s, "\n"); logf:flush() end
-local function check(name, got, want) log(("%s %s: %s (want %s)"):format(got == want and "PASS" or "FAIL", name, tostring(got), tostring(want))) end
-vim.defer_fn(function() log("TIMEOUT"); vim.cmd("qall!") end, 30000)
+local function log(s)
+  logf:write(s, "\n")
+  logf:flush()
+end
+local function check(name, got, want)
+  log(("%s %s: %s (want %s)"):format(got == want and "PASS" or "FAIL", name, tostring(got), tostring(want)))
+end
+vim.defer_fn(function()
+  log("TIMEOUT")
+  vim.cmd("qall!")
+end, 30000)
 vim.schedule(function()
   local ok, err = pcall(function()
     vim.api.nvim_exec_autocmds("User", { pattern = "VeryLazy" })
