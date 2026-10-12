@@ -48,22 +48,43 @@ vim.schedule(function()
     check("a className call folds on its own", shape(21), "20..23 className={cn( ... )}")
     fold(29)
     check("a self-closing tag folds through />", shape(29), "28..31 <Hero ... />")
-    fold(35)
-    check("a nested element", shape(35), "34..36 <li key={item}> ... </li>")
     fold(33)
-    check("a map callback", shape(33), "33..37 {items.map((item) => ( ... ))}")
-    fold(39)
-    check("a conditional", shape(39), "39..43 {open && ( ... )}")
-    fold(40)
-    check("the element inside it", shape(40), "40..42 <aside> ... </aside>")
-    fold(45)
-    check("a fragment folds through </>", shape(45), "44..47 <> ... </>")
-    fold(54)
-    check("an arrow component's element", shape(54), '53..55 <div className="card"> ... </div>')
-    fold(52)
-    check("the arrow component", shape(52), "52..56 const Card = ({ title }: { title: string }) => ( ... );")
+    check("a self-closing tag the server skips (treesitter knows it)", shape(33), "32..35 <script ... />")
+    fold(41)
+    check("an element with wrapped attributes, from its text", shape(41), "37..42 <a ... </a>")
+    fold(38)
+    check("its attribute list on its own", shape(38), "37..40 <a ... >")
+    fold(46)
+    check("a nested element", shape(46), "45..47 <li key={item}> ... </li>")
+    fold(44)
+    check("a map callback", shape(44), "44..48 {items.map((item) => ( ... ))}")
+    fold(50)
+    check("a conditional", shape(50), "50..54 {open && ( ... )}")
+    fold(51)
+    check("the element inside it", shape(51), "51..53 <aside> ... </aside>")
+    fold(56)
+    check("a fragment folds through </>", shape(56), "55..58 <> ... </>")
+    fold(65)
+    check("an arrow component's element", shape(65), '64..66 <div className="card"> ... </div>')
+    fold(63)
+    check("the arrow component", shape(63), "63..67 const Card = ({ title }: { title: string }) => ( ... );")
     fold(18)
-    check("the root element", shape(18), '18..48 <main className="flex flex-col"> ... </main>')
+    check("the root element", shape(18), '18..59 <main className="flex flex-col"> ... </main>')
+    -- the closing tag on the fold line is dim, like a `}` the fold hides behind
+    _G.__probe = function()
+      local c = require("util.foldtext").text()
+      _G.__chunks = c
+      return c
+    end
+    local ft = vim.wo.foldtext
+    vim.wo.foldtext = "v:lua.__probe()"
+    vim.fn.foldtextresult(18)
+    vim.wo.foldtext = ft
+    check(
+      "closing tag dim on the fold line",
+      _G.__chunks[#_G.__chunks][1] .. "=" .. _G.__chunks[#_G.__chunks][2],
+      "</main>=FoldEllipsis"
+    )
     log("OK")
   end)
   log(ok and "DONE" or ("ERROR: " .. tostring(err)))

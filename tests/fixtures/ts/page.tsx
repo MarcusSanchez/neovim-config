@@ -29,6 +29,17 @@ export default function Page({ items, open }: Props) {
         title="Hi"
         subtitle="There"
       />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(items) }}
+      />
+      {/* keyboard users jump the fixed nav */}
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only"
+      >
+        Skip to content
+      </a>
       <ul>
         {items.map((item) => (
           <li key={item}>

@@ -404,6 +404,42 @@ local function autofold(buf)
   end
 end
 
+--- JSX regions treesitter knows, as folding ranges: the typescript server
+--- reports elements inconsistently (a `<Hero … />` gets a range, the
+--- `<script … />` beside it none), and treesitter's nodes already end on
+--- the closing tag. Elements, fragments, self-closing elements, and
+--- opening tags that wrap (the attribute list on its own). Fragments are
+--- jsx_elements with an empty name.
+local jsx_query = "[(jsx_element) (jsx_self_closing_element) (jsx_opening_element)] @e"
+local function jsx_ranges(buf)
+  local ok, parser = pcall(vim.treesitter.get_parser, buf, nil, { error = false })
+  if not ok or not parser then
+    return {}
+  end
+  local lang = parser:lang()
+  if lang ~= "tsx" and lang ~= "javascript" then
+    return {}
+  end
+  local okq, query = pcall(vim.treesitter.query.parse, lang, jsx_query)
+  if not okq then
+    return {}
+  end
+  parser:parse(true)
+  local out = {}
+  for _, tree in ipairs(parser:trees()) do
+    for _, node in query:iter_captures(tree:root(), buf) do
+      local s, _, e, ecol = node:range()
+      if ecol == 0 then
+        e = e - 1
+      end
+      if e > s then
+        out[#out + 1] = { startLine = s, endLine = e }
+      end
+    end
+  end
+  return out
+end
+
 local function request(buf)
   local st = states[buf]
   if not st or not api.nvim_buf_is_loaded(buf) then
@@ -424,6 +460,7 @@ local function request(buf)
         vim.list_extend(ranges, res.result)
       end
     end
+    vim.list_extend(ranges, jsx_ranges(buf))
     local lines = api.nvim_buf_get_lines(buf, 0, -1, false)
     local first = st.levels == nil
     local folds = require("util.folds")
