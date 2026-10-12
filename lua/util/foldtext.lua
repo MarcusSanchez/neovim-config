@@ -181,6 +181,30 @@ function M.text()
     return vim.api.nvim_buf_get_lines(buf, lnum - 1, lnum, false)[1] or ""
   end
 
+  -- a run of imports (the server says so) reads `import ...` / `use ...`,
+  -- as JetBrains collapses it: no one line stands for the whole run.
+  -- Bracketed forms (`import (` … `)`) keep the usual shape.
+  if require("util.foldranges").kind(buf, first_lnum, last_lnum) == "imports" then
+    local head = line_at(first_lnum)
+    local keyword = head:match("^%s*(%a+)")
+    if keyword and not select(2, trailing_openers(head)) then
+      local chunks, pos, want = {}, 0, #head:match("^%s*") + #keyword
+      for _, c in ipairs((highlighted(buf, first_lnum, head))) do
+        if pos >= want then
+          break
+        end
+        local text = c[1]
+        if pos + #text > want then
+          text = text:sub(1, want - pos)
+        end
+        chunks[#chunks + 1] = { text, c[2] }
+        pos = pos + #text
+      end
+      chunks[#chunks + 1] = { " ...", "FoldEllipsis" }
+      return chunks
+    end
+  end
+
   -- Walk the fold: a line whose trailing opener closes *before* the fold's
   -- last line (a wrapped parameter list, a call spanning lines) is followed
   -- by ` ... ` and the line that closes it, so `fn send(` … `) -> R {` … `}`

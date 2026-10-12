@@ -94,7 +94,8 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
   being folded. Fold the other one while that is still folded and the pair
   collapses to its chain: `if x { ... } else { ... }`. Import blocks are
   folded when a file opens, as JetBrains does (the server's `imports` fold
-  kind: gopls' `import (…)`, rust-analyzer's run of `use` items).
+  kind: gopls' `import (…)`, rust-analyzer's run of `use` items, a run of
+  TypeScript imports), and a run of them reads `import ...` / `use ...`.
 - **Searching doesn't unfold**: a match inside a closed fold opens that
   fold only while the cursor is in it (`/`, `n`, `N`, `*`, `#`); step out
   and it closes again, unless you edited inside. Folds a search merely

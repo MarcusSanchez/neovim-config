@@ -174,6 +174,9 @@ vim.schedule(function()
       "    }",
       "    0",
       "}",
+      "",
+      "use std::fmt::Debug;",
+      "use std::fmt::Display;",
     }, dir .. "/src/probe.rs")
     vim.cmd("edit " .. dir .. "/src/probe.rs")
     local FR = require("util.foldranges")
@@ -184,6 +187,10 @@ vim.schedule(function()
       return false
     end)
     check("probe folds come from rust-analyzer", FR.has(0), true)
+    -- a run of `use` items is rust-analyzer's imports fold: folded on open,
+    -- reading `use ...`
+    check("a run of use items folds on open", range(70), "70..71")
+    check("imports fold line", vim.fn.foldtextresult(70), "use ...")
     local function fold(l) -- ,d on line l
       vim.cmd(("normal! %dG"):format(l))
       FR.toggle()
@@ -227,6 +234,7 @@ vim.schedule(function()
     fold(62) -- inside a condition wrapped over three lines before its `{`
     check(",d in a wrapped condition folds the whole if", range(62), "61..66")
     check("its fold line shows the condition elided, then the body", vim.fn.foldtextresult(61), "    if x ... { ... }")
+
     vim.cmd("normal! zR")
   end)
   log(ok and "DONE" or ("ERROR: " .. tostring(err)))

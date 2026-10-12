@@ -239,6 +239,20 @@ function M.ranges(buf)
   end, st.ranges)
 end
 
+--- The server's fold kind ("imports", "comment", "region") for the fold
+--- spanning exactly these 1-based lines, if it has one.
+function M.kind(buf, start, stop)
+  local st = states[buf == 0 and api.nvim_get_current_buf() or buf]
+  if not (st and st.ranges) then
+    return nil
+  end
+  for _, r in ipairs(st.ranges) do
+    if r.s == start - 1 and r.e == stop - 1 then
+      return r.kind
+    end
+  end
+end
+
 --- Whether the buffer's folds come from its language server.
 function M.has(buf)
   if not buf or buf == 0 then
