@@ -604,22 +604,45 @@ function M.edit(key)
   end
 end
 
----@class util.foldcursor.Reclose a fold opened for insert or visual mode, to close again after
+---@class util.foldcursor.Reclose folds opened at the cursor for insert or visual mode, to close again after
 ---@field buf integer
----@field start integer
----@field stop integer
----@field lines integer the buffer's line count then (the fold's end moves with it)
+---@field folds { [1]: integer, [2]: integer }[] outermost first, as opened
+---@field lines integer the buffer's line count then (the folds' ends move with it)
 
--- Insert mode opens the fold under the cursor (Vim does, on entering
--- it), and v opens it to show the selection; a fold the caret was on
+-- Insert mode opens the folds under the cursor (Vim does, on entering
+-- it), and v opens them to show the selection; what the caret was on
 -- closes again when that mode ends, with the caret back where the
--- cursor is.
+-- cursor is. The folds are opened one level at a time so each is known
+-- and can be put back exactly, innermost first — closing the outer one
+-- alone can't be done while its inner folds are open.
 local reclose = {} ---@type table<integer, util.foldcursor.Reclose> after insert mode
 local reclose_visual = {} ---@type table<integer, util.foldcursor.Reclose> after visual mode
 
---- Close the fold again once Vim is idle: the keys a mapping still has
+--- Open the closed folds at the cursor level by level; the folds opened,
+--- outermost first, or nil when the line wasn't folded.
+---@return util.foldcursor.Reclose?
+local function reveal(win, buf)
+  local lnum = api.nvim_win_get_cursor(win)[1]
+  if vim.fn.foldclosed(lnum) == -1 then
+    return
+  end
+  local r = { buf = buf, folds = {}, lines = api.nvim_buf_line_count(buf) }
+  api.nvim_win_call(win, function()
+    for _ = 1, 20 do
+      local start = vim.fn.foldclosed(lnum)
+      if start == -1 then
+        break
+      end
+      r.folds[#r.folds + 1] = { start, vim.fn.foldclosedend(lnum) }
+      vim.cmd(("silent! %dfoldopen"):format(lnum))
+    end
+  end)
+  return r
+end
+
+--- Close the folds again once Vim is idle: the keys a mapping still has
 --- queued (the config's stay-put Esc jumps to the `^ mark, and
---- 'foldopen' has "mark") would reopen it if closed right away.
+--- 'foldopen' has "mark") would reopen them if closed right away.
 local function reclose_later(win, buf, r)
   api.nvim_create_autocmd("SafeState", {
     once = true,
@@ -627,14 +650,18 @@ local function reclose_later(win, buf, r)
       if not (api.nvim_win_is_valid(win) and api.nvim_win_get_buf(win) == buf) then
         return
       end
-      local stop = r.stop + api.nvim_buf_line_count(buf) - r.lines
-      local s, e = require("util.foldranges").fold(buf, win, r.start - 1, stop - 1)
-      local c = api.nvim_win_get_cursor(win)
-      trace(("re-close: cursor %d:%d fold %s..%s"):format(c[1], c[2], tostring(s), tostring(e)))
-      if s then
-        require("util.folds").close_exact(s, e)
-        caret_at_cursor(win, buf)
-      end
+      local delta = api.nvim_buf_line_count(buf) - r.lines
+      local FR, folds = require("util.foldranges"), require("util.folds")
+      api.nvim_win_call(win, function()
+        for i = #r.folds, 1, -1 do
+          local s, e = FR.fold(buf, win, r.folds[i][1] - 1, r.folds[i][2] + delta - 1)
+          trace(("re-close: %d..%d -> %s..%s"):format(r.folds[i][1], r.folds[i][2] + delta, tostring(s), tostring(e)))
+          if s then
+            folds.close_exact(s, e)
+          end
+        end
+      end)
+      caret_at_cursor(win, buf)
     end,
   })
 end
@@ -642,26 +669,15 @@ end
 --- v on a closed fold: the folds hiding the cursor's line open (the
 --- caret's character is where the selection starts) and visual mode
 --- starts there, since a selection can't be drawn on a fold line. The
---- fold closes again when visual mode ends (`viwy` is a blink).
+--- folds close again when visual mode ends (`viwy` is a blink).
 function M.visual()
   local win, buf = api.nvim_get_current_win(), api.nvim_get_current_buf()
-  local lnum = api.nvim_win_get_cursor(win)[1]
-  local start = vim.fn.foldclosed(lnum)
-  if start ~= -1 then
-    reclose_visual[win] =
-      { buf = buf, start = start, stop = vim.fn.foldclosedend(lnum), lines = api.nvim_buf_line_count(buf) }
-    for _ = 1, 10 do
-      if vim.fn.foldclosed(lnum) == -1 then
-        break
-      end
-      vim.cmd(("silent! %dfoldopen"):format(lnum))
-    end
-  end
+  reclose_visual[win] = reveal(win, buf)
   vim.cmd("normal! v")
 end
 
---- Visual mode ended: back in normal mode the fold closes again; into
---- insert mode (`c`) it closes when that ends.
+--- Visual mode ended: back in normal mode the folds close again; into
+--- insert mode (`c`) they close when that ends.
 local function visual_ended()
   local win = api.nvim_get_current_win()
   local r = reclose_visual[win]
@@ -678,29 +694,20 @@ local function visual_ended()
   end
 end
 
+--- Entering insert mode on a closed fold: the folds at the cursor open
+--- here, level by level, before Vim opens them all at once.
 local function insert_enter()
   local win, buf = api.nvim_get_current_win(), api.nvim_get_current_buf()
-  local st = states[win]
-  local lnum = api.nvim_win_get_cursor(win)[1]
-  local start, stop = vim.fn.foldclosed(lnum), nil
-  if start ~= -1 then
-    stop = vim.fn.foldclosedend(lnum)
-  elseif st and st.buf == buf and lnum >= st.start and lnum <= st.stop then
-    start, stop = st.start, st.stop -- already opened for insert
-  end
-  if stop then
-    reclose[win] = { buf = buf, start = start, stop = stop, lines = api.nvim_buf_line_count(buf) }
-  end
+  reclose[win] = reveal(win, buf) or reclose[win]
 end
 
 local function insert_leave()
   local win, buf = api.nvim_get_current_win(), api.nvim_get_current_buf()
   local r = reclose[win]
   reclose[win] = nil
-  if not r or r.buf ~= buf then
-    return
+  if r and r.buf == buf then
+    reclose_later(win, buf, r)
   end
-  reclose_later(win, buf, r)
 end
 
 --- The caret for the cursor's position, when it's on a closed fold (after

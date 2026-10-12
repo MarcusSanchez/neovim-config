@@ -326,6 +326,37 @@ lib.suite("gopls", function(t)
   t.check("l from there: onto the fold's first cell", cursor() .. " " .. caret(), "5:0 f")
   key("3h")
   t.check("a count past the start wraps too", cursor(), "4:0")
+  -- on a chain fold (`func h( ... ) (int, error) { ... }`) the same: the
+  -- folds opened for the selection or the insert close again, innermost
+  -- first, and the folds not on the cursor's path keep their state
+  vim.cmd("normal! zR")
+  t.fold(6)
+  t.fold(9)
+  vim.api.nvim_win_set_cursor(win, { 8, 7 })
+  key("l") -- caret on `e` of error
+  key("viwy")
+  vim.api.nvim_exec_autocmds("SafeState", {})
+  t.check("viwy on a chain fold: yanked", vim.fn.getreg('"'), "error")
+  t.check(
+    "and the chain is folded again with the same line",
+    t.span(5) .. " " .. vim.fn.foldtextresult(5) .. " " .. caret(),
+    "5..10 func h( ... ) (int, error) { ... } e"
+  )
+  key("iX<Esc>")
+  vim.api.nvim_exec_autocmds("SafeState", {})
+  moved()
+  t.check("insert on a chain fold: folded again", t.span(5) .. " " .. vim.fn.getline(8), "5..10 ) (int, Xerror) {")
+  t.check("caret after the inserted character", caret(), "e")
+  vim.api.nvim_buf_set_lines(buf, 7, 8, false, { ") (int, error) {" })
+  vim.wait(10000, function()
+    for _, r in ipairs(FR.ranges(buf) or {}) do
+      if r[1] == 5 and r[2] == 8 then
+        return true
+      end
+    end
+    return false
+  end, 50)
+  t.wait(300)
   -- a fold line ending in dots (a comment run): h from below opens it
   vim.cmd("normal! zR")
   t.fold(15)
