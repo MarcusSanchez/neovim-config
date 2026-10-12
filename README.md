@@ -87,8 +87,9 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
   parser. A closed fold is drawn as its first line (highlighted) plus
   ` ... }`; the dots and the bracket are only drawn. A wrapped parameter
   list folds on its own through its `) -> R {` (`zc` again, or inside the
-  body: the whole function); an if branch folds short of its `} else {`,
-  whose branch is its own fold.
+  body: the whole function); an if branch folds through its `} else {`
+  line with the else body open, and from inside the else the whole chain
+  folds as `if x { ... } else { ... }`.
 - **Sessions**: a bare `nvim` in a directory you've worked in restores that
   session (persistence.nvim) instead of showing the dashboard; the dashboard
   appears only when there's nothing to restore.

@@ -11,10 +11,11 @@
 -- (`}`, `});`, `}, log)` …); IntelliJ, and the fold line
 -- `func main() { ... }`, want the closer inside the fold. So a range still
 -- missing a closer grows onto the next line when that line starts with one.
--- Where that line also starts another range, one of them has to give (a
--- line belongs to one fold): after `) -> R {` the parameters keep their
--- closer and the body folds with the whole function; after `} else {` the
--- block stays short and the else branch is its own fold.
+-- Where that line also opens another range (`) -> R {`, `} else {`,
+-- `}).catch(() => {`), a line can only belong to one fold, so the range
+-- opening there starts where the closing one does instead: the parameters
+-- read `fn f( ... ) -> R {` and the body folds as the whole function; an if
+-- branch reads `if x { ... } else {` and the else branch folds the chain.
 local M = {}
 
 local api = vim.api
@@ -80,42 +81,24 @@ function M.normalize(ranges, lines)
     starts[r.s] = starts[r.s] or {}
     table.insert(starts[r.s], r)
   end
-  local merged = {}
   for _, r in ipairs(list) do
     local n = r.e + 1
     local text = lines[n + 1]
-    local closer = text and leading_closer(text)
-    if closer and balance(lines, r.s, r.e) > 0 then
-      local others = starts[n]
-      if not others then
-        r.e = n -- `}`, `});`, `}, log)`, `).bar()`: the closer joins the fold
-      elseif closer ~= "}" then
-        -- `) -> R {`: parameters keep their closer; the body that opens on
-        -- that line folds with the whole function instead
-        r.e = n
-        for _, b in ipairs(others) do
-          b.drop = true
-          merged[#merged + 1] = { s = r.s, e = b.e }
-        end
+    if text and leading_closer(text) and balance(lines, r.s, r.e) > 0 then
+      r.e = n -- `}`, `});`, `}, log)`, `).bar()`: the closer joins the fold
+      -- `) -> R {`, `} else {`: what opens on that line starts here instead
+      for _, b in ipairs(starts[n] or {}) do
+        b.s = r.s
       end
-      -- `} else {`: the block stays a line short, the else is its own fold
     end
   end
   local out, seen = {}, {}
-  local function add(s, e, kind)
-    local key = s .. ":" .. e
-    if e > s and not seen[key] then
-      seen[key] = true
-      out[#out + 1] = { startLine = s, endLine = e, kind = kind }
-    end
-  end
   for _, r in ipairs(list) do
-    if not r.drop then
-      add(r.s, r.e, r.kind)
+    local key = r.s .. ":" .. r.e
+    if r.e > r.s and not seen[key] then
+      seen[key] = true
+      out[#out + 1] = { startLine = r.s, endLine = r.e, kind = r.kind }
     end
-  end
-  for _, m in ipairs(merged) do
-    add(m.s, m.e)
   end
   -- a line can start a fold or end another, not both: the ending one gives way
   local opens = {} ---@type table<integer, true>
