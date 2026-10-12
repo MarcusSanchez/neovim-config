@@ -103,6 +103,11 @@ end
 --- rest — `) -> Result<(), Error> {` is closers `)` plus the rest. Nil
 --- closers when the line doesn't start with one.
 local function closer(last)
+  -- a closing tag closes an element the way `}` closes a block
+  local tag = last:match("^%s*(</[%w%.%-_]*>)") or last:match("^%s*(/?>)")
+  if tag then
+    return tag, last:sub(#last:match("^%s*") + #tag + 1)
+  end
   local closers, rest = last:match("^%s*([%)%]}\"'`#]+[,;]?)(.*)$")
   if not closers then
     return nil, nil
@@ -332,7 +337,17 @@ function M.text()
   local _, hl = highlighted(buf, lnum, line)
   local dim_from = select(2, trailing_openers(line))
   chunks[#chunks + 1] = { tail and " ... " or " ...", "FoldEllipsis" }
-  if tail then
+  if tail and tail:match("^[</]") then
+    -- a closing tag, in its own colours
+    local indent, pos = #last:match("^%s*"), 0
+    for _, c in ipairs((highlighted(buf, last_lnum, last))) do
+      local text = c[1]
+      if pos + #text > indent and pos < indent + #tail then
+        chunks[#chunks + 1] = { text:sub(math.max(indent - pos + 1, 1), indent + #tail - pos), c[2] }
+      end
+      pos = pos + #text
+    end
+  elseif tail then
     local openers = unmatched_openers(line)
     for i = 1, #tail do
       local ch = tail:sub(i, i)

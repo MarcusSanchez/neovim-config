@@ -50,6 +50,29 @@ local function leading_closer(text)
   return text:match("^%s*([%)%]}])")
 end
 
+--- The tag a line closes, if it starts with one: the name for `</div>`,
+--- "" for a fragment's `</>` or a self-closing `/>`.
+local function closing_tag(text)
+  local name = text:match("^%s*</([%w%.%-_]*)>")
+  if name then
+    return name
+  end
+  if text:match("^%s*/>") then
+    return ""
+  end
+end
+
+--- The tag a line opens, if it starts with one (`<div`, `<Foo.Bar`, `<`).
+local function opening_tag(text)
+  return text:match("^%s*<([%w%.%-_]*)")
+end
+
+--- A line that only ends an opening tag whose attributes wrapped: `>` or
+--- `/>` (with whatever follows).
+local function tag_end(text)
+  return text:match("^%s*/?>") ~= nil
+end
+
 --- Openers minus closers over the range's lines (0-based rows), ignoring
 --- closers before the first opener on the first line (`} else {`,
 --- `}).catch(() => {`): positive means the range hasn't closed yet.
@@ -89,15 +112,40 @@ function M.normalize(ranges, lines)
       list[#list + 1] = { s = r.startLine, e = r.endLine, kind = r.kind }
     end
   end
+  local starts = {} ---@type table<integer, util.foldranges.Range[]>
+  for _, r in ipairs(list) do
+    starts[r.s] = starts[r.s] or {}
+    table.insert(starts[r.s], r)
+  end
   for _, r in ipairs(list) do
     local n = r.e + 1
     local text = lines[n + 1]
+    local grows = false
     if text and leading_closer(text) and balance(lines, r.s, r.e) > 0 then
-      r.e = n -- `}`, `});`, `}, log)`, `).bar()`: the closer joins the fold
+      grows = true -- `}`, `});`, `}, log)`, `).bar()`: the closer joins the fold
+    elseif text and closing_tag(text) then
+      -- `</div>` after an element that opened on the range's first line,
+      -- `/>` after a self-closing one, `</>` after a fragment
+      local opened = opening_tag(lines[r.s + 1] or "")
+      local closed = closing_tag(text)
+      grows = opened ~= nil and (closed == "" or closed == opened)
+    end
+    if text and tag_end(text) and not opening_tag(lines[r.s + 1] or "") and r.s > 0 then
+      -- the attribute list of an opening tag that wrapped (`<Hero` / attrs /
+      -- `/>`): the server folds the attributes alone; fold the tag instead,
+      -- from `<Hero` through its `/>` or `>`
+      local above = lines[r.s] or ""
+      if opening_tag(above) and not above:find(">", 1, true) then
+        r.s = r.s - 1
+        grows = true
+      end
+    end
+    if grows then
+      r.e = n
     end
   end
   -- a chain (if / else if / else; parameters / body) folds as one too
-  local starts = {} ---@type table<integer, util.foldranges.Range[]>
+  starts = {}
   for _, r in ipairs(list) do
     starts[r.s] = starts[r.s] or {}
     table.insert(starts[r.s], r)
@@ -428,6 +476,9 @@ end
 --- or nil when the buffer has no server folds or no such range.
 ---@return integer? start, integer? stop
 function M.fold(buf, win, s, e)
+  if buf == 0 then
+    buf = api.nvim_get_current_buf()
+  end
   local st = states[buf]
   if not (st and st.levels) then
     return

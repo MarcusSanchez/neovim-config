@@ -96,6 +96,11 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
   folded when a file opens, as JetBrains does (the server's `imports` fold
   kind: gopls' `import (…)`, rust-analyzer's run of `use` items, a run of
   TypeScript imports), and a run of them reads `import ...` / `use ...`.
+  JSX and HTML elements fold through their closing tag
+  (`<main className="x"> ... </main>`, `<> ... </>`), a wrapped opening
+  tag through its `/>` or `>` (`<Hero ... />`, `<header ... >` — the
+  attribute list on its own), a class through its brace, a block comment
+  through its `*/`.
 - **Searching doesn't unfold**: a match inside a closed fold opens that
   fold only while the cursor is in it (`/`, `n`, `N`, `*`, `#`); step out
   and it closes again, unless you edited inside. Folds a search merely
@@ -112,11 +117,12 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
 
 ## Tests
 
-`tests/run.sh` drives headless nvim against small Go, Rust and protobuf
-fixtures and prints PASS/FAIL per behaviour. Suites: `go` (gd/gh, usages
-popup, autosave, popups, fold shapes with gopls), `rust` (gs filtering,
-italics, fold shapes with rust-analyzer), `session`, `copilot`, `proto`,
+`tests/run.sh` drives headless nvim against small Go, Rust, TSX and
+protobuf fixtures and prints PASS/FAIL per behaviour. Suites: `go` (gd/gh,
+usages popup, autosave, popups, fold shapes with gopls), `rust` (gs
+filtering, italics, fold shapes with rust-analyzer), `tsx` (JSX fold
+shapes with the typescript server), `session`, `copilot`, `proto`,
 `scroll`, `keys` (j/k swaps), `ranges` (the fold-range normaliser against
 captured server output, no server needed) and `folds` (persistence across
-two runs, plain text and treesitter/LSP). Needs gopls, rust-analyzer and
-buf.
+two runs, plain text and treesitter/LSP). Needs gopls, rust-analyzer,
+vtsls and buf.

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Headless regression suite for the custom behaviour in this config.
-# Needs gopls, rust-analyzer and buf on PATH (mason installs them).
+# Needs gopls, rust-analyzer, vtsls and buf on PATH (mason installs them).
 #
 #   tests/run.sh          # everything
-#   tests/run.sh go       # one suite: go | rust | session | copilot | proto | scroll | keys | ranges | folds
+#   tests/run.sh go       # one suite: go | rust | tsx | session | copilot | proto | scroll | keys | ranges | folds
 #
 # Each suite drives a real nvim with this config against a fixture project
 # and prints PASS/FAIL lines. Fixtures are copied to a temp dir first: the
@@ -39,6 +39,7 @@ run() { # name, cwd, file to open, lua script, result log
 want=${1:-all}
 [[ $want == all || $want == go ]] && run go "$work/go" main.go "$here/go.lua" "$work/go/result.log"
 [[ $want == all || $want == rust ]] && run rust "$work/rust" src/lib.rs "$here/rust.lua" "$work/rust/result.log"
+[[ $want == all || $want == tsx ]] && run tsx "$work/ts" page.tsx "$here/tsx.lua" "$work/ts/result.log"
 if [[ $want == all || $want == session ]]; then
   # its own state dir: other suites' exits save sessions for the fixture dirs
   export XDG_STATE_HOME="$work/state-session" SESSION_PASS=1
