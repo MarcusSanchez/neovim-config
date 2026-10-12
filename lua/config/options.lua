@@ -18,5 +18,11 @@ vim.opt.whichwrap:append("h,l")
 -- (frontend/, mobile/, ...) even when editing backend/main.go.
 vim.g.root_spec = { "cwd" }
 
+-- Sessions don't record fold options or folds: a window's 'foldmethod' is
+-- decided when its file opens (LazyVim's treesitter switch), and replaying a
+-- stale "setlocal foldmethod=…" from a session would override that for good
+-- (it gets re-saved on every exit). Folds themselves persist content-anchored
+-- via lua/util/folds.lua.
+vim.opt.sessionoptions:remove("folds")
 -- closed folds read `func main() { ... }` (lua/util/foldtext.lua)
 vim.opt.foldtext = "v:lua.require('util.foldtext').text()"
