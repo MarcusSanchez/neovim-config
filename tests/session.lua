@@ -123,6 +123,9 @@ vim.schedule(function()
     local r = vim.api.nvim_eval_statusline(vim.o.tabline, { use_tabline = true, highlights = true })
     local last = r.highlights[#r.highlights]
     check("pass 2: tabline offset above the sidebar uses the bar's fill", last and last.group, "BufferLineFill")
+    -- quit with no file open: run.sh then expects the session file gone
+    vim.cmd("%bwipeout!")
+    check("pass 2: no file buffers left before quitting", vim.api.nvim_buf_get_name(0), "")
     log("OK")
   end)
   log(ok and "DONE" or ("ERROR: " .. tostring(err)))

@@ -44,6 +44,10 @@ if [[ $want == all || $want == session ]]; then
   export XDG_STATE_HOME="$work/state-session" SESSION_PASS=1
   (cd "$work/go" && nvim --headless -c "luafile $here/session.lua" >/dev/null 2>&1)
   SESSION_PASS=2 run session "$work/go" "" "$here/session.lua" "$work/go/result.log"
+  # pass 2 quits with no file open: that forgets the directory's session
+  sess="$XDG_STATE_HOME/nvim/sessions/$(echo "$work/go" | sed 's#/#%#g').vim"
+  if [[ -f $sess ]]; then echo "FAIL pass 2: quitting with no file open forgets the session: file still there"; status=1
+  else echo "PASS pass 2: quitting with no file open forgets the session"; fi
   unset SESSION_PASS
   export XDG_STATE_HOME="$work/state"
 fi

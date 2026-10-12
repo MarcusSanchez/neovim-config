@@ -101,7 +101,9 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
   passed over never open.
 - **Sessions**: a bare `nvim` in a directory you've worked in restores that
   session (persistence.nvim) instead of showing the dashboard; the dashboard
-  appears only when there's nothing to restore.
+  appears only when there's nothing to restore. Quitting with no file open
+  forgets the directory's session, so the next bare `nvim` there starts
+  with the dashboard again.
 - **Folds persist**: close a fold, come back to the file next week, it's
   still closed — if the same text is still there (it follows the text when
   lines shift; edited text is left unfolded rather than folded wrong).

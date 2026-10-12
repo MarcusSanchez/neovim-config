@@ -48,12 +48,43 @@ function M.restore()
   return false
 end
 
+--- Quitting with no file open means there is nothing to come back to:
+--- forget the directory's session, so the next bare `nvim` here shows the
+--- dashboard instead of restoring whatever the previous visit left.
+--- (persistence.nvim only skips the save in that case; the old file would
+--- stay and be restored.) Same count of file buffers it uses.
+function M.forget_if_empty()
+  for _, b in ipairs(vim.api.nvim_list_bufs()) do
+    if
+      vim.bo[b].buftype == ""
+      and vim.api.nvim_buf_get_name(b) ~= ""
+      and not vim.tbl_contains({ "gitcommit", "gitrebase", "jj" }, vim.bo[b].filetype)
+    then
+      return false
+    end
+  end
+  local ok, persistence = pcall(require, "persistence")
+  if not ok then
+    return false
+  end
+  for _, file in ipairs({ persistence.current(), persistence.current({ branch = false }) }) do
+    if vim.fn.filereadable(file) == 1 then
+      vim.fn.delete(file)
+    end
+  end
+  return true
+end
+
 --- Keep the explorer sidebar out of the session file: its scratch buffer
 --- comes back as an empty split with a [No Name] buffer. Close it before
 --- the save, remember that it was open (a global the session's "globals"
 --- option carries), and reopen it after the load.
 function M.setup()
   local group = vim.api.nvim_create_augroup("session_explorer", { clear = true })
+  vim.api.nvim_create_autocmd("VimLeavePre", {
+    group = group,
+    callback = M.forget_if_empty,
+  })
   vim.api.nvim_create_autocmd("User", {
     group = group,
     pattern = "PersistenceSavePre",
