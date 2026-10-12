@@ -509,30 +509,27 @@ end
 --- `runs` names a node whose consecutive siblings fold as one range of
 --- the given kind (a run of `#include`s, like Go's import block).
 ---@type table<string, { nodes?: string, runs?: { query: string, kind: string } }>
-local supplements = {
-  -- elements, fragments (elements with an empty name), self-closing
-  -- elements, and opening tags that wrap (the attribute list on its own)
-  tsx = { nodes = "[(jsx_element) (jsx_self_closing_element) (jsx_opening_element)] @e" },
-  javascript = { nodes = "[(jsx_element) (jsx_self_closing_element) (jsx_opening_element)] @e" },
-  -- every bracketed region: the function (so a wrapped signature folds as
-  -- parameters + body like Go's), blocks, case, literals, argument lists
-  gleam = {
-    nodes = "[(function) (function_parameters) (block) (case) (anonymous_function)"
-      .. " (arguments) (data_constructor_arguments) (record_update)"
-      .. " (list) (tuple) (bit_array) (unqualified_imports)] @e",
-  },
-  c = {
-    nodes = "[(preproc_ifdef) (preproc_if)] @e",
-    runs = { query = "(preproc_include) @e", kind = "imports" },
-  },
-  cpp = {
-    nodes = "[(preproc_ifdef) (preproc_if)] @e",
-    runs = { query = "(preproc_include) @e", kind = "imports" },
-  },
+local supplements = {}
+-- elements, fragments (elements with an empty name), self-closing
+-- elements, and opening tags that wrap (the attribute list on its own)
+local jsx = { nodes = "[(jsx_element) (jsx_self_closing_element) (jsx_opening_element)] @e" }
+supplements.tsx, supplements.javascript = jsx, jsx
+-- every bracketed region: the function (so a wrapped signature folds as
+-- parameters + body like Go's), blocks, case, literals, argument lists
+supplements.gleam = {
+  nodes = "[(function) (function_parameters) (block) (case) (anonymous_function)"
+    .. " (arguments) (data_constructor_arguments) (record_update)"
+    .. " (list) (tuple) (bit_array) (unqualified_imports)] @e",
 }
+-- preprocessor conditionals through their `#endif`; `#include` runs
+local preproc = {
+  nodes = "[(preproc_ifdef) (preproc_if)] @e",
+  runs = { query = "(preproc_include) @e", kind = "imports" },
+}
+supplements.c, supplements.cpp = preproc, preproc
 
---- The rows each capture of the query spans, 0-based, last row exclusive
---- of a node ending at column 0.
+--- The rows each capture of the query spans, 0-based and sorted; a node
+--- ending at column 0 ends on the row before.
 local function captured_rows(buf, parser, lang, query_text)
   local ok, query = pcall(vim.treesitter.query.parse, lang, query_text)
   if not ok then
