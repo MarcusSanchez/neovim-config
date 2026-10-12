@@ -203,8 +203,12 @@ map({ "n", "x" }, "B", "E", opts("Next WORD End"))
 -- Shift+U to redo
 map("n", "<S-U>", "<C-R>", opts("Redo"))
 
--- ,d to fold under cursor
-map("n", ",d", "za", { desc = "Toggle Fold Under Cursor" })
+-- ,d folds the region at the cursor the way JetBrains does (an if branch,
+-- its else, wrapped parameters: each on its own), or opens the fold there
+-- (lua/util/foldranges.lua)
+map("n", ",d", function()
+  require("util.foldranges").toggle()
+end, { desc = "Toggle Fold Under Cursor" })
 
 -- ,r to rename symbol under cursor
 map("n", ",r", "<leader>cr", { remap = true, desc = "Rename Symbol Under Cursor" })

@@ -11,17 +11,28 @@
 -- (`}`, `});`, `}, log)` …); IntelliJ, and the fold line
 -- `func main() { ... }`, want the closer inside the fold. So a range still
 -- missing a closer grows onto the next line when that line starts with one.
--- Where that line also opens another range (`) -> R {`, `} else {`,
--- `}).catch(() => {`), a line can only belong to one fold, so the range
--- opening there starts where the closing one does instead: the parameters
--- read `fn f( ... ) -> R {` and the body folds as the whole function; an if
--- branch reads `if x { ... } else {` and the else branch folds the chain.
+--
+-- That leaves lines two regions share: `) -> R {` ends the parameters and
+-- opens the body, `} else {` ends one branch and opens the next. Vim gives
+-- a line to one fold, so the shared line's owner is decided when a fold is
+-- made (M.fold, behind ,d): fold the if branch and it reads
+-- `if x { ... } else {`; fold the else branch instead and it reads
+-- `} else { ... }` with the if body open. When the neighbour is already
+-- closed, the fold grows to the chain both belong to:
+-- `if x { ... } else { ... }`, `fn f( ... ) -> R { ... }`.
 local M = {}
 
 local api = vim.api
 
+---@class util.foldranges.Range 0-based rows, closer included
+---@field s integer
+---@field e integer
+---@field kind? string
+
 ---@class util.foldranges.State
----@field levels table<integer, { [1]: integer, [2]: string? }>? row -> level, ">"/"<"
+---@field ranges util.foldranges.Range[]? the server's ranges, normalised; neighbours may share a line
+---@field owners table<integer, "start"|"end"> who gets a shared row: the range starting or the one ending there
+---@field levels table<integer, { [1]: integer, [2]: string? }>? row -> level and ">" where a fold starts, from the resolved ranges
 
 local states = {} ---@type table<integer, util.foldranges.State>
 
@@ -58,10 +69,19 @@ local function balance(lines, first, last)
   return net
 end
 
---- Server folding ranges, normalised so a closed fold hides its closer.
+local function by_start(a, b)
+  if a.s ~= b.s then
+    return a.s < b.s
+  end
+  return a.e > b.e
+end
+
+--- Server folding ranges, normalised: each one runs through its closing
+--- bracket, so neighbours like an if and its else share that line; a chain
+--- of such neighbours also gets one range covering all of it.
 ---@param ranges lsp.FoldingRange[]
 ---@param lines string[] the buffer's lines
----@return lsp.FoldingRange[]
+---@return util.foldranges.Range[]
 function M.normalize(ranges, lines)
   local list = {}
   for _, r in ipairs(ranges) do
@@ -69,77 +89,119 @@ function M.normalize(ranges, lines)
       list[#list + 1] = { s = r.startLine, e = r.endLine, kind = r.kind }
     end
   end
-  -- later starts first, so a range is final before an earlier one looks at it
-  table.sort(list, function(a, b)
-    if a.s ~= b.s then
-      return a.s > b.s
-    end
-    return a.e < b.e
-  end)
-  local starts = {} ---@type table<integer, table[]>
-  for _, r in ipairs(list) do
-    starts[r.s] = starts[r.s] or {}
-    table.insert(starts[r.s], r)
-  end
   for _, r in ipairs(list) do
     local n = r.e + 1
     local text = lines[n + 1]
     if text and leading_closer(text) and balance(lines, r.s, r.e) > 0 then
       r.e = n -- `}`, `});`, `}, log)`, `).bar()`: the closer joins the fold
-      -- `) -> R {`, `} else {`: what opens on that line starts here instead
-      for _, b in ipairs(starts[n] or {}) do
-        b.s = r.s
-      end
     end
   end
+  -- a chain (if / else if / else; parameters / body) folds as one too
+  local starts = {} ---@type table<integer, util.foldranges.Range[]>
+  for _, r in ipairs(list) do
+    starts[r.s] = starts[r.s] or {}
+    table.insert(starts[r.s], r)
+  end
+  local function chain_end(r, seen)
+    local e = r.e
+    for _, b in ipairs(starts[r.e] or {}) do
+      if b ~= r and b.s ~= r.s and not seen[b] then
+        seen[b] = true
+        e = math.max(e, chain_end(b, seen))
+      end
+    end
+    return e
+  end
+  local unions = {}
+  for _, r in ipairs(list) do
+    local e = chain_end(r, { [r] = true })
+    if e > r.e then
+      unions[#unions + 1] = { s = r.s, e = e }
+    end
+  end
+  vim.list_extend(list, unions)
   local out, seen = {}, {}
   for _, r in ipairs(list) do
     local key = r.s .. ":" .. r.e
-    if r.e > r.s and not seen[key] then
+    if not seen[key] then
       seen[key] = true
-      out[#out + 1] = { startLine = r.s, endLine = r.e, kind = r.kind }
+      out[#out + 1] = { s = r.s, e = r.e, kind = r.kind }
     end
   end
-  -- a line can start a fold or end another, not both: the ending one gives way
-  local opens = {} ---@type table<integer, true>
-  for _, r in ipairs(out) do
-    opens[r.startLine] = true
-  end
-  local final = {}
-  for _, r in ipairs(out) do
-    if opens[r.endLine] and r.endLine ~= r.startLine then
-      r.endLine = r.endLine - 1
-    end
-    if r.endLine > r.startLine then
-      final[#final + 1] = r
-    end
-  end
-  table.sort(final, function(a, b)
-    if a.startLine ~= b.startLine then
-      return a.startLine < b.startLine
-    end
-    return a.endLine > b.endLine
-  end)
-  return final
+  table.sort(out, by_start)
+  return out
 end
 
---- Fold levels per row from normalised ranges, in 'foldexpr' terms.
-local function levels_of(ranges)
-  local levels = {}
+--- The ranges as folds Vim can hold: every shared row goes to the range
+--- the owners table names (the one ending there unless told otherwise),
+--- and the other one gives up that row.
+---@param ranges util.foldranges.Range[]
+---@param owners table<integer, "start"|"end">
+---@return util.foldranges.Range[]
+function M.resolve(ranges, owners)
+  local ends, starts = {}, {}
   for _, r in ipairs(ranges) do
-    for row = r.startLine, r.endLine do
+    ends[r.e] = true
+    starts[r.s] = true
+  end
+  local out, seen = {}, {}
+  for _, r in ipairs(ranges) do
+    local s, e = r.s, r.e
+    if starts[e] and owners[e] == "start" then
+      e = e - 1 -- the range starting on our last row owns it
+    end
+    if ends[s] and owners[s] ~= "start" then
+      s = s + 1 -- the range ending on our first row owns it
+    end
+    local key = s .. ":" .. e
+    if e > s and not seen[key] then
+      seen[key] = true
+      out[#out + 1] = { s = s, e = e, kind = r.kind }
+    end
+  end
+  return out
+end
+
+--- Fold levels per row, in 'foldexpr' terms: the level, ">" where a fold
+--- starts, and "<" where one ends and Vim couldn't tell otherwise. Vim ends
+--- an unmarked fold when the level drops, but a "<" line ends every deeper
+--- fold still open there too, pulling it onto that line. So a fold's end
+--- is marked when the next row is as deep or deeper (the parameters end,
+--- the body and its first statement start) or is itself marked — and
+--- otherwise left to the drop, since a "<" can only name one level and
+--- would drag an unmarked outer fold along.
+---@param ranges util.foldranges.Range[] resolved: no two share a row
+function M.levels(ranges)
+  local levels, ends, last = {}, {}, 0
+  for _, r in ipairs(ranges) do
+    for row = r.s, r.e do
       local l = levels[row] or { 0 }
       l[1] = l[1] + 1
       levels[row] = l
     end
+    ends[r.e] = true
+    last = math.max(last, r.e)
+  end
+  local next_marked = false
+  for row = last, 0, -1 do
+    local marked = false
+    if ends[row] then
+      local next_row = levels[row + 1]
+      marked = next_marked or (next_row ~= nil and next_row[1] >= levels[row][1])
+      if marked then
+        levels[row][2] = "<"
+      end
+    end
+    next_marked = marked
   end
   for _, r in ipairs(ranges) do
-    levels[r.endLine][2] = "<"
-  end
-  for _, r in ipairs(ranges) do
-    levels[r.startLine][2] = ">"
+    levels[r.s][2] = ">"
   end
   return levels
+end
+
+local function relevel(st)
+  st.levels = M.levels(M.resolve(st.ranges, st.owners))
 end
 
 -- the fold expression -----------------------------------------------------------
@@ -163,6 +225,18 @@ function M.foldexpr(lnum)
     return vim.treesitter.foldexpr(lnum)
   end
   return indent_level(lnum)
+end
+
+--- The buffer's normalised server ranges, 1-based `{ start, stop }` pairs
+--- (for tests and :lua inspection); nil without server folds.
+function M.ranges(buf)
+  local st = states[buf == 0 and api.nvim_get_current_buf() or buf]
+  if not (st and st.ranges) then
+    return nil
+  end
+  return vim.tbl_map(function(r)
+    return { r.s + 1, r.e + 1 }
+  end, st.ranges)
 end
 
 --- Whether the buffer's folds come from its language server.
@@ -208,31 +282,42 @@ local function update(buf)
   foldupdate(buf)
 end
 
---- Shift the levels for lines inserted or deleted since the last answer,
+--- Shift the state for lines inserted or deleted since the last answer,
 --- so folds don't jump while the next one is on its way.
-local function shift(levels, start_row, old_rows, new_rows)
+local function shift(st, start_row, old_rows, new_rows)
   local delta = new_rows - old_rows
-  if delta == 0 then
-    return levels
+  if delta == 0 or not st.levels then
+    return
   end
-  local out = {}
-  for row, l in pairs(levels) do
+  local function moved(row)
     if row < start_row then
-      out[row] = l
+      return row
     elseif delta > 0 or row >= start_row - delta then
-      out[row + delta] = l
+      return row + delta
     end
+  end
+  local levels, owners = {}, {}
+  for row, l in pairs(st.levels) do
+    local to = moved(row)
+    if to then
+      levels[to] = l
+    end
+  end
+  for row, who in pairs(st.owners) do
+    local to = moved(row)
+    if to then
+      owners[to] = who
+    end
+  end
+  for _, r in ipairs(st.ranges) do
+    r.s, r.e = moved(r.s) or start_row, moved(r.e) or start_row
   end
   if delta > 0 then
-    local prev = out[start_row - 1]
-    -- new lines take "undefined" (-1), unless they follow a fold's last
-    -- line, where -1 would be read as a new fold start
-    local fill = prev and prev[2] == "<" and { prev[1] - 1 } or { -1 }
     for row = start_row, start_row + delta - 1 do
-      out[row] = fill
+      levels[row] = { -1 } -- undefined: the lower of the neighbours' levels
     end
   end
-  return out
+  st.levels, st.owners = levels, owners
 end
 
 local function request(buf)
@@ -262,13 +347,126 @@ local function request(buf)
     -- what's closed across the rebuild, then apply saved folds that had no
     -- matching fold until now
     local closed = first and folds.snapshot(buf) or nil
-    st.levels = levels_of(M.normalize(ranges, lines))
+    st.ranges = M.normalize(ranges, lines)
+    relevel(st)
     update(buf)
     if first then
       folds.restore(buf, closed)
       folds.rebuilt(buf)
     end
   end)
+end
+
+-- folding ------------------------------------------------------------------------
+
+--- The smallest range holding the row, preferring one that starts on it.
+local function range_at(st, row)
+  local best
+  for _, r in ipairs(st.ranges) do
+    if r.s <= row and row <= r.e then
+      local starts = r.s == row
+      if not best or (starts and best.s ~= row) or (starts == (best.s == row) and r.e - r.s < best.e - best.s) then
+        best = r
+      end
+    end
+  end
+  return best
+end
+
+--- The smallest range strictly containing r.
+local function parent_of(st, r)
+  local best
+  for _, p in ipairs(st.ranges) do
+    if p.s <= r.s and r.e <= p.e and (p.s < r.s or p.e > r.e) and (not best or p.e - p.s < best.e - best.s) then
+      best = p
+    end
+  end
+  return best
+end
+
+--- Make the fold for the range at rows s..e in the window: claim its shared
+--- rows (so it reads `if x { ... } else {`, or `} else { ... }`), unless a
+--- neighbour holding one is already closed — then the chain they both
+--- belong to is the fold. Returns the 1-based lines of the fold to close,
+--- or nil when the buffer has no server folds or no such range.
+---@return integer? start, integer? stop
+function M.fold(buf, win, s, e)
+  local st = states[buf]
+  if not (st and st.levels) then
+    return
+  end
+  local r
+  for _, x in ipairs(st.ranges) do
+    if x.s == s and x.e == e then
+      r = x
+      break
+    end
+  end
+  if not r then
+    return
+  end
+  local shared = {} ---@type table<integer, "start"|"end"> row -> what r is there
+  for _, o in ipairs(st.ranges) do
+    if o ~= r and o.s ~= r.s and o.e == r.s then
+      shared[r.s] = "start"
+    end
+    if o ~= r and o.e ~= r.e and o.s == r.e then
+      shared[r.e] = "end"
+    end
+  end
+  local blocked = false
+  api.nvim_win_call(win, function()
+    for row in pairs(shared) do
+      local closed = vim.fn.foldclosed(row + 1)
+      if closed ~= -1 and not (closed - 1 <= r.s and vim.fn.foldclosedend(row + 1) - 1 >= r.e) then
+        blocked = true -- the neighbour holding that row is closed
+      end
+    end
+  end)
+  if blocked then
+    local p = parent_of(st, r)
+    if not p then
+      return
+    end
+    return M.fold(buf, win, p.s, p.e)
+  end
+  local changed = false
+  for row, who in pairs(shared) do
+    if st.owners[row] ~= who then
+      st.owners[row] = who
+      changed = true
+    end
+  end
+  if changed then
+    relevel(st)
+    foldupdate(buf)
+  end
+  return r.s + 1, r.e + 1
+end
+
+--- ,d: open the closed fold at the cursor, else fold the region there.
+function M.toggle()
+  local buf, win = api.nvim_get_current_buf(), api.nvim_get_current_win()
+  local lnum = api.nvim_win_get_cursor(win)[1]
+  local st = states[buf]
+  if not (st and st.levels) then
+    vim.cmd("normal! za") -- treesitter's or indent folds: Vim's toggle
+    return
+  end
+  if vim.fn.foldclosed(lnum) ~= -1 then
+    vim.cmd("normal! zo")
+    return
+  end
+  local r = range_at(st, lnum - 1)
+  local s, e
+  if r then
+    s, e = M.fold(buf, win, r.s, r.e)
+  end
+  if not s then
+    vim.notify("Nothing to fold here", vim.log.levels.INFO, { title = "Fold" })
+    return
+  end
+  require("util.folds").close_exact(s, e)
 end
 
 local function supports(client, buf)
@@ -285,16 +483,14 @@ function M.setup()
         return
       end
       if not states[ev.buf] then
-        local st = {}
+        local st = { owners = {} }
         states[ev.buf] = st
         api.nvim_buf_attach(ev.buf, false, {
           on_bytes = function(_, _, _, start_row, _, _, old_row, _, _, new_row)
             if states[ev.buf] ~= st then
               return true
             end
-            if st.levels then
-              st.levels = shift(st.levels, start_row, old_row, new_row)
-            end
+            shift(st, start_row, old_row, new_row)
           end,
           on_reload = function()
             if states[ev.buf] == st then

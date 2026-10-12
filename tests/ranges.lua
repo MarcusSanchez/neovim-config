@@ -20,7 +20,7 @@ local N = require("util.foldranges").normalize
 local function shapes(ranges, lines)
   local out = {}
   for _, r in ipairs(N(ranges, lines)) do
-    out[#out + 1] = (r.startLine + 1) .. ".." .. (r.endLine + 1)
+    out[#out + 1] = (r.s + 1) .. ".." .. (r.e + 1)
   end
   return table.concat(out, " ")
 end
@@ -216,10 +216,12 @@ local ok, err = pcall(function()
       "14..16",
       "18..52",
       "18..22",
+      "22..52",
       "23..30",
       "26..29",
       "31..35",
       "31..33",
+      "33..35",
       "36..41",
       "37..39",
       "42..46",
@@ -252,10 +254,12 @@ local ok, err = pcall(function()
       "10..13",
       "15..20",
       "15..18",
+      "18..20",
       "22..47",
       "23..26",
       "27..31",
       "27..29",
+      "29..31",
       "32..35",
       "36..38",
       "39..41",
@@ -291,54 +295,80 @@ local ok, err = pcall(function()
       "15..18",
       "19..23",
       "19..21",
+      "21..23",
       "24..30",
       "26..29",
       "31..35",
       "31..33",
+      "33..35",
       "36..39",
       "42..46",
       "43..45",
     }, " ")
   )
-  -- idempotent: normalising the result changes nothing
-  local once = N({
-    { startLine = 2, endLine = 4, kind = "imports" },
-    { startLine = 7, endLine = 8, kind = "comment" },
-    { startLine = 9, endLine = 11 },
-    { startLine = 14, endLine = 16 },
-    { startLine = 17, endLine = 18 },
-    { startLine = 21, endLine = 45 },
-    { startLine = 22, endLine = 24 },
-    { startLine = 22, endLine = 24 },
-    { startLine = 26, endLine = 27 },
-    { startLine = 28, endLine = 29 },
-    { startLine = 31, endLine = 33 },
-    { startLine = 35, endLine = 36 },
-    { startLine = 35, endLine = 36 },
-    { startLine = 38, endLine = 40 },
-    { startLine = 41, endLine = 43 },
-  }, go)
+  -- shared rows: resolve() hands each one to its owner — the range ending
+  -- there unless the owners table says the one starting there — so Vim
+  -- never sees two folds on a line
+  local R = require("util.foldranges").resolve
+  local function resolved(ranges, owners)
+    local out = {}
+    for _, r in ipairs(R(ranges, owners)) do
+      out[#out + 1] = (r.s + 1) .. ".." .. (r.e + 1)
+    end
+    return table.concat(out, " ")
+  end
+  local chain = {
+    { s = 14, e = 19 },
+    { s = 14, e = 17 },
+    { s = 17, e = 19 },
+    { s = 26, e = 30 },
+    { s = 26, e = 28 },
+    { s = 28, e = 30 },
+  }
   check(
-    "normalising twice is the same",
-    shapes(once, go),
-    shapes({
-      { startLine = 2, endLine = 4, kind = "imports" },
-      { startLine = 7, endLine = 8, kind = "comment" },
-      { startLine = 9, endLine = 11 },
-      { startLine = 14, endLine = 16 },
-      { startLine = 17, endLine = 18 },
-      { startLine = 21, endLine = 45 },
-      { startLine = 22, endLine = 24 },
-      { startLine = 22, endLine = 24 },
-      { startLine = 26, endLine = 27 },
-      { startLine = 28, endLine = 29 },
-      { startLine = 31, endLine = 33 },
-      { startLine = 35, endLine = 36 },
-      { startLine = 35, endLine = 36 },
-      { startLine = 38, endLine = 40 },
-      { startLine = 41, endLine = 43 },
-    }, go)
+    "by default the ending range keeps the shared row",
+    resolved(chain, {}),
+    "15..20 15..18 19..20 27..31 27..29 30..31"
   )
+  check(
+    "an owner named for the row hands it to the range starting there",
+    resolved(chain, { [17] = "start", [28] = "start" }),
+    "15..20 15..17 18..20 27..31 27..28 29..31"
+  )
+  check(
+    "a row no range shares is untouched by owners",
+    resolved(chain, { [15] = "start" }),
+    "15..20 15..18 19..20 27..31 27..29 30..31"
+  )
+  -- fold levels: a "<" only where Vim needs one (next row as deep, or itself
+  -- marked), never where the level drops, since "<" drags unmarked folds
+  local L = require("util.foldranges").levels
+  local function marks(levels, rows)
+    local out = {}
+    for _, row in ipairs(rows) do
+      local l = levels[row - 1]
+      out[#out + 1] = row .. "=" .. (l and ((l[2] or "") .. l[1]) or "0")
+    end
+    return table.concat(out, " ")
+  end
+  local lv = L(R(
+    N({
+      { startLine = 12, endLine = 52 },
+      { startLine = 17, endLine = 51 },
+      { startLine = 17, endLine = 20 },
+      { startLine = 21, endLine = 51 },
+      { startLine = 22, endLine = 29 },
+      { startLine = 25, endLine = 28 },
+      { startLine = 25, endLine = 27 },
+      { startLine = 30, endLine = 34 },
+      { startLine = 30, endLine = 31 },
+      { startLine = 32, endLine = 34 },
+    }, rust),
+    {}
+  ))
+  check("parameters' end marked: body and let start deeper right after", marks(lv, { 22, 23 }), "22=<3 23=>4")
+  check("map literal's end marked because the let's end is marked", marks(lv, { 29, 30, 31 }), "29=<5 30=<4 31=>5")
+  check("fn and body end unmarked: the level drops to the impl", marks(lv, { 51, 52, 53, 54 }), "51=3 52=3 53=1 54=0")
   -- a comment range keeps its kind
   local kinds = {}
   for _, r in
@@ -361,7 +391,7 @@ local ok, err = pcall(function()
     }, go))
   do
     if r.kind then
-      kinds[#kinds + 1] = (r.startLine + 1) .. "=" .. r.kind
+      kinds[#kinds + 1] = (r.s + 1) .. "=" .. r.kind
     end
   end
   check("kinds survive", table.concat(kinds, " "), "3=imports 8=comment")

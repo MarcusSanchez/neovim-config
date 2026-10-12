@@ -92,30 +92,34 @@ local function locate(fold, lines)
   end
 end
 
---- Close the fold spanning exactly start..stop; leave things open if the
---- fold structure there no longer matches.
-local function close_exact(start, stop)
+--- Close the fold spanning exactly start..stop in the current window,
+--- closing nothing else; false if no fold has exactly those lines.
+--- `foldclose` at a line closes the innermost open fold holding it (or
+--- the parent of a closed one), so try each line of the target, undoing
+--- a close that turned out to be some other fold.
+function M.close_exact(start, stop)
   local function closed()
     return vim.fn.foldclosed(start) == start and vim.fn.foldclosedend(start) == stop
   end
   if closed() then
-    return true -- re-applying: foldclose on a closed fold would close its parent
+    return true
   end
-  for _ = 1, 20 do -- one nesting level per foldclose
-    if vim.fn.foldlevel(start) == 0 then
-      return false
-    end
-    vim.cmd(("silent! %dfoldclose"):format(start))
+  local l = start
+  while l <= stop do
+    local before = vim.fn.foldclosed(l)
+    vim.cmd(("silent! %dfoldclose"):format(l))
+    local s, e = vim.fn.foldclosed(l), vim.fn.foldclosedend(l)
     if closed() then
       return true
     end
-    local s, e = vim.fn.foldclosed(start), vim.fn.foldclosedend(start)
-    if s ~= -1 and (s < start or e > stop) then
-      vim.cmd(("silent! %d,%dfoldopen"):format(s, e)) -- overshot: undo it
-      return false
-    end
-    if s == -1 then
-      return false
+    if s == before then
+      l = s == -1 and l + 1 or e + 1 -- nothing closed here: no fold holds this line
+    else
+      vim.cmd(("silent! %d,%dfoldopen"):format(l, l)) -- not it: undo
+      if s < start or e > stop then
+        return false -- the innermost open fold here is bigger: no such fold
+      end
+      l = e + 1
     end
   end
   return false
@@ -129,12 +133,21 @@ end
 local function apply(buf, win, folds, applied, only_pending)
   local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
   applied = applied or {}
+  local ranges = require("util.foldranges")
   vim.api.nvim_win_call(win, function()
     for i, fold in ipairs(folds) do
       if not (only_pending and applied[i]) then
         local at = locate(fold, lines)
-        if at and vim.fn.foldlevel(at) > 0 and close_exact(at, at + fold.stop - fold.start) then
-          applied[i] = true
+        if at then
+          local start, stop = at, at + fold.stop - fold.start
+          -- a server fold first claims the rows it shares with a neighbour
+          local s, e = ranges.fold(buf, win, start - 1, stop - 1)
+          if s then
+            start, stop = s, e
+          end
+          if vim.fn.foldlevel(start) > 0 and M.close_exact(start, stop) then
+            applied[i] = true
+          end
         end
       end
     end
@@ -265,7 +278,7 @@ function M.restore(buf, closed)
     if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == buf then
       vim.api.nvim_win_call(win, function()
         for _, fold in ipairs(folds) do
-          close_exact(fold.start, fold.stop)
+          M.close_exact(fold.start, fold.stop)
         end
       end)
     end

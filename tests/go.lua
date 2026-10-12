@@ -229,9 +229,13 @@ vim.schedule(function()
     end
     check("the fold expression is ours", vim.wo.foldexpr, "v:lua.require('util.foldranges').foldexpr()")
     check("folds come from gopls", server_folds(), true)
-    vim.cmd("normal! 9Gzc")
+    local function fold(l) -- ,d on line l
+      vim.cmd(("normal! %dG"):format(l))
+      FR.toggle()
+    end
+    fold(9)
     check(
-      "zc on func main folds through its closing brace",
+      ",d on func main folds through its closing brace",
       vim.fn.foldclosed(9) .. ".." .. vim.fn.foldclosedend(9),
       "9..13"
     )
@@ -283,7 +287,7 @@ vim.schedule(function()
       require("rainbow-delimiters.lib").attach(0)
     end)
     server_folds()
-    vim.cmd("normal! 6Gzc")
+    fold(6)
     check("literal fold reads right", vim.fn.foldtextresult(6), "    x := g(1, func() int { ... })")
     chunks = nil
     vim.wo.foldtext = "v:lua.__fold_probe()"
@@ -310,9 +314,9 @@ vim.schedule(function()
     -- the parameter list is its own fold: zc on `func h(` folds just it,
     -- through its closing `) int {` line (the body that opens there folds
     -- with the whole function: a line belongs to one fold)
-    vim.cmd("normal! 3Gzc")
+    fold(3)
     check(
-      "zc on the signature folds the parameters only",
+      ",d on the signature folds the parameters only",
       vim.fn.foldclosed(3) .. ".." .. vim.fn.foldclosedend(3),
       "3..6"
     )
@@ -330,14 +334,26 @@ vim.schedule(function()
     end
     check("its ) is dim like the ( it pairs with", got[")"], "FoldEllipsis")
     check("the { opening the visible body is not dim", got["{"] ~= nil and got["{"] ~= "FoldEllipsis", true)
-    -- a second zc folds the whole function
-    vim.cmd("normal! 3Gzc")
-    check("second zc folds the whole function", vim.fn.foldclosed(3) .. ".." .. vim.fn.foldclosedend(3), "3..8")
+    -- ,d on the closed fold opens it
+    fold(3)
+    check(",d again opens the parameters", vim.fn.foldclosed(3), -1)
+    -- the body folds on its own from its `) int {` line, parameters open
+    fold(7)
+    check(",d in the body folds the body only", vim.fn.foldclosed(7) .. ".." .. vim.fn.foldclosedend(7), "6..8")
+    check("body fold line", vim.fn.foldtextresult(6), ") int { ... }")
+    check("the parameters stay open above it", vim.fn.foldclosed(3), -1)
+    -- folding the parameters while the body is folded: the whole function
+    fold(3)
+    check(
+      "parameters over a folded body: the whole function",
+      vim.fn.foldclosed(3) .. ".." .. vim.fn.foldclosedend(3),
+      "3..8"
+    )
     check("whole-function fold line", vim.fn.foldtextresult(3), "func h( ... ) int { ... }")
-    -- zc inside the body folds the whole function too (no separate body fold)
-    vim.cmd("normal! zR")
-    vim.cmd("normal! 7Gzc")
-    check("zc in the body folds the whole function", vim.fn.foldclosed(7) .. ".." .. vim.fn.foldclosedend(7), "3..8")
+    -- opening it leaves the body folded
+    fold(3)
+    check("opening the function keeps the body folded", vim.fn.foldclosed(6) .. ".." .. vim.fn.foldclosedend(6), "6..8")
+    check("and the signature open", vim.fn.foldclosed(3), -1)
     vim.cmd("normal! zR")
     vim.cmd("buffer main.go")
     vim.api.nvim_buf_delete(gb, { force = true })
@@ -351,9 +367,9 @@ vim.schedule(function()
     vim.cmd("edit rest.go")
     local rb = vim.api.nvim_get_current_buf()
     server_folds()
-    vim.cmd("normal! 5Gzc")
+    fold(5)
     check(
-      "zc inside a composite literal folds through `}, log)`",
+      ",d inside a composite literal folds through `}, log)`",
       vim.fn.foldclosed(5) .. ".." .. vim.fn.foldclosedend(5),
       "4..6"
     )
@@ -370,9 +386,9 @@ vim.schedule(function()
     vim.cmd("edit args.go")
     local ab = vim.api.nvim_get_current_buf()
     server_folds()
-    vim.cmd("normal! 6Gzc")
+    fold(6)
     check(
-      "zc inside wrapped arguments folds them through `)`",
+      ",d inside wrapped arguments folds them through `)`",
       vim.fn.foldclosed(6) .. ".." .. vim.fn.foldclosedend(6),
       "4..7"
     )
@@ -389,7 +405,7 @@ vim.schedule(function()
     vim.cmd("edit str.go")
     local sb = vim.api.nvim_get_current_buf()
     server_folds()
-    vim.cmd("normal! 3Gzc")
+    fold(3)
     check("folded raw string shows its closing quote", vim.fn.foldtextresult(3), "var q = ` ... `")
     chunks = nil
     vim.wo.foldtext = "v:lua.__fold_probe()"
