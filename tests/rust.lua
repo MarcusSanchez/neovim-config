@@ -232,8 +232,21 @@ vim.schedule(function()
     check("macro fold line", vim.fn.foldtextresult(42), "        println!( ... );")
     vim.cmd("normal! zR")
     fold(62) -- inside a condition wrapped over three lines before its `{`
-    check(",d in a wrapped condition folds the whole if", range(62), "61..66")
-    check("its fold line shows the condition elided, then the body", vim.fn.foldtextresult(61), "    if x ... { ... }")
+    check(",d in a wrapped condition folds the condition through its `{`", range(62), "61..64")
+    check("condition fold line", vim.fn.foldtextresult(61), "    if x ... {")
+    check("the body stays open under it", vim.fn.foldclosed(65), -1)
+    fold(65)
+    check(",d in the body while the condition is folded: the whole if", range(65), "61..66")
+    check(
+      "whole-if fold line shows the condition elided, then the body",
+      vim.fn.foldtextresult(61),
+      "    if x ... { ... }"
+    )
+    vim.cmd("normal! zR")
+    fold(65)
+    check(",d in the body alone folds the body from its `{`", range(65), "64..66")
+    check("body fold line", vim.fn.foldtextresult(64), "    { ... }")
+    check("the condition stays open above it", vim.fn.foldclosed(62), -1)
 
     vim.cmd("normal! zR")
   end)

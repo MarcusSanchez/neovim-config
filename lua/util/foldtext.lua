@@ -381,6 +381,19 @@ function M.text()
   -- fold reads `fn send( ... ) -> Result<(), Error> {`
   local _, hl = highlighted(buf, lnum, line)
   local dim_from = select(2, trailing_openers(line))
+  if not tail and last:match("^%s*[%({%[]") and last_lnum > lnum then
+    -- a head fold ends on the line that opens the body (`{` alone under a
+    -- wrapped condition): show it, so `if self` … `{` reads `if self ... {`
+    chunks[#chunks + 1] = { " ... ", "FoldEllipsis" }
+    local seg = highlighted(buf, last_lnum, last)
+    if seg[1] and seg[1][1]:match("^%s+$") then
+      table.remove(seg, 1)
+    elseif seg[1] then
+      seg[1][1] = seg[1][1]:gsub("^%s+", "")
+    end
+    vim.list_extend(chunks, seg)
+    return chunks
+  end
   chunks[#chunks + 1] = { tail and " ... " or " ...", "FoldEllipsis" }
   if tail and tail:match("^[</>]") then
     -- a closing tag keeps its own colours (the one closer that isn't dim:

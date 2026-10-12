@@ -168,6 +168,19 @@ function M.normalize(ranges, lines)
     end
   end
   vim.list_extend(list, unions)
+  -- a statement whose body starts lines after it and ends with it (`if self`
+  -- / `.is_some_and(…)` / `{` … `}`) has a head the server never folds: the
+  -- condition, wrapped. It gets a range through the `{` line, sharing that
+  -- line with the body the way wrapped parameters share `) -> R {`.
+  local heads = {}
+  for _, r in ipairs(list) do
+    for _, b in ipairs(list) do
+      if b ~= r and b.e == r.e and b.s >= r.s + 2 then
+        heads[#heads + 1] = { s = r.s, e = b.s }
+      end
+    end
+  end
+  vim.list_extend(list, heads)
   local out, seen = {}, {}
   for _, r in ipairs(list) do
     local key = r.s .. ":" .. r.e
