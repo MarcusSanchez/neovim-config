@@ -23,21 +23,13 @@ local api = vim.api
 
 local states = {} ---@type table<integer, util.foldcursor.State>
 
---- The caret cell to draw in the fold starting at `start` of the window,
---- if the caret is still there: the text unchanged, the real cursor still
---- where the caret put it.
----@return integer?
-function M.cell_at(win, buf, start)
-  local st = states[win]
-  if not st or st.buf ~= buf or st.start ~= start then
-    return
+--- Set to a function to see the caret's decisions (tests/probing).
+---@type fun(msg: string)?
+M.trace = nil
+local function trace(msg)
+  if M.trace then
+    M.trace(msg)
   end
-  local cur = api.nvim_win_get_cursor(win)
-  if api.nvim_buf_get_changedtick(buf) ~= st.tick or cur[1] ~= st.lnum or cur[2] ~= st.col then
-    states[win] = nil
-    return
-  end
-  return st.cell
 end
 
 local foldtext = require("util.foldtext")
@@ -45,6 +37,39 @@ local foldtext = require("util.foldtext")
 --- The fold line's cells (util/foldtext.lua) for the closed fold.
 local function cells_of(buf, start, stop)
   return foldtext.cells(foldtext.build(buf, start, stop))
+end
+
+--- The caret cell to draw in the fold starting at `start` of the window,
+--- if the caret is still there: the real cursor still where the caret
+--- put it, and that cell still standing for that position.
+---@return integer?
+function M.cell_at(win, buf, start)
+  local st = states[win]
+  if not st or st.buf ~= buf or st.start ~= start then
+    return
+  end
+  local cur = api.nvim_win_get_cursor(win)
+  if cur[1] ~= st.lnum or cur[2] ~= st.col then
+    trace(("cell_at: dropped (cursor %d:%d vs %d:%d)"):format(cur[1], cur[2], st.lnum, st.col))
+    states[win] = nil
+    return
+  end
+  local tick = api.nvim_buf_get_changedtick(buf)
+  if tick ~= st.tick then
+    -- the text changed (or only the tick: a save's pre-save edits): the
+    -- caret stays if its cell still stands for the cursor's position
+    local stop = api.nvim_win_call(win, function()
+      return vim.fn.foldclosedend(st.start)
+    end)
+    local cell = stop ~= -1 and cells_of(buf, st.start, stop)[st.cell]
+    if not (cell and cell.lnum == st.lnum and cell.col == st.col) then
+      trace(("cell_at: dropped (tick %d vs %d, cell moved)"):format(tick, st.tick))
+      states[win] = nil
+      return
+    end
+    st.stop, st.tick = stop, tick
+  end
+  return st.cell
 end
 
 --- The caret's cell: the one it was left on, else the cell standing for
@@ -67,6 +92,12 @@ end
 
 local function visible(c)
   return c.lnum ~= nil
+end
+
+--- A cell drawn as part of the hidden text: the ` ... ` itself, or the
+--- closer drawn dim behind it (the `}` of `func main() { ... }`).
+local function dim(c)
+  return not visible(c) or c.hl == "FoldEllipsis"
 end
 
 --- Nearest visible cell at or after/before index i, stepping by dir.
@@ -232,6 +263,20 @@ local function open_segment(win, buf, start, stop, cells, target, dir)
   end)
 end
 
+--- The fold line ends in hidden text (` ... `, or a dim closer): going
+--- to its end opens that last run and puts the cursor at the end of the
+--- fold's last line.
+local function open_end(win, buf, start, stop, cells)
+  local last = #cells
+  while last > 1 and visible(cells[last]) do
+    last = last - 1 -- back from a dim closer onto the dots
+  end
+  api.nvim_win_set_cursor(win, { start, 0 })
+  open_segment(win, buf, start, stop, cells, last, -1)
+  local line = vim.fn.getline(stop)
+  api.nvim_win_set_cursor(win, { stop, math.max(#line - 1, 0) })
+end
+
 -- Vim's own cursor sits in the fold line's first column whatever the
 -- caret does; while the caret is drawn it's a beam in the line's colour.
 local shown_as ---@type string? 'guicursor' before the cursor was hidden
@@ -271,6 +316,7 @@ end
 --- at the drawn column rather than that position's.
 local function place(win, buf, start, stop, cells, target, curswant)
   local cell = cells[target]
+  trace(("place: cell %d at %d:%d"):format(target, cell.lnum, cell.col))
   api.nvim_win_set_cursor(win, { cell.lnum, cell.col })
   api.nvim_win_call(win, function()
     vim.fn.winrestview({ curswant = curswant or target - 1 })
@@ -301,11 +347,10 @@ local function land(win, buf, lnum, edge)
   if fs ~= -1 then
     local fe = vim.fn.foldclosedend(lnum)
     local cells = cells_of(buf, fs, fe)
-    if edge < 0 and #cells > 0 and not visible(cells[#cells]) then
-      -- the line ends in a ` ... ` (`import ...`): stepping back onto it
-      -- is stepping onto the dots, so the fold opens at its end
-      api.nvim_win_set_cursor(win, { fs, 0 })
-      open_segment(win, buf, fs, fe, cells, #cells, -1)
+    if edge < 0 and #cells > 0 and dim(cells[#cells]) then
+      -- the line ends in hidden text (`import ...`, `{ ... }`): stepping
+      -- back onto it is stepping into the fold, which opens at its end
+      open_end(win, buf, fs, fe, cells)
       return
     end
     local target = edge < 0 and nearest(cells, #cells, -1) or nearest(cells, 1, 1)
@@ -427,7 +472,10 @@ function M.motion(key, run)
     end
     target = math.max(at - count, 1)
   elseif key == "$" then
-    target = nearest(cells, #cells, -1)
+    if dim(cells[#cells]) then
+      return open_end(win, buf, start, stop, cells) -- the end is in the fold
+    end
+    target = #cells
   elseif key == "^" or key == "_" then
     target = 1
     while cells[target] and cells[target].ch:match("^%s$") do
@@ -454,6 +502,7 @@ end
 --- the nearest drawn character to its left if that falls in a ` ... `.
 --- Nothing opens.
 local function arrive()
+  trace("arrive: mode " .. api.nvim_get_mode().mode)
   if api.nvim_get_mode().mode ~= "n" then
     return
   end
@@ -596,12 +645,37 @@ local function insert_leave()
   if not r or r.buf ~= buf then
     return
   end
-  local stop = r.stop + api.nvim_buf_line_count(buf) - r.lines
-  local s, e = require("util.foldranges").fold(buf, win, r.start - 1, stop - 1)
-  if s then
-    require("util.folds").close_exact(s, e)
-    caret_at_cursor(win, buf) -- Esc may still move the cursor: arrive() follows it
-  end
+  -- once Vim is idle: the keys an Esc mapping still has queued (the
+  -- config's stay-put Esc jumps to the `^ mark, and 'foldopen' has
+  -- "mark") would reopen the fold closed here
+  api.nvim_create_autocmd("SafeState", {
+    once = true,
+    callback = function()
+      if not (api.nvim_win_is_valid(win) and api.nvim_win_get_buf(win) == buf) then
+        return
+      end
+      local stop = r.stop + api.nvim_buf_line_count(buf) - r.lines
+      local s, e = require("util.foldranges").fold(buf, win, r.start - 1, stop - 1)
+      local c = api.nvim_win_get_cursor(win)
+      trace(("insert re-close: cursor %d:%d fold %s..%s"):format(c[1], c[2], tostring(s), tostring(e)))
+      if s then
+        require("util.folds").close_exact(s, e)
+        caret_at_cursor(win, buf)
+      end
+    end,
+  })
+end
+
+--- The caret for the cursor's position, when it's on a closed fold (after
+--- ,d closed one around it).
+function M.refresh()
+  caret_at_cursor(api.nvim_get_current_win(), api.nvim_get_current_buf())
+end
+
+--- The caret's record for a window, for tests: nil, or where it was
+--- placed and the changedtick then (validated by cell_at()).
+function M.state(win)
+  return states[win]
 end
 
 --- The hidden-cursor state, for tests: the 'guicursor' value it will go

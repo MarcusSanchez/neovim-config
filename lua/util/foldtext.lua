@@ -14,6 +14,7 @@ local M = {}
 
 ---@class util.foldtext.Cell
 ---@field ch string
+---@field hl string highlight group
 ---@field lnum integer? buffer line, nil for drawn text
 ---@field col integer? 0-based byte column
 
@@ -470,17 +471,17 @@ function M.cells(chunks)
         local ch = raw:sub(b, (starts[n + 1] or #raw + 1) - 1)
         if ch == "\t" then
           for _ = 1, width do
-            cells[#cells + 1] = { ch = " ", lnum = c[3], col = c[4] + b - 1 }
+            cells[#cells + 1] = { ch = " ", hl = c[2], lnum = c[3], col = c[4] + b - 1 }
           end
         else
-          cells[#cells + 1] = { ch = ch, lnum = c[3], col = c[4] + b - 1 }
+          cells[#cells + 1] = { ch = ch, hl = c[2], lnum = c[3], col = c[4] + b - 1 }
         end
       end
     else
       local text = c[1]
       local starts = vim.str_utf_pos(text)
       for n, b in ipairs(starts) do
-        cells[#cells + 1] = { ch = text:sub(b, (starts[n + 1] or #text + 1) - 1) }
+        cells[#cells + 1] = { ch = text:sub(b, (starts[n + 1] or #text + 1) - 1), hl = c[2] }
       end
     end
   end

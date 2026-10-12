@@ -410,6 +410,16 @@ local function foldupdate(buf)
             break
           end
         end
+        -- and the reverse: a fold that was closed and still spans the same
+        -- lines comes out of the rebuild closed (a rebuild right after
+        -- insert mode re-created it open)
+        local after = closed_set(win)
+        for key in pairs(before) do
+          if not after[key] then
+            local s, e = key:match("^(%d+):(%d+)$")
+            require("util.folds").close_exact(tonumber(s), tonumber(e))
+          end
+        end
       end)
     end
   end
@@ -746,6 +756,7 @@ function M.toggle()
     return
   end
   require("util.folds").close_exact(s, e)
+  require("util.foldcursor").refresh()
 end
 
 local function supports(client, buf)

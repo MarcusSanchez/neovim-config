@@ -42,9 +42,13 @@ lib.suite("gopls", function(t)
   local function moved()
     vim.api.nvim_exec_autocmds("CursorMoved", { buffer = buf })
   end
-  local function caret()
-    local stop = vim.fn.foldclosedend(5) > 0 and vim.fn.foldclosedend(5) or 8
-    for _, c in ipairs(FT.render(FT.build(buf, 5, stop), FC.cell_at(win, buf, 5))) do
+  local function caret() -- the caret's character in the closed fold at the cursor
+    local l = vim.api.nvim_win_get_cursor(win)[1]
+    local s = vim.fn.foldclosed(l)
+    if s == -1 then
+      return "none"
+    end
+    for _, c in ipairs(FT.render(FT.build(buf, s, vim.fn.foldclosedend(l)), FC.cell_at(win, buf, s))) do
       if c[2] == "FoldCursor" then
         return c[1]
       end
@@ -61,8 +65,8 @@ lib.suite("gopls", function(t)
     table.concat(cells, " "),
     "f5.0 u5.1 n5.2 c5.3  5.4 h5.5 (5.6   . . .   )8.0  8.1 (8.2 i8.3 n8.4 t8.5 ,8.6  8.7 e8.8 r8.9 r8.10 o8.11 r8.12 )8.13  8.14 {8.15"
   )
+  t.check("folding from a hidden line: the caret on the first cell", cursor() .. " " .. caret(), "5:0 f")
   vim.api.nvim_win_set_cursor(win, { 5, 0 })
-  t.check("no caret before a motion", caret(), "none")
   key("$")
   t.check("$ lands on the `{` of the last line", cursor() .. " " .. caret(), "8:15 {")
   t.check("the fold stays closed", vim.fn.foldclosed(8), 5)
@@ -122,14 +126,17 @@ lib.suite("gopls", function(t)
   t.check("restored to the value from before", FC.hidden(), nil)
   vim.cmd("normal! j")
   key("$")
-  -- an edit drops the caret
+  -- an edit elsewhere keeps the caret (its character still where it was);
+  -- one that moves the character drops it
   t.check("caret back", caret(), "{")
   vim.api.nvim_buf_set_lines(buf, 9, 10, false, { "}", "" })
-  t.check("an edit drops the caret", caret(), "none")
+  t.check("an edit elsewhere keeps the caret", caret(), "{")
+  vim.api.nvim_buf_set_text(buf, 7, 0, 7, 0, { " " })
+  t.check("an edit moving its character drops the caret", caret(), "none")
   vim.api.nvim_exec_autocmds("TextChanged", { buffer = buf })
   t.check("and shows the cursor", vim.o.guicursor:find("FoldHiddenCursor") == nil, true)
   -- a line with two ` ... `: each opens only what it hides
-  vim.api.nvim_buf_set_lines(buf, 9, 11, false, { "}" }) -- the edit undone; gopls answers again
+  vim.api.nvim_buf_set_lines(buf, 7, 11, false, { ") (int, error) {", '\treturn a + b, errors.New("x")', "}" }) -- the edits undone; gopls answers again
   vim.wait(10000, function()
     for _, r in ipairs(FR.ranges(buf) or {}) do
       if r[1] == 5 and r[2] == 10 then
@@ -220,6 +227,7 @@ lib.suite("gopls", function(t)
   key("2x")
   t.check("a count", vim.fn.getline(8) .. " " .. caret(), ") (inrror) { r")
   key("iX<Esc>") -- insert before the caret's `r`: `inXrror`, still parsing
+  vim.api.nvim_exec_autocmds("SafeState", {}) -- the fold closes again once idle
   moved() -- Esc here stays put, after the X (config/keymaps.lua)
   t.check(
     "insert at the caret, then the fold is closed again",
@@ -244,6 +252,44 @@ lib.suite("gopls", function(t)
     return false
   end, 50)
   t.wait(300)
+  -- ,d closing a fold around the cursor gives it the caret
+  vim.cmd("normal! zR")
+  vim.api.nvim_win_set_cursor(win, { 8, 5 })
+  t.fold(8) -- the body, from its `) (int, error) {` line
+  t.check(",d puts the caret where the cursor was", t.span(8) .. " " .. cursor() .. " " .. caret(), "8..10 8:5 t")
+  -- $ / Shift-L into hidden text: the fold line ends in a ` ... ` or the
+  -- dim closer behind it, so the end is inside: that last run opens
+  vim.cmd("normal! zR")
+  t.fold(6)
+  t.fold(9) -- the whole function: `func h( ... ) (int, error) { ... }`
+  vim.api.nvim_win_set_cursor(win, { 5, 0 })
+  key("<S-l>")
+  t.check("Shift-L on a line ending `{ ... }`: the body opens", vim.fn.foldclosed(9) .. " " .. t.span(6), "-1 5..8")
+  t.check("cursor on the closing brace", cursor(), "10:0")
+  vim.cmd("normal! zR")
+  t.fold(15)
+  vim.api.nvim_win_set_cursor(win, { 14, 0 })
+  key("$")
+  t.check(
+    "$ on a line ending in dots: the fold opens, cursor at its end",
+    vim.fn.foldclosed(14) .. " " .. cursor(),
+    "-1 15:5"
+  )
+  vim.cmd("normal! zR")
+  t.fold(6)
+  vim.api.nvim_win_set_cursor(win, { 5, 0 })
+  key("$")
+  t.check("$ on a line ending in a real character: the caret", cursor() .. " " .. caret(), "8:15 {")
+  vim.cmd("normal! zR")
+  t.fold(6)
+  t.fold(9)
+  vim.api.nvim_win_set_cursor(win, { 11, 0 })
+  key("h")
+  t.check(
+    "h from below a `{ ... }` line: the body opens",
+    vim.fn.foldclosed(9) .. " " .. t.span(6) .. " " .. cursor(),
+    "-1 5..8 10:0"
+  )
   -- 'whichwrap' has h and l: off either end of the fold line they go to
   -- the line above / below, and from those lines back onto the fold's
   -- last / first drawn character

@@ -117,6 +117,9 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
   heading for, and leaving keeps it. `h`/`l` wrap across the fold line
   as 'whichwrap' says: off its start to the line above, off its end to
   the line below, and from those back onto its last or first character.
+  `$` (Shift-L), or `h` wrapping up from below, on a line whose end is
+  hidden text (` ... `, or the dim `}` of `{ ... }`) opens that last run
+  and goes to the end of the fold's last line.
   `x`, `X` and `r` edit the character under the caret with the fold
   closed. Insert mode opens the fold (Vim does that on entering it) and
   it closes again on leaving, the caret back on the edited line. `v`
