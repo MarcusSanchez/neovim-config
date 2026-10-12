@@ -86,7 +86,8 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
   its closing bracket the way JetBrains does — servers stop a line short
   and leave `}` / `});` / `}, log)` / `</div>` visible. Treesitter's folds
   serve until the server answers and where none does, and supplement the
-  server for JSX; indentation folds files with no parser.
+  server where it is thin (JSX elements, Gleam's blocks, cases and
+  literals); indentation folds files with no parser.
 - **Fold lines read like the code**: the first line highlighted, then
   ` ... ` and the closer — `func main() { ... }`, `fn f( ... ) -> R { ... }`,
   `<main className="x"> ... </main>`, `<a ... > ... </a>`, `/** ... */`;
@@ -117,12 +118,14 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
 
 ## Tests
 
-`tests/run.sh` drives headless nvim against small Go, Rust, TSX and
-protobuf fixtures and prints PASS/FAIL per behaviour. Suites: `go` (gd/gh,
-usages popup, autosave, popups, fold shapes with gopls), `rust` (gs
-filtering, italics, fold shapes with rust-analyzer), `tsx` (JSX fold
-shapes with the typescript server), `session`, `copilot`, `proto`,
+`tests/run.sh` drives headless nvim against small Go, Rust, TSX, Zig,
+Gleam and protobuf fixtures and prints PASS/FAIL per behaviour. Suites:
+`go` (gd/gh, usages popup, autosave, popups, fold shapes with gopls),
+`rust` (gs filtering, italics, fold shapes with rust-analyzer), `tsx` (JSX
+fold shapes with the typescript server), `zig` (fold shapes with zls:
+nested if/else chains, wrapped signatures), `gleam` (fold shapes with the
+gleam server plus treesitter's), `session`, `copilot`, `proto`,
 `scroll`, `keys` (j/k swaps), `ranges` (the fold-range normaliser against
 captured server output, no server needed) and `folds` (persistence across
 two runs, plain text and treesitter/LSP). Needs gopls, rust-analyzer,
-vtsls and buf.
+vtsls, zls, gleam and buf.

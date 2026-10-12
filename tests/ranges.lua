@@ -529,6 +529,34 @@ local ok, err = pcall(function()
   lv = L(R(N(zls, zig), {}))
   check("a `}` ending an else and its chain is marked at the chain's level", marks(lv, { 8 }), "8=<4")
   check("the outer `} else {` ends the if branch there", marks(lv, { 9, 10 }), "9=<3 10=>5")
+  -- gleam (captured 2026-10-12): the server's range for a wrapped
+  -- signature starts on its `)` line; treesitter's function node (added by
+  -- the supplement) gives the whole, and the two make parameters + body
+  local gleam = {
+    "pub fn insert(",
+    "  tree: Tree(Int),",
+    "  value: Int,",
+    ") -> Tree(Int) {",
+    "  case tree {",
+    "    Leaf -> Node(Leaf, value, Leaf)",
+    "    Node(left, v, right) -> {",
+    "      Node(left, v, insert(right, value))",
+    "    }",
+    "  }",
+    "}",
+  }
+  check(
+    "gleam server + treesitter ranges normalised",
+    shapes({
+      { startLine = 3, endLine = 10 }, -- the server's function, from `)`
+      { startLine = 0, endLine = 10 }, -- treesitter's function
+      { startLine = 0, endLine = 3 }, -- function_parameters
+      { startLine = 3, endLine = 10 }, -- block
+      { startLine = 4, endLine = 9 }, -- case
+      { startLine = 6, endLine = 8 }, -- block
+    }, gleam),
+    "1..11 1..4 4..11 5..10 7..9"
+  )
   -- a block that already ends on its closer is left alone even when the
   -- next line is the parent's closer
   local nested = { "let x = [", "    || {", "        a", "    }", "];" }

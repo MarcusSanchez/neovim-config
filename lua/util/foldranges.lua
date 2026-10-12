@@ -494,23 +494,33 @@ local function autofold(buf)
   end
 end
 
---- JSX regions treesitter knows, as folding ranges: the typescript server
---- reports elements inconsistently (a `<Hero … />` gets a range, the
---- `<script … />` beside it none), and treesitter's nodes already end on
---- the closing tag. Elements, fragments, self-closing elements, and
---- opening tags that wrap (the attribute list on its own). Fragments are
---- jsx_elements with an empty name.
-local jsx_query = "[(jsx_element) (jsx_self_closing_element) (jsx_opening_element)] @e"
-local function jsx_ranges(buf)
+--- Regions treesitter knows that a server leaves out, as folding ranges,
+--- per parser language. The typescript server reports JSX elements
+--- inconsistently (a `<Hero … />` gets a range, the `<script … />` beside
+--- it none); gleam's folds only top-level declarations, and a wrapped
+--- signature from its `)` line. Treesitter's nodes already end on the
+--- closer. A node sharing both lines with a server range is the same fold.
+local supplements = {
+  -- elements, fragments (elements with an empty name), self-closing
+  -- elements, and opening tags that wrap (the attribute list on its own)
+  tsx = "[(jsx_element) (jsx_self_closing_element) (jsx_opening_element)] @e",
+  javascript = "[(jsx_element) (jsx_self_closing_element) (jsx_opening_element)] @e",
+  -- every bracketed region: the function (so a wrapped signature folds as
+  -- parameters + body like Go's), blocks, case, literals, argument lists
+  gleam = "[(function) (function_parameters) (block) (case) (anonymous_function)"
+    .. " (arguments) (data_constructor_arguments) (record_update)"
+    .. " (list) (tuple) (bit_array) (unqualified_imports)] @e",
+}
+local function treesitter_ranges(buf)
   local ok, parser = pcall(vim.treesitter.get_parser, buf, nil, { error = false })
   if not ok or not parser then
     return {}
   end
   local lang = parser:lang()
-  if lang ~= "tsx" and lang ~= "javascript" then
+  if not supplements[lang] then
     return {}
   end
-  local okq, query = pcall(vim.treesitter.query.parse, lang, jsx_query)
+  local okq, query = pcall(vim.treesitter.query.parse, lang, supplements[lang])
   if not okq then
     return {}
   end
@@ -550,7 +560,7 @@ local function request(buf)
         vim.list_extend(ranges, res.result)
       end
     end
-    vim.list_extend(ranges, jsx_ranges(buf))
+    vim.list_extend(ranges, treesitter_ranges(buf))
     local lines = api.nvim_buf_get_lines(buf, 0, -1, false)
     local first = st.levels == nil
     local folds = require("util.folds")

@@ -110,12 +110,13 @@ end
 --- rest — `) -> Result<(), Error> {` is closers `)` plus the rest. Nil
 --- closers when the line doesn't start with one.
 local function closer(last)
-  -- a closing tag closes an element the way `}` closes a block
-  local tag = last:match("^%s*(</[%w%.%-_]*>)") or last:match("^%s*(/?>)")
+  -- a closing tag closes an element the way `}` closes a block (a `>>`
+  -- closes a bit array, not a tag)
+  local tag = last:match("^%s*(</[%w%.%-_]*>)") or (not last:match("^%s*>>") and last:match("^%s*(/?>)"))
   if tag then
     return tag, last:sub(#last:match("^%s*") + #tag + 1)
   end
-  local closers, rest = last:match("^%s*([%)%]}\"'`#]+[,;]?)(.*)$")
+  local closers, rest = last:match("^%s*([%)%]}>\"'`#]+[,;]?)(.*)$")
   if not closers then
     return nil, nil
   end
