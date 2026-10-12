@@ -60,9 +60,10 @@ vim.schedule(function()
     check("pass 2: stock intro hidden (I in shortmess)", vim.o.shortmess:find("I", 1, true) ~= nil, true)
     check("pass 2: buffers restored", listed(), "main.go,main_test.go")
     -- a session saved with no file window focused has `badd` lines but no
-    -- `edit`: the window stays on the empty start buffer, which the load
-    -- hook wipes, and Vim loads the next listed file into it. That load
-    -- must still detect the filetype (treesitter, LSP hang off it).
+    -- `edit`: the window stays on the empty start buffer and the load hook
+    -- shows the first listed file in it. The saved line is past the file's
+    -- end (the file shrank on disk since — a git reset): the load must still
+    -- detect the filetype (treesitter, LSP hang off it).
     vim.fn.writefile({
       "let SessionLoad = 1",
       "silent only",
@@ -72,7 +73,7 @@ vim.schedule(function()
       "  let s:wipebuf = bufnr('%')",
       "endif",
       "set shortmess+=aoO",
-      "badd +9 main.go",
+      "badd +500 main.go",
       "%argdel",
       "if exists('s:wipebuf') && len(win_findbuf(s:wipebuf)) == 0",
       "  silent exe 'bwipe ' . s:wipebuf",

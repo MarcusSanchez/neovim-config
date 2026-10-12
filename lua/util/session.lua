@@ -114,24 +114,43 @@ function M.setup()
   vim.api.nvim_create_autocmd("User", {
     group = group,
     pattern = "PersistenceLoadPost",
-    -- nested: wiping the empty buffer a window is on makes Vim load the
-    -- next listed file into it, and that load's BufRead/FileType events
-    -- (filetype, treesitter, LSP) only fire from inside an autocmd when
-    -- it's nested. A session saved with no file window focused restores
-    -- exactly this way, and came back as a file with no highlighting or LSP.
+    -- nested, so the loads below fire their BufRead/FileType events
+    -- (filetype, treesitter, LSP) like any other
     nested = true,
     callback = function()
-      -- anything the layout left behind as an empty unnamed buffer
-      for _, b in ipairs(vim.api.nvim_list_bufs()) do
-        if
-          vim.api.nvim_buf_is_loaded(b)
+      -- A session saved with no file window focused has `badd` lines but no
+      -- `edit`: the window comes back on the empty start buffer. Show the
+      -- first listed file in it ourselves. (Wiping the empty buffer and
+      -- letting Vim pick the replacement loaded the file without a
+      -- filetype whenever the saved line number was past the file's new
+      -- end — after a git reset, say.)
+      local function placeholder(b)
+        return vim.api.nvim_buf_is_loaded(b)
           and vim.api.nvim_buf_get_name(b) == ""
           and vim.bo[b].buftype == ""
           and not vim.bo[b].modified
           and vim.api.nvim_buf_line_count(b) == 1
           and vim.api.nvim_buf_get_lines(b, 0, 1, false)[1] == ""
-          and #vim.api.nvim_list_bufs() > 1
-        then
+      end
+      for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+        local cur = vim.api.nvim_win_get_buf(win)
+        if placeholder(cur) and vim.api.nvim_win_get_config(win).relative == "" then
+          for _, b in ipairs(vim.api.nvim_list_bufs()) do
+            if vim.bo[b].buflisted and vim.api.nvim_buf_get_name(b) ~= "" and vim.bo[b].buftype == "" then
+              vim.api.nvim_win_call(win, function()
+                vim.cmd("buffer " .. b)
+                if vim.bo[b].filetype == "" then
+                  vim.cmd("filetype detect") -- belt and braces: a load can skip it
+                end
+              end)
+              break
+            end
+          end
+        end
+      end
+      -- anything the layout left behind as an empty unnamed buffer
+      for _, b in ipairs(vim.api.nvim_list_bufs()) do
+        if placeholder(b) and #vim.api.nvim_list_bufs() > 1 then
           pcall(vim.api.nvim_buf_delete, b, { force = true })
         end
       end
