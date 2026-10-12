@@ -185,6 +185,16 @@ map("n", "D", [["_D]], opts("Delete to End of Line (No Yank)"))
 map("x", "p", [["_dP]], opts("Paste Over Selection (No Yank)"))
 map("x", "P", [["_dP]], opts("Paste Over Selection (No Yank)"))
 
+-- gc on a selection within a line: a block comment around it, IntelliJ
+-- style (lua/util/comment.lua); linewise selections stay line comments
+map("x", "gc", function()
+  local pos = vim.fn.getpos("v")
+  if vim.fn.mode() == "v" and require("util.comment").form(0, pos[2] - 1, pos[3] - 1) then
+    return "<Cmd>lua require('util.comment').block()<CR>"
+  end
+  return require("vim._comment").operator()
+end, { expr = true, desc = "Toggle Comment (block within a line)" })
+
 -- s in visual mode substitutes the selection without yanking
 map("x", "s", [["_di]], opts("Substitute Selection (No Yank)"))
 

@@ -78,23 +78,76 @@ end
 
 local scratch ---@type integer? a buffer the word motions run in
 
---- Where a word motion (`run`, acting on the current window) lands from
---- byte `col` of the fold line, run on that line with its neighbours
---- above and below: the resulting line (1 = the line above the fold, 2 =
---- the fold line, 3 = the line below) and byte column.
-local function word_motion(buf, run, text, col, above, below)
+---@class util.foldcursor.Drawn a closed fold as the word motions see it
+---@field start integer
+---@field stop integer
+---@field text string the fold line
+---@field cells util.foldtext.Cell[]
+
+--- The buffer with each of the closed folds replaced by its drawn line,
+--- and the line mappings both ways (`to_copy` gives the copy's line for
+--- a buffer line, `from_copy` a buffer line or the fold drawn there).
+---@param folds util.foldcursor.Drawn[] sorted by start
+local function copy_with(buf, folds)
+  local lines = api.nvim_buf_get_lines(buf, 0, -1, false)
+  local copy, at = {}, 1
+  for _, f in ipairs(folds) do
+    vim.list_extend(copy, lines, at, f.start - 1)
+    copy[#copy + 1] = f.text
+    at = f.stop + 1
+  end
+  vim.list_extend(copy, lines, at, #lines)
+  local function to_copy(lnum)
+    local off = 0
+    for _, f in ipairs(folds) do
+      if lnum > f.stop then
+        off = off + f.stop - f.start
+      elseif lnum >= f.start then
+        return f.start - off
+      end
+    end
+    return lnum - off
+  end
+  local function from_copy(lnum)
+    local off = 0
+    for _, f in ipairs(folds) do
+      if lnum == f.start - off then
+        return nil, f
+      elseif lnum > f.start - off then
+        off = off + f.stop - f.start
+      end
+    end
+    return lnum + off
+  end
+  return copy, to_copy, from_copy
+end
+
+--- Run a word motion (`run`, acting on the current window) in the copy,
+--- from buffer position (lnum, col) — or the fold line's byte `col` when
+--- lnum is a drawn fold's — and return where it lands, in the copy's
+--- lines.
+local function run_in_copy(buf, run, copy, lnum, col)
   if not (scratch and api.nvim_buf_is_valid(scratch)) then
     scratch = api.nvim_create_buf(false, true)
     vim.bo[scratch].bufhidden = "hide"
   end
-  api.nvim_buf_set_lines(scratch, 0, -1, false, { above, text, below })
+  api.nvim_buf_set_lines(scratch, 0, -1, false, copy)
   vim.bo[scratch].iskeyword = vim.bo[buf].iskeyword
   local c = api.nvim_buf_call(scratch, function()
-    api.nvim_win_set_cursor(0, { 2, col })
+    api.nvim_win_set_cursor(0, { lnum, col })
     run()
     return api.nvim_win_get_cursor(0)
   end)
   return c[1], c[2]
+end
+
+local function drawn(buf, start, stop)
+  local cells = cells_of(buf, start, stop)
+  local text = ""
+  for _, c in ipairs(cells) do
+    text = text .. c.ch
+  end
+  return { start = start, stop = stop, text = text, cells = cells }
 end
 
 ---@class util.foldcursor.Segment a ` ... ` of the fold line and what it hides
@@ -212,6 +265,88 @@ local function on_caret()
   return start ~= -1 and M.cell_at(win, buf, start) ~= nil
 end
 
+--- The caret onto cell `target`: the real cursor goes to the position it
+--- stands for, keeping `curswant` (the column a later `j`/`k` heads for)
+--- at the drawn column rather than that position's.
+local function place(win, buf, start, stop, cells, target, curswant)
+  local cell = cells[target]
+  api.nvim_win_set_cursor(win, { cell.lnum, cell.col })
+  api.nvim_win_call(win, function()
+    vim.fn.winrestview({ curswant = curswant or target - 1 })
+  end)
+  states[win] = {
+    buf = buf,
+    start = start,
+    cell = target,
+    lnum = cell.lnum,
+    col = cell.col,
+    tick = api.nvim_buf_get_changedtick(buf),
+  }
+  hide_cursor(win)
+  pcall(api.nvim__redraw, { win = win, range = { start - 1, stop }, valid = false })
+end
+
+--- A word motion, from a fold line (`start`…: its cells and the caret's
+--- cell `at`) or from an open line (none of those): run over the buffer
+--- as drawn — every closed fold it lands in is its one drawn line, so a
+--- motion from below a folded function onto it lands on the fold line's
+--- last word, with the caret, and never inside the fold.
+local function word(win, buf, start, stop, cells, at, run)
+  local folds = {} ---@type util.foldcursor.Drawn[]
+  local origin = api.nvim_win_get_cursor(win)
+  if start then
+    local f = drawn(buf, start, stop)
+    f.cells = cells
+    folds[1] = f
+    local col = 0
+    for i = 1, at - 1 do
+      col = col + #cells[i].ch
+    end
+    origin = { start, col }
+  end
+  for _ = 1, 8 do
+    local line, col
+    local landed ---@type util.foldcursor.Drawn?
+    if #folds == 0 then
+      run()
+      line, col = unpack(api.nvim_win_get_cursor(win))
+    else
+      table.sort(folds, function(x, y)
+        return x.start < y.start
+      end)
+      local copy, to_copy, from_copy = copy_with(buf, folds)
+      local from = to_copy(origin[1])
+      local cl, cc = run_in_copy(buf, run, copy, from, origin[2])
+      line, landed = from_copy(cl)
+      col = cc
+    end
+    if landed then
+      local target = vim.fn.charidx(landed.text, col) + 1
+      if visible(landed.cells[target]) then
+        place(win, buf, landed.start, landed.stop, landed.cells, target)
+      else
+        -- onto a ` ... `: from the right of it when the caret was on this
+        -- fold's line past it, or the motion came from below the fold
+        local dir = 1
+        if start == landed.start then
+          dir = target >= at and 1 or -1
+        elseif origin[1] > landed.stop then
+          dir = -1
+        end
+        api.nvim_win_set_cursor(win, { landed.start, 0 })
+        open_segment(win, buf, landed.start, landed.stop, landed.cells, target, dir)
+      end
+      return
+    end
+    local closed = vim.fn.foldclosed(line)
+    if closed == -1 then
+      api.nvim_win_set_cursor(win, { line, col })
+      return
+    end
+    folds[#folds + 1] = drawn(buf, closed, vim.fn.foldclosedend(line)) -- redo, with it drawn
+  end
+end
+
 --- Run a motion with the pending count: as it is unless the cursor is on
 --- a closed fold, where it walks the fold line. `h` `l` `^` `_` `$` step
 --- the line's cells; any other key is a word motion, run by `run` (Vim's
@@ -226,8 +361,13 @@ function M.motion(key, run)
   local win, buf = api.nvim_get_current_win(), api.nvim_get_current_buf()
   local lnum = api.nvim_win_get_cursor(win)[1]
   local start = vim.fn.foldclosed(lnum)
+  local stepping = key == "h" or key == "l" or key == "$" or key == "^" or key == "_"
   if start == -1 then
-    run()
+    if stepping then
+      run()
+    else
+      word(win, buf, nil, nil, nil, nil, run)
+    end
     return
   end
   count = math.max(count, 1)
@@ -238,7 +378,6 @@ function M.motion(key, run)
   end
   local at = current_cell(win, buf, start, cells)
   local target ---@type integer? cell to land on
-  local leave ---@type { [1]: integer, [2]: integer }? buffer position to leave the fold for
   if key == "l" then
     target = math.min(at + count, #cells)
   elseif key == "h" then
@@ -251,29 +390,8 @@ function M.motion(key, run)
       target = target + 1
     end
     target = nearest(cells, target, 1)
-  else -- a word motion over the drawn line
-    local text, col = "", 0
-    for i, c in ipairs(cells) do
-      if i == at then
-        col = #text
-      end
-      text = text .. c.ch
-    end
-    local above = start > 1 and vim.fn.getline(start - 1) or ""
-    local below = stop < vim.fn.line("$") and vim.fn.getline(stop + 1) or ""
-    local line, newcol = word_motion(buf, run, text, col, above, below)
-    if line == 2 then
-      target = vim.fn.charidx(text, newcol) + 1
-    elseif line == 1 and start > 1 then
-      leave = { start - 1, newcol }
-    elseif line == 3 and stop < vim.fn.line("$") then
-      leave = { stop + 1, newcol }
-    else
-      return
-    end
-  end
-  if leave then
-    api.nvim_win_set_cursor(win, leave)
+  else
+    word(win, buf, start, stop, cells, at, run)
     return
   end
   if not target then
@@ -284,17 +402,33 @@ function M.motion(key, run)
     open_segment(win, buf, start, stop, cells, target, target >= at and 1 or -1)
     return
   end
-  api.nvim_win_set_cursor(win, { cell.lnum, cell.col })
-  states[win] = {
-    buf = buf,
-    start = start,
-    cell = target,
-    lnum = cell.lnum,
-    col = cell.col,
-    tick = api.nvim_buf_get_changedtick(buf),
-  }
-  hide_cursor(win)
-  pcall(api.nvim__redraw, { win = win, range = { start - 1, stop }, valid = false })
+  place(win, buf, start, stop, cells, target)
+end
+
+--- Arriving on a closed fold from another line (`j`, `k`, a jump): the
+--- caret takes the column the cursor was heading for, as on any line,
+--- the nearest drawn character to its left if that falls in a ` ... `.
+--- Nothing opens.
+local function arrive()
+  if api.nvim_get_mode().mode ~= "n" then
+    return
+  end
+  local win, buf = api.nvim_get_current_win(), api.nvim_get_current_buf()
+  local lnum = api.nvim_win_get_cursor(win)[1]
+  local start = vim.fn.foldclosed(lnum)
+  if start == -1 or M.cell_at(win, buf, start) then
+    return
+  end
+  local stop = vim.fn.foldclosedend(lnum)
+  local cells = cells_of(buf, start, stop)
+  if #cells == 0 then
+    return
+  end
+  local want = vim.fn.winsaveview().curswant + 1
+  local target = nearest(cells, math.min(want, #cells), -1) or nearest(cells, 1, 1)
+  if target then
+    place(win, buf, start, stop, cells, target, want - 1)
+  end
 end
 
 --- The hidden-cursor state, for tests: the 'guicursor' value it will go
@@ -317,9 +451,12 @@ function M.setup()
   -- text edited, the window or mode left
   api.nvim_create_autocmd({ "CursorMoved", "TextChanged", "InsertEnter", "WinLeave", "BufLeave", "ModeChanged" }, {
     group = group,
-    callback = function()
+    callback = function(ev)
       if shown_as and not on_caret() then
         show_cursor()
+      end
+      if ev.event == "CursorMoved" then
+        arrive()
       end
     end,
   })

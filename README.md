@@ -27,6 +27,7 @@ lua/util/                feature logic, one module per feature
   folds.lua              folds persist across sessions, anchored to the text they hide
   foldtext.lua           closed folds read `func main() { ... }`, first line highlighted
   searchfolds.lua        a search doesn't unfold what it passes through
+  comment.lua            gc on a selection within a line: a block comment around it
   foldcursor.lua         a caret walks a closed fold's line; the real cursor follows
   harpoon.lua            a harpoon jump from an empty buffer replaces it instead of adding a tab
   session.lua            a bare `nvim` restores the directory's session instead of the dashboard
@@ -111,9 +112,17 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
   and `gd` on `Error` act on it with the fold closed; Vim's own cursor,
   stuck in the first column, is hidden meanwhile. Stepping onto a ` ... `
   opens what it hides and nothing else: on `fn f( ... ) -> R { ... }` the
-  first dots show the parameters with the body still folded. Word motions
-  keep this config's meaning (`w` back, `b`/`e` forward, punctuation
-  skipped).
+  first dots show the parameters with the body still folded. Arriving on
+  a folded line with `j`/`k` puts the caret at the column the cursor was
+  heading for, and leaving keeps it. Word motions keep this config's
+  meaning (`w` back, `b`/`e` forward, punctuation skipped) and treat a
+  closed fold as its one drawn line: from below a folded function `w`
+  lands on the line's last word, never inside the fold.
+- **`gc` on a selection within a line** wraps it in a block comment,
+  `foo(/* bar */, baz)`, as IntelliJ comments a selection (and unwraps
+  one). Linewise `gc` and `gcc` stay line comments; in JSX markup the
+  comment is `{/* … */}`; languages without block comments (Zig, Gleam)
+  keep the line comment.
 - **Searching doesn't unfold**: a match inside a closed fold opens that
   fold only while the cursor is in it (`/`, `n`, `*`, `#`); step out and
   it closes again, unless you edited inside. Folds a search merely passed
@@ -133,7 +142,7 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
 `tests/run.sh` drives headless nvim against small Go, Rust, TSX, Zig,
 Gleam, C, C++ and protobuf fixtures and prints PASS/FAIL per behaviour. Suites:
 `go` (gd/gh, usages popup, autosave, popups, fold shapes with gopls),
-`caret` (the caret on a closed fold),
+`caret` (the caret on a closed fold), `comment` (block comments on a selection),
 `rust` (gs filtering, italics, fold shapes with rust-analyzer), `tsx` (JSX
 fold shapes with the typescript server), `zig` (fold shapes with zls:
 nested if/else chains, wrapped signatures), `gleam` (fold shapes with the

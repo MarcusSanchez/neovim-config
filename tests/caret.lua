@@ -16,6 +16,8 @@ lib.suite("gopls", function(t)
     ") (int, error) {",
     '\treturn a + b, errors.New("x")',
     "}",
+    "",
+    "func g() {}",
   }, "sig.go")
   vim.cmd("edit sig.go")
   vim.wait(15000, function()
@@ -34,7 +36,8 @@ lib.suite("gopls", function(t)
     return c[1] .. ":" .. c[2]
   end
   local function caret()
-    for _, c in ipairs(FT.render(FT.build(buf, 5, 8), FC.cell_at(win, buf, 5))) do
+    local stop = vim.fn.foldclosedend(5) > 0 and vim.fn.foldclosedend(5) or 8
+    for _, c in ipairs(FT.render(FT.build(buf, 5, stop), FC.cell_at(win, buf, 5))) do
       if c[2] == "FoldCursor" then
         return c[1]
       end
@@ -161,6 +164,67 @@ lib.suite("gopls", function(t)
     "-1 5..8"
   )
   t.check("cursor at the end of the last body line", cursor(), "9:29")
+  -- word motions go on past the line, into the buffer beyond the fold
+  vim.cmd("normal! zR")
+  t.fold(6)
+  t.fold(9)
+  vim.api.nvim_win_set_cursor(win, { 10, 0 }) -- the `}`
+  key("e") -- next word start: nothing left on the line, `func` two lines down
+  t.check("e past the fold's line: the next word in the buffer", cursor() .. " " .. vim.fn.foldclosed(5), "12:0 5")
+  key("w") -- previous word start: back onto the fold line, its last word
+  t.check("w back onto the fold: its last word", cursor() .. " " .. caret(), "8:8 e")
+  -- and from an open line a motion never lands inside a closed fold: it
+  -- lands on the fold's line
+  vim.api.nvim_win_set_cursor(win, { 12, 5 }) -- `g`
+  key("w") -- previous word start: `func`, then `error` on the fold line
+  key("w")
+  t.check(
+    "w from below a closed fold: onto its line",
+    cursor() .. " " .. caret() .. " " .. vim.fn.foldclosed(5),
+    "8:8 e 5"
+  )
+  vim.api.nvim_win_set_cursor(win, { 3, 0 })
+  key("b") -- next word end: `import`, `errors`, then the fold line's `func`
+  key("b")
+  key("b")
+  t.check("b from above: onto the fold line's first word", cursor() .. " " .. caret(), "5:3 c")
+  vim.api.nvim_win_set_cursor(win, { 4, 0 })
+  key("E") -- next WORD start: the fold line's `func`, then its `h(`
+  t.check("E from above: the fold line's first WORD", cursor() .. " " .. caret(), "5:0 f")
+  key("E")
+  t.check("E again: its second WORD", cursor() .. " " .. caret(), "5:5 h")
+  -- arriving from another line, the caret takes the column the cursor
+  -- was heading for, and keeps it for the next vertical move
+  local function moved()
+    vim.api.nvim_exec_autocmds("CursorMoved", { buffer = buf })
+  end
+  vim.api.nvim_win_set_cursor(win, { 3, 12 })
+  moved()
+  vim.cmd("normal! jj") -- Vim's own j: onto the fold
+  moved()
+  t.check("arriving on the fold: the caret at that column", cursor() .. " " .. caret(), "8:0 )")
+  t.check("curswant kept at the drawn column", vim.fn.winsaveview().curswant, 12)
+  vim.cmd("normal! j")
+  moved()
+  t.check("j off the fold keeps the column", cursor(), "11:0")
+  vim.cmd("normal! k")
+  moved()
+  t.check("k back: the same caret", cursor() .. " " .. caret(), "8:0 )")
+  vim.api.nvim_win_set_cursor(win, { 12, 0 })
+  vim.cmd("normal! $")
+  moved()
+  vim.cmd("normal! kk")
+  moved()
+  t.check("arriving after $: the last cell", cursor() .. " " .. caret(), "10:0 }")
+  vim.api.nvim_win_set_cursor(win, { 3, 9 }) -- column 10 is in the ` ... `
+  moved()
+  vim.cmd("normal! jj")
+  moved()
+  t.check(
+    "a column in the dots: the cell before them, nothing opens",
+    cursor() .. " " .. caret() .. " " .. vim.fn.foldclosed(5),
+    "5:6 ( 5"
+  )
   -- off a fold the motions are as before: the config's w goes backwards
   vim.cmd("normal! zR")
   vim.api.nvim_win_set_cursor(win, { 9, 10 })
