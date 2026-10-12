@@ -40,7 +40,7 @@ vim.schedule(function()
           and table.concat(client.config.cmd, " "):find(copilot.server, 1, true) ~= nil,
         true
       )
-      check("exit_timeout set", client.config.exit_timeout, 1000)
+      check("exit_timeout set, short enough not to hold :qa", client.config.exit_timeout, 100)
       local server_pid = client.rpc and client.rpc.pid or (vim.fn.jobpid and 0)
       -- the exec'd server pid: nvim's child running the server script
       local pid = vim.trim(vim.fn.system({ "pgrep", "-P", tostring(vim.fn.getpid()), "-f", copilot.server }))

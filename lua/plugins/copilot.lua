@@ -38,8 +38,10 @@ return {
     copilot_node_command = require("util.copilot").node_command(),
     server_opts_overrides = {
       -- a normal quit waits up to this long for the polite shutdown, then
-      -- force-stops the server (nvim's default is to not wait at all)
-      exit_timeout = 1000,
+      -- force-stops the server (nvim's default is to not wait at all). Short:
+      -- :qa is held for the whole of it when the server is mid-request, and
+      -- the watchdog in util/copilot.lua reaps a lingering server anyway.
+      exit_timeout = 100,
     },
   },
 }
