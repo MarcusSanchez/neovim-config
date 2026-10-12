@@ -286,6 +286,29 @@ local function place(win, buf, start, stop, cells, target, curswant)
   pcall(api.nvim__redraw, { win = win, range = { start - 1, stop }, valid = false })
 end
 
+--- Whether 'whichwrap' lets the key cross a line boundary.
+local function wraps(key)
+  return vim.o.whichwrap:find(key, 1, true) ~= nil
+end
+
+--- `h`/`l` wrapping onto buffer line `lnum` ('whichwrap'): onto a closed
+--- fold, the caret on its last (`edge` -1) or first (1) drawn character;
+--- onto an open line, its last or first character.
+local function land(win, buf, lnum, edge)
+  local fs = vim.fn.foldclosed(lnum)
+  if fs ~= -1 then
+    local fe = vim.fn.foldclosedend(lnum)
+    local cells = cells_of(buf, fs, fe)
+    local target = edge < 0 and nearest(cells, #cells, -1) or nearest(cells, 1, 1)
+    if target then
+      place(win, buf, fs, fe, cells, target)
+    end
+    return
+  end
+  local line = vim.fn.getline(lnum)
+  api.nvim_win_set_cursor(win, { lnum, edge < 0 and math.max(#line - 1, 0) or 0 })
+end
+
 --- A word motion, from a fold line (`start`…: its cells and the caret's
 --- cell `at`) or from an open line (none of those): run over the buffer
 --- as drawn — every closed fold it lands in is its one drawn line, so a
@@ -365,6 +388,12 @@ function M.motion(key, run)
   if start == -1 then
     if stepping then
       run()
+      -- h/l wrapped onto a closed fold ('whichwrap'): its last or first
+      -- drawn character, not a hidden line
+      local c = api.nvim_win_get_cursor(win)
+      if (key == "h" or key == "l") and vim.fn.foldclosed(c[1]) ~= -1 then
+        land(win, buf, c[1], key == "h" and -1 or 1)
+      end
     else
       word(win, buf, nil, nil, nil, nil, run)
     end
@@ -379,8 +408,14 @@ function M.motion(key, run)
   local at = current_cell(win, buf, start, cells)
   local target ---@type integer? cell to land on
   if key == "l" then
+    if at + count > #cells and wraps("l") and stop < vim.fn.line("$") then
+      return land(win, buf, stop + 1, 1) -- off the end: the line below
+    end
     target = math.min(at + count, #cells)
   elseif key == "h" then
+    if at - count < 1 and wraps("h") and start > 1 then
+      return land(win, buf, start - 1, -1) -- off the start: the line above
+    end
     target = math.max(at - count, 1)
   elseif key == "$" then
     target = nearest(cells, #cells, -1)

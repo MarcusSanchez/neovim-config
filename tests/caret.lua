@@ -193,6 +193,28 @@ lib.suite("gopls", function(t)
   t.check("E from above: the fold line's first WORD", cursor() .. " " .. caret(), "5:0 f")
   key("E")
   t.check("E again: its second WORD", cursor() .. " " .. caret(), "5:5 h")
+  -- 'whichwrap' has h and l: off either end of the fold line they go to
+  -- the line above / below, and from those lines back onto the fold's
+  -- last / first drawn character
+  t.check("whichwrap has h and l", vim.o.whichwrap:find("h") ~= nil and vim.o.whichwrap:find("l") ~= nil, true)
+  vim.cmd("normal! zR")
+  t.fold(6)
+  vim.api.nvim_win_set_cursor(win, { 5, 0 })
+  key("$")
+  key("l")
+  t.check("l off the end: the line below", cursor() .. " " .. caret(), "9:0 none")
+  key("h")
+  t.check("h from there: back onto the fold's last cell", cursor() .. " " .. caret(), "8:15 {")
+  key("<S-h>")
+  key("h")
+  t.check("h off the start: the line above", cursor() .. " " .. caret(), "4:0 none")
+  key("l")
+  t.check("l from there: onto the fold's first cell", cursor() .. " " .. caret(), "5:0 f")
+  key("3h")
+  t.check("a count past the start wraps too", cursor(), "4:0")
+  vim.cmd("normal! zR")
+  t.fold(6)
+  t.fold(9) -- the whole function again
   -- arriving from another line, the caret takes the column the cursor
   -- was heading for, and keeps it for the next vertical move
   local function moved()
