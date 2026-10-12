@@ -25,17 +25,24 @@ local function highlighted(buf, lnum, line, dim)
     return { { line, "Folded" } }
   end
   local hl = {} ---@type table<integer, string> column (1-based) -> group
-  for id, node, metadata in query:iter_captures(tree:root(), buf, lnum - 1, lnum) do
-    local srow, scol, erow, ecol = node:range()
-    if srow < lnum - 1 then
-      scol = 0
-    end
-    if erow > lnum - 1 then
-      ecol = #line
-    end
-    local group = "@" .. query.captures[id] .. "." .. parser:lang()
-    for col = scol + 1, math.min(ecol, #line) do
-      hl[col] = group
+  for id, node in query:iter_captures(tree:root(), buf, lnum - 1, lnum) do
+    local name = query.captures[id]
+    -- captures that aren't highlights: `_`-prefixed helpers the queries
+    -- use in predicates (`@_tag`, `@_jsx_attribute`), and the spell markers
+    -- on comments and strings. They have no colour, so a chunk given one
+    -- would fall back to Folded (blue). The highlighter skips them too.
+    if name:sub(1, 1) ~= "_" and name ~= "spell" and name ~= "nospell" then
+      local srow, scol, erow, ecol = node:range()
+      if srow < lnum - 1 then
+        scol = 0
+      end
+      if erow > lnum - 1 then
+        ecol = #line
+      end
+      local group = "@" .. name .. "." .. parser:lang()
+      for col = scol + 1, math.min(ecol, #line) do
+        hl[col] = group
+      end
     end
   end
   -- Everything else that colours the open line is an extmark: rainbow

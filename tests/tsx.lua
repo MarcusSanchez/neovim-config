@@ -85,6 +85,26 @@ vim.schedule(function()
       _G.__chunks[#_G.__chunks][1] .. "=" .. _G.__chunks[#_G.__chunks][2],
       "</main>=FoldEllipsis"
     )
+    -- every visible chunk has a colour of its own: attribute names and tag
+    -- names must not fall back to Folded (helper captures carry no colour)
+    local function folded_fallbacks()
+      local blue = {}
+      for _, c in ipairs(_G.__chunks) do
+        local h = vim.api.nvim_get_hl(0, { name = c[2], link = false })
+        if not c[1]:match("^%s*$") and h.fg == nil then
+          blue[#blue + 1] = c[1] .. "=" .. c[2]
+        end
+      end
+      return table.concat(blue, " ")
+    end
+    check("no fold-line chunk falls back to Folded", folded_fallbacks(), "")
+    vim.cmd("normal! zR")
+    vim.cmd("normal! 41G")
+    FR.toggle()
+    vim.wo.foldtext = "v:lua.__probe()"
+    vim.fn.foldtextresult(37)
+    vim.wo.foldtext = ft
+    check("the <a> fold line has no Folded fallback either", folded_fallbacks(), "")
     log("OK")
   end)
   log(ok and "DONE" or ("ERROR: " .. tostring(err)))
