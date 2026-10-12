@@ -181,6 +181,19 @@ function M.normalize(ranges, lines)
     end
   end
   vim.list_extend(list, heads)
+  -- and the mirror: something whose head is a range of its own from the
+  -- same line (an element after its wrapped opening tag, a function after
+  -- its parameters) has a body from the head's last line through the end,
+  -- sharing that line: `>` … `</a>` folds with the attributes still open.
+  local bodies = {}
+  for _, r in ipairs(list) do
+    for _, t in ipairs(list) do
+      if t ~= r and t.s == r.s and t.e < r.e and t.e > t.s then
+        bodies[#bodies + 1] = { s = t.e, e = r.e }
+      end
+    end
+  end
+  vim.list_extend(list, bodies)
   local out, seen = {}, {}
   for _, r in ipairs(list) do
     local key = r.s .. ":" .. r.e

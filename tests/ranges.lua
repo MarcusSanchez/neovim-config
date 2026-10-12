@@ -402,7 +402,7 @@ local ok, err = pcall(function()
       { startLine = 52, endLine = 52 },
       { startLine = 53, endLine = 53 },
     }, tsx),
-    "3..6 8..14 11..13 16..50 17..49 18..48 19..27 19..25 20..23 28..31 32..38 33..37 34..36 39..43 40..42 44..47 52..56 53..55"
+    "3..6 8..14 11..13 16..50 17..49 18..48 19..27 19..25 20..23 25..27 28..31 32..38 33..37 34..36 39..43 40..42 44..47 52..56 53..55"
   )
   -- shared rows: resolve() hands each one to its owner — the range ending
   -- there unless the owners table says the one starting there — so Vim
