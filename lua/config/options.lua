@@ -8,7 +8,7 @@
 -- session-restoring start, which puts it back (see dashboard.lua).
 vim.opt.shortmess:remove("I")
 
--- No snacks animations (scroll, windows); the cursor trail is smear-cursor's
+-- No snacks animations (scroll, windows, cursor)
 vim.g.snacks_animate = false
 -- Copilot as ghost text, not as completion entries
 vim.g.ai_cmp = false
