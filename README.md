@@ -27,6 +27,7 @@ lua/util/                feature logic, one module per feature
   folds.lua              folds persist across sessions, anchored to the text they hide
   foldtext.lua           closed folds read `func main() { ... }`, first line highlighted
   searchfolds.lua        a search doesn't unfold what it passes through
+  jumps.lua              half-page scrolls, gg and G glide to where they land
   comment.lua            gc on a selection within a line: a block comment around it
   foldcursor.lua         a caret walks a closed fold's line; the real cursor follows
   harpoon.lua            a harpoon jump from an empty buffer replaces it instead of adding a tab
@@ -139,6 +140,12 @@ only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
   one). Linewise `gc` and `gcc` stay line comments; in JSX markup the
   comment is `{/* … */}`; languages without block comments (Zig, Gleam)
   keep the line comment.
+- **Jumps glide**: a half-page scroll (Shift-J/K, `<C-D>`/`<C-U>`, a
+  full page), `gg` and `G` run as usual, then the view eases to where
+  they landed over ~160 ms (lua/util/jumps.lua). Only those animate —
+  `j`/`k` move as Vim does — and a key typed mid-glide lands the view at
+  once, so holding a key never queues animations. Snacks' own animations
+  stay off (`vim.g.snacks_animate = false`).
 - **Searching doesn't unfold**: a match inside a closed fold opens that
   fold only while the cursor is in it (`/`, `n`, `*`, `#`); step out and
   it closes again, unless you edited inside. Folds a search merely passed
@@ -166,7 +173,7 @@ server plus treesitter's), `c` and `cpp` (fold shapes with clangd:
 if/else-if chains, `#include` runs, block comments, lambdas), `lua`
 (keyword blocks with lua_ls), `json`, `yaml`, `protofold` (buf), `sh`,
 `toml`, `markdown`, `nix`, `python` (treesitter's folds, no server
-ranges), `session`, `copilot`, `proto`, `scroll`, `keys` (j/k swaps),
+ranges), `session`, `copilot`, `proto`, `scroll`, `keys` (j/k swaps), `jumps` (the glide),
 `ranges` (the fold-range normaliser against captured server output, no
 server needed) and `folds` (persistence across two runs, plain text and
 treesitter/LSP). Needs gopls, rust-analyzer, vtsls, zls, clangd, gleam,

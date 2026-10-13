@@ -5,7 +5,7 @@
 # PATH (mason installs all but gleam, which comes with its compiler).
 #
 #   tests/run.sh          # everything
-#   tests/run.sh go       # one suite: go | caret | rust | tsx | zig | gleam | c | cpp | lua | sh | json | yaml | toml | markdown | nix | python | protofold | session | copilot | proto | scroll | keys | comment | ranges | folds
+#   tests/run.sh go       # one suite: go | caret | rust | tsx | zig | gleam | c | cpp | lua | sh | json | yaml | toml | markdown | nix | python | protofold | session | copilot | proto | scroll | keys | jumps | comment | ranges | folds
 #
 # Each suite drives a real nvim with this config against a fixture project
 # and prints PASS/FAIL lines. Fixtures are copied to a temp dir first: the
@@ -94,10 +94,11 @@ if [[ $want == all || $want == copilot ]]; then
   grep -q '^FAIL\|ERROR\|TIMEOUT' "$work/go/result.log" 2>/dev/null && status=1
 fi
 [[ $want == all || $want == proto ]] && run proto "$work/proto" acme/v1/user.proto "$here/proto.lua" "$work/proto/result.log"
-if [[ $want == all || $want == scroll || $want == keys || $want == comment || $want == ranges || $want == folds ]]; then
+if [[ $want == all || $want == scroll || $want == keys || $want == jumps || $want == comment || $want == ranges || $want == folds ]]; then
   seq 1 100 | sed 's/^/line /' > "$work/long.txt"
   [[ $want == all || $want == scroll ]] && run scroll "$work" long.txt "$here/scroll.lua" "$work/result.log"
   [[ $want == all || $want == keys ]] && run keys "$work" long.txt "$here/keys.lua" "$work/result.log"
+  [[ $want == all || $want == jumps ]] && run jumps "$work" long.txt "$here/jumps.lua" "$work/result.log"
   [[ $want == all || $want == comment ]] && run comment "$work" long.txt "$here/comment.lua" "$work/result.log"
   [[ $want == all || $want == ranges ]] && run ranges "$work" long.txt "$here/ranges.lua" "$work/result.log"
   if [[ $want == all || $want == folds ]]; then
