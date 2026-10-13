@@ -8,9 +8,9 @@ return {
     { "<leader><up>", mode = { "n", "x" }, desc = "Skip Cursor Above" },
     { "<leader><down>", mode = { "n", "x" }, desc = "Skip Cursor Below" },
     { "<M-S-l>", mode = { "n", "x" }, desc = "Add Cursor by Matching Word (Next)" },
-    { "<leader>s", mode = { "n", "x" }, desc = "Skip Cursor by Matching Word (Next)" },
-    { "<leader>N", mode = { "n", "x" }, desc = "Add Cursor by Matching Word (Prev)" },
-    { "<leader>S", mode = { "n", "x" }, desc = "Skip Cursor by Matching Word (Prev)" },
+    { "<M-S-n>", mode = { "n", "x" }, desc = "Add Cursor by Matching Word (Prev)" },
+    { "<M-S-s>", mode = { "n", "x" }, desc = "Skip Cursor by Matching Word (Next)" },
+    { "<M-S-b>", mode = { "n", "x" }, desc = "Skip Cursor by Matching Word (Prev)" },
   },
   config = function()
     local mc = require("multicursor-nvim")
@@ -33,17 +33,20 @@ return {
       mc.lineSkipCursor(1)
     end, { desc = "Skip Cursor Below" })
 
-    -- Add or skip adding a new cursor by matching word/selection
+    -- Add or skip the next/previous match of the word or selection: one
+    -- Alt-Shift family (l next, n previous, as `n`/`N` search; s skip the
+    -- next, b skip back; h in the layer below lets the last one go). Off
+    -- <leader>s, which is LazyVim's search prefix.
     set({ "n", "x" }, "<M-S-l>", function()
       mc.matchAddCursor(1)
     end, { desc = "Add Cursor by Matching Word (Next)" })
-    set({ "n", "x" }, "<leader>s", function()
-      mc.matchSkipCursor(1)
-    end, { desc = "Skip Cursor by Matching Word (Next)" })
-    set({ "n", "x" }, "<leader>N", function()
+    set({ "n", "x" }, "<M-S-n>", function()
       mc.matchAddCursor(-1)
     end, { desc = "Add Cursor by Matching Word (Prev)" })
-    set({ "n", "x" }, "<leader>S", function()
+    set({ "n", "x" }, "<M-S-s>", function()
+      mc.matchSkipCursor(1)
+    end, { desc = "Skip Cursor by Matching Word (Next)" })
+    set({ "n", "x" }, "<M-S-b>", function()
       mc.matchSkipCursor(-1)
     end, { desc = "Skip Cursor by Matching Word (Prev)" })
 

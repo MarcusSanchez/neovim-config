@@ -53,8 +53,13 @@ not `v`. Formatting is stylua (`stylua.toml`), tests included.
 
 Navigation: `j`/`k` are swapped everywhere — motions, operators, picker
 lists, `<C-j>`/`<C-k>` in pickers and terminals, `<C-w>j`/`<C-w>k`, `zj`/`zk`,
-undotree's `J`/`K`. `S-J`/`S-K` half page, `S-H`/`S-L` line start/end. `w`/`e`/`b` hop alphanumeric words
-only (w back, e next start, b next end); `W`/`E`/`B` likewise for WORDs.
+undotree's `J`/`K`; without a count they move by screen row in wrapped
+text. `S-J`/`S-K` half page, `S-H`/`S-L` line start/end. `w`/`e`/`b` hop
+alphanumeric words only (w back, e next start, b next end); `W`/`E`/`B`
+likewise for WORDs. Operators keep Vim's word motions: `dw`/`cw` act
+forward as they always have. Multiple cursors: `<C-j>`/`<C-k>` add one
+above/below, `<M-S-l>`/`<M-S-n>` add the next/previous match of the word,
+`<M-S-s>`/`<M-S-b>` skip it, `<M-S-h>` lets the last one go.
 
 | key | does |
 |---|---|

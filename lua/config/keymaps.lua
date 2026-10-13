@@ -59,10 +59,13 @@ for lhs, jump in pairs({
   end, opts(jump[2]))
 end
 
--- Swap j and k in normal, visual, and operator-pending mode
--- (operator-pending covers dj/dk, cj/ck, etc. — no separate swaps needed)
-map({ "n", "x", "o" }, "j", "k", opts("Up (j/k swapped)"))
-map({ "n", "x", "o" }, "k", "j", opts("Down (j/k swapped)"))
+-- Swap j and k. Without a count they move by display line (gj/gk), as
+-- LazyVim's own j/k do, so a wrapped paragraph is walked screen row by
+-- screen row; with a count, and for operators (dj/dk, cj/ck), by line.
+map({ "n", "x" }, "j", "v:count == 0 ? 'gk' : 'k'", { expr = true, silent = true, desc = "Up (j/k swapped)" })
+map({ "n", "x" }, "k", "v:count == 0 ? 'gj' : 'j'", { expr = true, silent = true, desc = "Down (j/k swapped)" })
+map("o", "j", "k", opts("Up (j/k swapped)"))
+map("o", "k", "j", opts("Down (j/k swapped)"))
 
 -- ...and everywhere else vim spells "down" as j and "up" as k:
 -- window focus (<C-w>j / <C-w><C-j>), window moves (<C-w>J), fold jumps

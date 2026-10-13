@@ -81,12 +81,14 @@ autocmd("FileType", {
   end,
 })
 
+-- Go: a tab shows as four columns; the tabs themselves stay tabs, which is
+-- what gofmt (and ,f) writes, so typing and formatting agree
 autocmd("FileType", {
   group = augroup("go_indent"),
   pattern = "go",
   callback = function()
     vim.opt_local.tabstop = 4
     vim.opt_local.shiftwidth = 4
-    vim.opt_local.expandtab = true
+    vim.opt_local.expandtab = false
   end,
 })
