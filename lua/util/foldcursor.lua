@@ -270,17 +270,21 @@ local function open_segment(win, buf, start, stop, cells, target, dir)
 end
 
 --- The fold line ends in hidden text (` ... `, or a dim closer): going
---- to its end opens that last run and puts the cursor at the end of the
---- fold's last line.
-local function open_end(win, buf, start, stop, cells)
+--- to its end opens that last run. `$` lands where its content begins
+--- (`dir` 1: the end of the line was the way in); `h` wrapping up from
+--- below lands at the end of the fold's last line (`dir` -1: stepping
+--- back into it).
+local function open_end(win, buf, start, stop, cells, dir)
   local last = #cells
   while last > 1 and visible(cells[last]) do
     last = last - 1 -- back from a dim closer onto the dots
   end
   api.nvim_win_set_cursor(win, { start, 0 })
-  open_segment(win, buf, start, stop, cells, last, -1)
-  local line = vim.fn.getline(stop)
-  api.nvim_win_set_cursor(win, { stop, math.max(#line - 1, 0) })
+  open_segment(win, buf, start, stop, cells, last, dir)
+  if dir < 0 then
+    local line = vim.fn.getline(stop)
+    api.nvim_win_set_cursor(win, { stop, math.max(#line - 1, 0) })
+  end
 end
 
 -- placing the caret ---------------------------------------------------------------
@@ -374,7 +378,7 @@ local function land(win, buf, lnum, edge)
     if edge < 0 and #cells > 0 and dim(cells[#cells]) then
       -- the line ends in hidden text (`import ...`, `{ ... }`): stepping
       -- back onto it is stepping into the fold, which opens at its end
-      open_end(win, buf, fs, fe, cells)
+      open_end(win, buf, fs, fe, cells, -1)
       return
     end
     local target = edge < 0 and nearest(cells, #cells, -1) or nearest(cells, 1, 1)
@@ -495,7 +499,7 @@ function M.motion(key, run)
     target = math.max(at - count, 1)
   elseif key == "$" then
     if dim(cells[#cells]) then
-      return open_end(win, buf, start, stop, cells) -- the end is in the fold
+      return open_end(win, buf, start, stop, cells, 1) -- the end is in the fold: into its content
     end
     target = #cells
   elseif key == "^" or key == "_" then

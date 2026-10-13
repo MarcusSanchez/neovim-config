@@ -279,15 +279,15 @@ lib.suite("gopls", function(t)
   vim.api.nvim_win_set_cursor(win, { 5, 0 })
   key("<S-l>")
   t.check("Shift-L on a line ending `{ ... }`: the body opens", vim.fn.foldclosed(9) .. " " .. t.span(6), "-1 5..8")
-  t.check("cursor on the closing brace", cursor(), "10:0")
+  t.check("cursor at the start of the body's content", cursor(), "9:1")
   vim.cmd("normal! zR")
   t.fold(15)
   vim.api.nvim_win_set_cursor(win, { 14, 0 })
   key("$")
   t.check(
-    "$ on a line ending in dots: the fold opens, cursor at its end",
+    "$ on a line ending in dots: the fold opens, cursor at its content",
     vim.fn.foldclosed(14) .. " " .. cursor(),
-    "-1 15:5"
+    "-1 15:0"
   )
   vim.cmd("normal! zR")
   t.fold(6)
