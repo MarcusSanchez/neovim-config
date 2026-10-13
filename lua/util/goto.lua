@@ -173,9 +173,35 @@ function M.definition_or_references()
   end)
 end
 
---- gh. Every LSP jump (gd, the usages popup, gr/gI/gy, <C-]>) pushes where it
---- came from onto the tagstack; pop the newest — the stock <C-t>, minus the
---- E73 error when the stack runs dry.
+--- Push the current position onto the tagstack as where a jump came from,
+--- so gh comes back to it (what Vim does for <C-]> and what gd does).
+---@param name string what the jump was, for :tags
+function M.push_origin(name)
+  local from = vim.fn.getpos(".")
+  from[1] = vim.api.nvim_get_current_buf()
+  vim.fn.settagstack(0, { items = { { tagname = name, from = from } } }, "t")
+end
+
+--- s: a flash jump, with where it came from on the tagstack like any
+--- other jump (flash only records the jumplist), so gh comes back.
+function M.flash()
+  local before = { vim.api.nvim_get_current_buf(), unpack(vim.api.nvim_win_get_cursor(0)) }
+  require("flash").jump()
+  local after = { vim.api.nvim_get_current_buf(), unpack(vim.api.nvim_win_get_cursor(0)) }
+  if vim.deep_equal(before, after) then
+    return -- cancelled, or landed where it started
+  end
+  -- push from the origin, then be back at the landing
+  vim.api.nvim_set_current_buf(before[1])
+  vim.api.nvim_win_set_cursor(0, { before[2], before[3] })
+  M.push_origin("flash")
+  vim.api.nvim_set_current_buf(after[1])
+  vim.api.nvim_win_set_cursor(0, { after[2], after[3] })
+end
+
+--- gh. Every jump (gd, the usages popup, gr/gI/gy, <C-]>, a flash s)
+--- pushes where it came from onto the tagstack; pop the newest — the
+--- stock <C-t>, minus the E73 error when the stack runs dry.
 function M.back()
   if vim.fn.gettagstack().curidx <= 1 then
     return vim.notify("No jump to go back to", vim.log.levels.WARN, { title = "Go Back" })

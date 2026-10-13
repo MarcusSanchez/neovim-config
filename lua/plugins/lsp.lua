@@ -32,8 +32,17 @@ return {
             end,
             desc = "Go Back (Pop Tagstack)",
           },
-          { "K", false }, -- hover is on gk instead:
-          { "gk", vim.lsp.buf.hover, has = "hover", desc = "LSP Hover" },
+          { "K", false }, -- hover is on gk instead (looked up when pressed:
+          -- noice replaces vim.lsp.buf.hover with its styled one after this
+          -- spec is read, so a direct reference here would be the stock hover)
+          {
+            "gk",
+            function()
+              vim.lsp.buf.hover()
+            end,
+            has = "hover",
+            desc = "LSP Hover",
+          },
         },
       },
       gopls = {

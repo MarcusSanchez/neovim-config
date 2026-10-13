@@ -215,8 +215,12 @@ map("x", "gc", function()
 end, { expr = true, desc = "Toggle Comment (block within a line)" })
 
 -- s in visual mode substitutes the selection without yanking (this is the
--- one mode flash's `s` doesn't get; flash keeps n and o)
+-- one mode flash's `s` doesn't get; flash keeps o, and in normal mode its
+-- jump goes through util/goto so gh comes back from it)
 map("x", "s", [["_di]], opts("Substitute Selection (No Yank)"))
+map("n", "s", function()
+  require("util.goto").flash()
+end, opts("Flash"))
 
 --------------------------------------------------------------------------------
 -- Word Motions Customization

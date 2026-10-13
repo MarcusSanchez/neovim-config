@@ -91,9 +91,7 @@ function M.follow_link()
   end
   M.dismiss()
   -- back in the source window now that the float is gone
-  local from = vim.fn.getpos(".")
-  from[1] = vim.api.nvim_get_current_buf()
-  vim.fn.settagstack(0, { items = { { tagname = vim.fn.fnamemodify(link.file, ":t"), from = from } } }, "t")
+  require("util.goto").push_origin(vim.fn.fnamemodify(link.file, ":t"))
   vim.cmd.edit(vim.fn.fnameescape(link.file))
   if link.row then
     vim.api.nvim_win_set_cursor(0, { math.min(link.row, vim.api.nvim_buf_line_count(0)), 0 })

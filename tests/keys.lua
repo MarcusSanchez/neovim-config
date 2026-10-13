@@ -202,6 +202,22 @@ vim.schedule(function()
     -- undotree
     require("lazy").load({ plugins = { "undotree" } })
     check("undotree custom map defined", vim.fn.exists("*g:Undotree_CustomMap"), 1)
+    -- a flash jump pushes where it came from, so gh returns (flash itself
+    -- only records the jumplist); driven through flash's API with a unique
+    -- pattern, which jumps without a label being typed
+    check("s is the flash jump through util/goto", vim.fn.maparg("s", "n", false, true).desc, "Flash")
+    require("lazy").load({ plugins = { "flash.nvim" } })
+    vim.api.nvim_win_set_cursor(0, { 3, 0 })
+    local flash = require("flash")
+    local jump = flash.jump
+    flash.jump = function() -- flash waits for a key in a headless run: stand in for the landing
+      vim.api.nvim_win_set_cursor(0, { 50, 0 })
+    end
+    require("util.goto").flash()
+    flash.jump = jump
+    check("the flash jump landed", vim.fn.line("."), 50)
+    require("util.goto").back() -- gh (an LSP key, so not mapped in this plain buffer)
+    check("gh comes back from a flash jump", vim.fn.line("."), 3)
   end)
   log(ok and "DONE" or ("ERROR: " .. tostring(err)))
   vim.cmd("qall!")

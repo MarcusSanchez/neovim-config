@@ -107,6 +107,19 @@ lib.suite("gopls", function(t)
   require("lazy").load({ plugins = { "noice.nvim" } })
   t.wait(300)
   local docs = require("noice.lsp.docs")
+  -- gk opens noice's hover (its styled one, which replaces vim.lsp.buf.hover
+  -- after the LSP keys spec is read — the key must look the function up
+  -- when pressed, not capture it)
+  vim.api.nvim_win_set_cursor(0, { 11, 2 })
+  t.check("gk is the LSP hover key", vim.fn.maparg("gk", "n", false, true).desc, "LSP Hover")
+  vim.fn.maparg("gk", "n", false, true).callback()
+  vim.wait(5000, function()
+    local m = docs.get("hover")
+    return m and m:win() ~= nil
+  end, 100)
+  t.check("gk opens noice's hover window", docs.get("hover"):win() ~= nil, true)
+  keys("<Esc>")
+  t.wait(200)
   local msg = docs.get("hover")
   local hid = false
   docs.hide = function(m)

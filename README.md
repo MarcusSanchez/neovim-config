@@ -63,7 +63,7 @@ above/below, `<M-S-l>`/`<M-S-n>` add the next/previous match of the word,
 | key | does |
 |---|---|
 | `gd` | goto definition; on the definition itself, open its usages (one usage jumps straight there) |
-| `gh` | back to where the last jump came from (tagstack) |
+| `gh` | back to where the last jump came from (tagstack): `gd`, a usages pick, a hover link, a flash `s` |
 | `gs` / `g/` | workspace symbols / project grep (literal, no escaping) |
 | `gk` / `ge` | hover docs / line diagnostics, in a cursor popup; `<Esc>` dismisses; `gd` inside the hover follows a link (file links jump there, https opens the browser) |
 | `,a` / `,c` | toggle-focus / close the explorer sidebar |
