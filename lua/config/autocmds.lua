@@ -40,6 +40,12 @@ autocmd("QuitPre", {
     require("util.explorer").on_quit_pre()
   end,
 })
+autocmd("ExitPre", {
+  group = augroup("quit_with_explorer_exit"),
+  callback = function()
+    require("util.explorer").on_exit_pre()
+  end,
+})
 
 -- write on leaving insert mode, and 300ms after a normal-mode edit; never
 -- formats

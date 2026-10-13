@@ -146,6 +146,8 @@ function M.real_window_count()
   return real
 end
 
+local quit_pending = false -- a qall scheduled by on_quit_pre, not yet run
+
 --- QuitPre handler: when :q closes the last real window, quit nvim entirely
 --- instead of leaving the sidebar behind. A :q in the sidebar itself or in
 --- a float closes just that.
@@ -160,10 +162,24 @@ function M.on_quit_pre()
   if M.real_window_count() <= 1 then
     -- scheduled so the original :q finishes first; if it aborts on a
     -- modified buffer, qall raises the same E37 rather than force-quitting
+    quit_pending = true
     vim.schedule(function()
+      if not quit_pending or vim.v.exiting ~= vim.NIL then
+        return
+      end
+      quit_pending = false
       vim.cmd("qall")
     end)
   end
+end
+
+--- ExitPre handler: Vim is exiting on its own (:qa, :wqa, the last :q),
+--- so the qall on_quit_pre scheduled must not run. It would: Neovim's
+--- exit waits for language servers to stop and runs scheduled callbacks
+--- meanwhile, and a qall nested in the exit ends the process at once —
+--- before VimLeavePre, so the session was never saved.
+function M.on_exit_pre()
+  quit_pending = false
 end
 
 return M

@@ -35,9 +35,11 @@ timed() { # cwd, file to open (may be empty), lua script: a headless nvim,
   kill -9 "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
 }
 
-run() { # name, cwd, file to open, lua script, result log
+run() { # name, cwd, file to open, lua script, result log [, keep]
   local name=$1 cwd=$2 file=$3 script=$4 log=$5
-  rm -f "$log" # never report a stale log as this run's
+  # never report a stale log as this run's — unless a first pass just
+  # wrote it and this pass appends to it
+  [[ ${6:-} == keep ]] || rm -f "$log"
   timed "$cwd" "$file" "$script"
   echo "== $name"
   if [[ -f $log ]]; then
@@ -71,7 +73,7 @@ if [[ $want == all || $want == session ]]; then
   export XDG_STATE_HOME="$work/state-session" SESSION_PASS=1
   rm -f "$work/go/result.log" "$work/go/session.path"
   timed "$work/go" "" "$here/session.lua"
-  SESSION_PASS=2 run session "$work/go" "" "$here/session.lua" "$work/go/result.log"
+  SESSION_PASS=2 run session "$work/go" "" "$here/session.lua" "$work/go/result.log" keep
   # pass 2 quits with no file open: that forgets the directory's session
   # (pass 2 wrote the session file's path, as util/session computes it)
   sess=$(cat "$work/go/session.path" 2>/dev/null)
@@ -119,12 +121,12 @@ if [[ $want == all || $want == scroll || $want == keys || $want == comment || $w
     timed "$work" folds.txt "$here/folds.lua"
     # shift everything down and change block three's content before pass 2
     { echo "new header"; echo "another"; echo "third"; sed 's/three line 5/three line 5 EDITED/' "$work/folds.txt"; } > "$work/folds.tmp" && mv "$work/folds.tmp" "$work/folds.txt"
-    FOLD_PASS=2 run folds "$work" folds.txt "$here/folds.lua" "$work/result.log"
+    FOLD_PASS=2 run folds "$work" folds.txt "$here/folds.lua" "$work/result.log" keep
     # same again for treesitter (async) folds, on the rust fixture
     export FOLD_PASS=1
     rm -f "$work/rust/result.log"
     timed "$work/rust" src/lib.rs "$here/folds_ts.lua"
-    FOLD_PASS=2 run folds-treesitter "$work/rust" src/lib.rs "$here/folds_ts.lua" "$work/rust/result.log"
+    FOLD_PASS=2 run folds-treesitter "$work/rust" src/lib.rs "$here/folds_ts.lua" "$work/rust/result.log" keep
     unset FOLD_PASS
   fi
 fi

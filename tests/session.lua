@@ -38,6 +38,17 @@ vim.schedule(function()
         return require("util.explorer").get() ~= nil
       end, 50)
       check("pass 1: explorer open before quitting", require("util.explorer").get() ~= nil, true)
+      vim.cmd("wincmd p") -- the file window, as when :wqa is typed over the code
+      -- the :q-with-explorer hook schedules a qall; a full exit (ExitPre)
+      -- must cancel it, or the qall runs nested inside the exit — Neovim
+      -- waits for language servers there and runs scheduled callbacks —
+      -- and ends the process before VimLeavePre, with no session saved
+      require("util.explorer").on_quit_pre()
+      vim.api.nvim_exec_autocmds("ExitPre", {})
+      vim.wait(200, function()
+        return false
+      end)
+      check("pass 1: a full exit cancels the sidebar's pending qall (still running)", true, true)
       vim.cmd("wqall")
       return
     end
