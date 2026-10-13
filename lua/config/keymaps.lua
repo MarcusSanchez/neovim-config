@@ -40,24 +40,8 @@ end
 
 -- Jump half page up/down with Shift+J/K
 -- (up/down follow the j/k swap below: Shift+J goes up, Shift+K goes down)
-map("x", "<S-J>", "<C-U>", opts("Scroll Half Page Up"))
-map("x", "<S-K>", "<C-D>", opts("Scroll Half Page Down"))
--- in normal mode the jumps glide to where they land (lua/util/jumps.lua)
-for lhs, jump in pairs({
-  ["<S-J>"] = { "<C-U>", "Scroll Half Page Up" },
-  ["<S-K>"] = { "<C-D>", "Scroll Half Page Down" },
-  ["<C-U>"] = { "<C-U>", "Scroll Half Page Up" },
-  ["<C-D>"] = { "<C-D>", "Scroll Half Page Down" },
-  ["<C-B>"] = { "<C-B>", "Scroll Page Up" },
-  ["<C-F>"] = { "<C-F>", "Scroll Page Down" },
-  gg = { "gg", "Go to First Line" },
-  G = { "G", "Go to Last Line" },
-}) do
-  local keys = vim.api.nvim_replace_termcodes(jump[1], true, false, true)
-  map("n", lhs, function()
-    require("util.jumps").animated(keys)
-  end, opts(jump[2]))
-end
+map({ "n", "x" }, "<S-J>", "<C-U>", opts("Scroll Half Page Up"))
+map({ "n", "x" }, "<S-K>", "<C-D>", opts("Scroll Half Page Down"))
 
 -- Swap j and k. Without a count they move by display line (gj/gk), as
 -- LazyVim's own j/k do, so a wrapped paragraph is walked screen row by

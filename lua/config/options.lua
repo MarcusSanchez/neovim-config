@@ -8,8 +8,7 @@
 -- session-restoring start, which puts it back (see dashboard.lua).
 vim.opt.shortmess:remove("I")
 
--- Disable all snacks animations globally (jumps glide on their own:
--- lua/util/jumps.lua)
+-- No snacks animations (scroll, windows); the cursor trail is smear-cursor's
 vim.g.snacks_animate = false
 -- Copilot as ghost text, not as completion entries
 vim.g.ai_cmp = false

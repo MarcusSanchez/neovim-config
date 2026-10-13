@@ -13,7 +13,7 @@
 # code, and cargo/gopls scratch output stays out of the tree.
 set -u
 here=$(cd "$(dirname "$0")" && pwd)
-suites="go caret rust tsx zig gleam c cpp lua sh json yaml toml markdown nix python protofold session copilot proto scroll keys jumps comment ranges folds"
+suites="go caret rust tsx zig gleam c cpp lua sh json yaml toml markdown nix python protofold session copilot proto scroll keys comment ranges folds"
 want=${1:-all}
 if [[ $want != all ]] && ! grep -qw -- "$want" <<< "$suites"; then
   echo "usage: tests/run.sh [all | $(echo $suites | tr ' ' '|')]" >&2; exit 2
@@ -106,10 +106,9 @@ if [[ $want == all || $want == copilot ]]; then
   grep -qE '^(FAIL|ERROR|TIMEOUT)' "$work/go/result.log" 2>/dev/null && status=1
 fi
 [[ $want == all || $want == proto ]] && run proto "$work/proto" acme/v1/user.proto "$here/proto.lua" "$work/proto/result.log"
-if [[ $want == all || $want == scroll || $want == keys || $want == jumps || $want == comment || $want == ranges || $want == folds ]]; then
+if [[ $want == all || $want == scroll || $want == keys || $want == comment || $want == ranges || $want == folds ]]; then
   [[ $want == all || $want == scroll ]] && run scroll "$work" long.txt "$here/scroll.lua" "$work/result.log"
   [[ $want == all || $want == keys ]] && run keys "$work" long.txt "$here/keys.lua" "$work/result.log"
-  [[ $want == all || $want == jumps ]] && run jumps "$work" long.txt "$here/jumps.lua" "$work/result.log"
   [[ $want == all || $want == comment ]] && run comment "$work" long.txt "$here/comment.lua" "$work/result.log"
   [[ $want == all || $want == ranges ]] && run ranges "$work" long.txt "$here/ranges.lua" "$work/result.log"
   if [[ $want == all || $want == folds ]]; then

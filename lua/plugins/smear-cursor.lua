@@ -1,9 +1,8 @@
--- The ui.smear-cursor extra (lazyvim.json) is kept installed but off: the
--- trail didn't earn its keep. Flip `enabled` to try it again.
+-- The cursor trail (the ui.smear-cursor extra in lazyvim.json, with these
+-- opts on top): a smear between positions, no cursor colour of its own.
 return {
   "sphamba/smear-cursor.nvim",
   event = "VeryLazy",
-  enabled = false,
   cond = vim.g.neovide == nil,
   opts = {
     hide_target_hack = true,
