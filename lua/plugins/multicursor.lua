@@ -1,15 +1,16 @@
 return {
   "jake-stewart/multicursor.nvim",
   branch = "1.0",
+  -- the keys that load the plugin; the mappings themselves are below
   keys = {
-    { "<C-j>", mode = { "n", "x" }, desc = "Add cursor above" },
-    { "<C-k>", mode = { "n", "x" }, desc = "Add cursor below" },
-    { "<leader><up>", mode = { "n", "x" }, desc = "Skip cursor above" },
-    { "<leader><down>", mode = { "n", "x" }, desc = "Skip cursor below" },
-    { "<M-S-l>", mode = { "n", "x" }, desc = "Add cursor by matching word" },
-    { "<leader>s", mode = { "n", "x" }, desc = "Skip cursor by matching word" },
-    { "<leader>N", mode = { "n", "x" }, desc = "Add cursor by matching selection" },
-    { "<leader>S", mode = { "n", "x" }, desc = "Skip cursor by matching selection" },
+    { "<C-j>", mode = { "n", "x" }, desc = "Add Cursor Above" },
+    { "<C-k>", mode = { "n", "x" }, desc = "Add Cursor Below" },
+    { "<leader><up>", mode = { "n", "x" }, desc = "Skip Cursor Above" },
+    { "<leader><down>", mode = { "n", "x" }, desc = "Skip Cursor Below" },
+    { "<M-S-l>", mode = { "n", "x" }, desc = "Add Cursor by Matching Word (Next)" },
+    { "<leader>s", mode = { "n", "x" }, desc = "Skip Cursor by Matching Word (Next)" },
+    { "<leader>N", mode = { "n", "x" }, desc = "Add Cursor by Matching Word (Prev)" },
+    { "<leader>S", mode = { "n", "x" }, desc = "Skip Cursor by Matching Word (Prev)" },
   },
   config = function()
     local mc = require("multicursor-nvim")
@@ -17,7 +18,14 @@ return {
 
     local set = vim.keymap.set
 
-    -- Add or skip cursor above/below the main cursor.
+    -- Add or skip cursor above/below the main cursor (<C-j> above, <C-k>
+    -- below: j/k are swapped in this config).
+    set({ "n", "x" }, "<C-j>", function()
+      mc.lineAddCursor(-1, { skipEmpty = false })
+    end, { desc = "Add Cursor Above" })
+    set({ "n", "x" }, "<C-k>", function()
+      mc.lineAddCursor(1, { skipEmpty = false })
+    end, { desc = "Add Cursor Below" })
     set({ "n", "x" }, "<leader><up>", function()
       mc.lineSkipCursor(-1)
     end, { desc = "Skip Cursor Above" })

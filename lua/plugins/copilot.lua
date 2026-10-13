@@ -1,8 +1,6 @@
+-- On top of LazyVim's ai.copilot extra (cmd/build/event come from there).
 return {
   "zbirenbaum/copilot.lua",
-  cmd = "Copilot",
-  build = ":Copilot auth",
-  event = "BufReadPost",
   init = function()
     require("util.copilot").setup() -- reap servers orphaned by earlier sessions
   end,
@@ -20,19 +18,8 @@ return {
         dismiss = "<C-]>",
       },
     },
-    panel = { enabled = false }, -- Disable Copilot panel
-    filetypes = {
-      markdown = true,
-      help = true,
-      -- Disable for certain filetypes if you want:
-      yaml = false,
-      gitcommit = false,
-      gitrebase = false,
-      hgcommit = false,
-      svn = false,
-      cvs = false,
-      ["."] = false,
-    },
+    -- (the panel is off and markdown/help on in the extra; yaml, commit
+    -- messages and the rest are off by copilot.lua's own defaults)
     -- node >= 20, launched through a watchdog wrapper so the server can't
     -- outlive nvim (lua/util/copilot.lua)
     copilot_node_command = require("util.copilot").node_command(),

@@ -32,7 +32,8 @@ return {
             end,
             desc = "Go Back (Pop Tagstack)",
           },
-          { "K", false }, -- hover is on gk (config/keymaps.lua)
+          { "K", false }, -- hover is on gk instead:
+          { "gk", vim.lsp.buf.hover, has = "hover", desc = "LSP Hover" },
         },
       },
       gopls = {

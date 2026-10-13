@@ -1,5 +1,5 @@
--- Buffer tabs (2026-08-13: the harpoon experiment is benched in
--- lua/benched/harpoon.lua). Alt+h/l cycle buffers, the tabline shows what's open.
+-- Buffer tabs: Alt+h/l cycle buffers, the tabline shows what's open;
+-- harpoon (plugins/harpoon.lua) pins slots alongside.
 return {
   "akinsho/bufferline.nvim",
   opts = function(_, opts)

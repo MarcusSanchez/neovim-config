@@ -12,7 +12,6 @@ end
 return {
   "folke/snacks.nvim",
   keys = {
-    -- (to bench the explorer again, see lua/benched/oil.lua)
     {
       "<leader>db",
       function()
@@ -32,9 +31,8 @@ return {
       },
     },
     -- dashboard config lives in dashboard.lua
-    -- the explorer rides as the right sidebar below (neo-tree was tried and
-    -- benched: lua/benched/neo-tree.lua)
-    explorer = { enabled = true },
+    -- the explorer (LazyVim's snacks_explorer extra) rides as the right
+    -- sidebar below; neo-tree was tried and benched: lua/benched/neo-tree.lua
     -- j/k are swapped in this config (see config/keymaps.lua): every
     -- picker list and the terminal window nav follow suit
     picker = {

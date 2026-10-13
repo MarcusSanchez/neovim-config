@@ -1,20 +1,14 @@
+-- Catppuccin Mocha, transparent, with highlights tracking a GoLand scheme.
+-- These opts merge into LazyVim's catppuccin spec (its integrations and
+-- undercurls stay); LazyVim loads the colorscheme named below at startup.
 return {
-  "catppuccin/nvim",
-  name = "catppuccin",
-  lazy = false,
-  priority = 1000,
-  config = function()
-    require("catppuccin").setup({
+  { "LazyVim/LazyVim", opts = { colorscheme = "catppuccin-mocha" } },
+  {
+    "catppuccin/nvim",
+    name = "catppuccin",
+    opts = {
       flavour = "mocha",
       transparent_background = true,
-      integrations = {
-        cmp = true,
-        semantic_tokens = true,
-        gitsigns = true,
-        nvimtree = true,
-        treesitter = true,
-        telescope = true,
-      },
       highlight_overrides = {
         all = function(colors)
           local fall = "#dabb9b"
@@ -28,12 +22,10 @@ return {
             ["@boolean"] = { fg = colors.mauve, style = { "italic" } },
             ["@constant.builtin"] = { fg = colors.mauve, style = { "italic" } },
             ["@function.builtin"] = { fg = colors.blue },
-            ["@field"] = { fg = colors.red },
             ["@property"] = { fg = colors.red },
-            ["@namespace"] = { fg = colors.subtext1, style = { "italic" } },
+            ["@module"] = { fg = colors.subtext1, style = { "italic" } },
             ["@variable"] = { fg = colors.subtext1 },
             ["@variable.member"] = { fg = colors.red },
-            ["@parameter"] = { fg = fall },
             ["@variable.parameter"] = { fg = fall },
             ["@number"] = { fg = colors.sky },
             ["@operator"] = { fg = cherry_blossom },
@@ -41,10 +33,6 @@ return {
             ["@punctuation.delimiter"] = { fg = colors.overlay2 },
             ["@punctuation.special"] = { fg = cherry_blossom },
             ["@lsp.type.enumMember"] = { fg = colors.peach },
-            DiagnosticUnderlineError = { style = { "undercurl" } },
-            DiagnosticUnderlineWarn = { style = { "undercurl" } },
-            DiagnosticUnderlineHint = { style = { "undercurl" } },
-
             -- treesitter-context: shade the pinned scope line's background so
             -- it reads as a distinct bar, no underline/separator needed (the
             -- separator-row experiment is commented in nvim-treesitter-context.lua)
@@ -91,7 +79,6 @@ return {
 
             -- JS/TS/JSX/TSX
             ["@keyword.operator.tsx"] = { fg = colors.mauve },
-            ["@keyword.operator.ts"] = { fg = colors.mauve },
             ["@tag.builtin"] = { fg = colors.red },
             ["@tag.attribute"] = { fg = fall },
             ["@tag.attribute.tsx"] = { fg = fall },
@@ -123,7 +110,6 @@ return {
           }
         end,
       },
-    })
-    vim.cmd.colorscheme("catppuccin-mocha")
-  end,
+    },
+  },
 }

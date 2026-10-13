@@ -35,7 +35,8 @@ return {
       opts.formatters_by_ft = opts.formatters_by_ft or {}
       -- goimports first (adds/removes imports), golangci-lint fmt last so the
       -- project's gci grouping has the final say on import layout — replaces
-      -- the LazyVim go extra's goimports+gofumpt pair, which never matched it.
+      -- the LazyVim go extra's goimports+gofumpt pair, which never matched it
+      -- (the extra still installs gofumpt through mason; it goes unused).
       opts.formatters_by_ft.go = { "goimports", "golangci_fmt" }
 
       -- conform's prettier resolves node_modules/.bin/prettier before any
