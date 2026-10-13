@@ -304,6 +304,30 @@ lib.suite("gopls", function(t)
     vim.fn.foldclosed(9) .. " " .. t.span(6) .. " " .. cursor(),
     "-1 5..8 10:0"
   )
+  -- a long line scrolls the window sideways ('nowrap'): the fold line
+  -- scrolls with it instead of sitting at column one, and the caret
+  -- landing on it scrolls the view back so the caret is in view
+  vim.cmd("normal! zR")
+  t.fold(6)
+  vim.api.nvim_buf_set_lines(buf, 3, 4, false, { "// " .. ("x"):rep(300) })
+  vim.api.nvim_win_set_cursor(win, { 4, 280 })
+  moved()
+  vim.cmd("redraw")
+  t.check("the long line scrolled the window", vim.fn.winsaveview().leftcol > 0, true)
+  t.check("the fold line scrolled with it", vim.fn.foldtextresult(5), "")
+  vim.cmd("normal! j") -- Vim's own j: onto the fold
+  moved()
+  local leftcol = vim.fn.winsaveview().leftcol
+  t.check("the caret is in view: the window scrolled back (minimally, like Vim)", leftcol <= 27 and leftcol > 0, true)
+  t.check(
+    "the fold line is scrolled by that much",
+    vim.fn.foldtextresult(5),
+    vim.fn.strcharpart("func h( ... ) (int, error) {", leftcol)
+  )
+  key("<S-h>") -- the caret to the first cell
+  t.check("the caret at the start brings the view fully back", vim.fn.winsaveview().leftcol, 0)
+  vim.api.nvim_buf_set_lines(buf, 3, 4, false, { "" })
+  t.ranges()
   -- 'whichwrap' has h and l: off either end of the fold line they go to
   -- the line above / below, and from those lines back onto the fold's
   -- last / first drawn character

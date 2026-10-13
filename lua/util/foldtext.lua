@@ -600,15 +600,35 @@ function M.cells(chunks)
 end
 
 --- The chunks as 'foldtext' takes them, `{ text, group }` only, with the
---- cell at index `cursor` (if any) drawn as the caret.
+--- cell at index `cursor` (if any) drawn as the caret, and the first
+--- `leftcol` cells dropped: Vim draws a fold line from column one however
+--- far the window is scrolled sideways, so with 'nowrap' a folded line
+--- stayed put while every real line scrolled away.
 ---@param chunks util.foldtext.Chunk[]
 ---@param cursor integer?
-function M.render(chunks, cursor)
+---@param leftcol integer?
+function M.render(chunks, cursor, leftcol)
   local out, seen = {}, 0
+  local skip = leftcol or 0
+  if skip > 0 then
+    cursor = cursor and cursor > skip and cursor - skip or nil
+  end
   for _, c in ipairs(chunks) do
     local text = c[1]
+    if skip > 0 then
+      local n = vim.fn.strchars(text)
+      if n <= skip then
+        skip = skip - n
+        text = ""
+      else
+        text = vim.fn.strcharpart(text, skip)
+        skip = 0
+      end
+    end
     local n = vim.fn.strchars(text)
-    if cursor and cursor > seen and cursor <= seen + n then
+    if text == "" then
+      -- scrolled away
+    elseif cursor and cursor > seen and cursor <= seen + n then
       local at = cursor - seen - 1 -- 0-based char index within the chunk
       local before, caret, after =
         vim.fn.strcharpart(text, 0, at), vim.fn.strcharpart(text, at, 1), vim.fn.strcharpart(text, at + 1)
@@ -628,11 +648,12 @@ function M.render(chunks, cursor)
 end
 
 --- 'foldtext': the fold line of the fold being drawn, with the caret
---- where the `caret` hook says there is one in this window.
+--- where the `caret` hook says there is one in this window, scrolled
+--- sideways as far as the window is.
 function M.text()
   local buf, win = vim.api.nvim_get_current_buf(), vim.api.nvim_get_current_win()
   local chunks = M.build(buf, vim.v.foldstart, vim.v.foldend)
-  return M.render(chunks, M.caret and M.caret(win, buf, vim.v.foldstart) or nil)
+  return M.render(chunks, M.caret and M.caret(win, buf, vim.v.foldstart) or nil, vim.fn.winsaveview().leftcol)
 end
 
 return M

@@ -327,7 +327,21 @@ local function place(win, buf, start, stop, cells, target, curswant)
   trace(("place: cell %d at %d:%d"):format(target, cell.lnum, cell.col))
   api.nvim_win_set_cursor(win, { cell.lnum, cell.col })
   api.nvim_win_call(win, function()
-    vim.fn.winrestview({ curswant = curswant or target - 1 })
+    -- the drawn column is the caret's: keep it in view sideways the way
+    -- Vim keeps a cursor on a long line (Vim doesn't scroll for a cursor
+    -- in a closed fold, and the fold line scrolls with the window)
+    local view = vim.fn.winsaveview()
+    local col, leftcol = target - 1, view.leftcol
+    if not vim.wo[win].wrap then
+      local width = api.nvim_win_get_width(win) - vim.fn.getwininfo(win)[1].textoff
+      local margin = math.min(vim.wo[win].sidescrolloff, math.floor((width - 1) / 2))
+      if col < leftcol + margin then
+        leftcol = math.max(0, col - margin)
+      elseif col >= leftcol + width - margin then
+        leftcol = col - width + margin + 1
+      end
+    end
+    vim.fn.winrestview({ curswant = curswant or target - 1, leftcol = leftcol })
   end)
   states[win] = {
     buf = buf,
