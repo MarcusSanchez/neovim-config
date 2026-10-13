@@ -4,19 +4,21 @@
 -- answered (rust-analyzer, gopls, vtsls… know every bracket region: a
 -- struct literal inside a closure, a wrapped argument list, an if/else
 -- chain), from treesitter's fold queries until then or where no server
--- folds, and from indentation in files with no parser. For JSX, treesitter
--- supplements the server, which reports elements inconsistently.
+-- folds (or a server answers with none), and from indentation in files
+-- with no parser. Treesitter also supplements servers that are thin: JSX
+-- elements, Gleam's blocks, C's `#include` runs and `#ifdef` regions.
 --
 -- Server ranges are normalised (M.normalize) in stages:
 --  1. grow: servers follow VS Code's convention and stop a range one line
 --     short so the closing bracket stays visible (`}`, `});`, `}, log)`,
---     `</div>`); the closer joins the fold. An opening tag's attribute
---     list grows into the tag itself (`<Hero` … `/>`).
---  2. chains: neighbours that share a line (if / else if / else,
---     parameters / body) also get one range covering all of them.
---  3. heads and bodies: a statement whose body starts lines later gets a
+--     `</div>`); the closer joins the fold. Keyword blocks close the same
+--     way (Lua's `end`, a shell's `fi`). An opening tag's attribute list
+--     grows into the tag itself (`<Hero` … `/>`).
+--  2. heads and bodies: a statement whose body starts lines later gets a
 --     range for its wrapped head (`if self` … `{`); a range whose head is
 --     its own range gets one for the body (`>` … `</a>`, `) -> R {` … `}`).
+--  3. chains: neighbours that share a line (if / else if / else,
+--     parameters / body) also get one range covering all of them.
 --
 -- Neighbours then share lines (`) -> R {`, `} else {`, `>`), and Vim gives
 -- a line to one fold. The owner is decided when a fold is made (M.fold,
@@ -58,20 +60,31 @@ end
 --- toward a range's balance the way brackets do, and a line starting
 --- with one of `lead` closes the region above it the way a `}` line does
 --- (`end`, `fi`; `else` and `elseif` close a branch and open the next).
+local function set(words)
+  local out = {}
+  for _, w in ipairs(words) do
+    out[w] = true
+  end
+  return out
+end
 local keywords = {
   lua = {
-    open = { "function", "then", "do", "repeat", "else" },
-    close = { "end", "until" },
-    lead = { "end", "until", "else", "elseif" },
+    open = set({ "function", "then", "do", "repeat", "else" }),
+    close = set({ "end", "until" }),
+    lead = set({ "end", "until", "else", "elseif" }),
   },
   sh = {
-    open = { "then", "do", "case", "else", "elif" },
-    close = { "fi", "done", "esac" },
-    lead = { "fi", "done", "esac", "else", "elif" },
+    open = set({ "then", "do", "case", "else", "elif" }),
+    close = set({ "fi", "done", "esac" }),
+    lead = set({ "fi", "done", "esac", "else", "elif" }),
   },
 }
 keywords.bash, keywords.zsh = keywords.sh, keywords.sh
-M.keywords = keywords
+
+--- The word a line starts with, when it is one.
+local function leading_word(text)
+  return text:match("^%s*(%a+)%f[%A]")
+end
 
 --- The closing bracket a line starts with, if any — or the closing
 --- keyword (`end`, `elseif`) of the filetype's blocks.
@@ -80,8 +93,19 @@ local function leading_closer(text, kw)
   if bracket or not kw then
     return bracket
   end
-  local word = text:match("^%s*(%a+)%f[%A]")
-  return word and vim.tbl_contains(kw.lead, word) and word or nil
+  local word = leading_word(text)
+  return word and kw.lead[word] and word or nil
+end
+
+--- The closing keyword the line starts with in the filetype's blocks
+--- (`end`, `fi`, an `elseif`), for the fold line's closer.
+function M.closing_keyword(text, filetype)
+  local kw = keywords[filetype]
+  if not kw then
+    return nil
+  end
+  local word = leading_word(text)
+  return word and kw.lead[word] and word or nil
 end
 
 --- The tag a line closes, if it starts with one: the name for `</div>`,
@@ -124,9 +148,9 @@ local function balance(lines, first, last, kw)
     end
     if kw then
       for word in text:gmatch("%f[%a]%a+%f[%A]") do
-        if vim.tbl_contains(kw.open, word) then
+        if kw.open[word] then
           net = net + 1
-        elseif vim.tbl_contains(kw.close, word) then
+        elseif kw.close[word] then
           net = net - 1
         end
       end
@@ -135,7 +159,12 @@ local function balance(lines, first, last, kw)
   return net
 end
 
-M.balance = balance
+--- Whether the line opens a keyword block it doesn't close (`if x then`,
+--- `function f()`, `else`), in the filetype's blocks.
+function M.opens_block(text, filetype)
+  local kw = keywords[filetype]
+  return kw ~= nil and balance({ text }, 0, 0, kw) > 0
+end
 
 local function by_start(a, b)
   if a.s ~= b.s then
@@ -802,7 +831,6 @@ function M.toggle()
     return
   end
   require("util.folds").close_exact(s, e)
-  require("util.foldcursor").refresh()
 end
 
 local function supports(client, buf)

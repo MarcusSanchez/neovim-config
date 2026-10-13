@@ -266,6 +266,7 @@ end
 -- (lua/util/foldranges.lua)
 map("n", ",d", function()
   require("util.foldranges").toggle()
+  require("util.foldcursor").refresh() -- a fold closed around the cursor gets the caret
 end, { desc = "Toggle Fold Under Cursor" })
 
 -- ,r to rename symbol under cursor

@@ -32,6 +32,8 @@ local function trace(msg)
   end
 end
 
+-- the caret ----------------------------------------------------------------------
+
 local foldtext = require("util.foldtext")
 
 --- The fold line's cells (util/foldtext.lua) for the closed fold.
@@ -108,6 +110,8 @@ local function nearest(cells, i, dir)
   return cells[i] and i or nil
 end
 
+-- the drawn line and what it hides ---------------------------------------------------
+
 local scratch ---@type integer? a buffer the word motions run in
 
 ---@class util.foldcursor.Drawn a closed fold as the word motions see it
@@ -173,13 +177,15 @@ local function run_in_copy(buf, run, copy, lnum, col)
   return c[1], c[2]
 end
 
-local function drawn(buf, start, stop)
-  local cells = cells_of(buf, start, stop)
-  local text = ""
-  for _, c in ipairs(cells) do
-    text = text .. c.ch
+--- A closed fold as the word motions see it (cells computed unless given).
+---@return util.foldcursor.Drawn
+local function drawn(buf, start, stop, cells)
+  cells = cells or cells_of(buf, start, stop)
+  local chars = {}
+  for i, c in ipairs(cells) do
+    chars[i] = c.ch
   end
-  return { start = start, stop = stop, text = text, cells = cells }
+  return { start = start, stop = stop, text = table.concat(chars), cells = cells }
 end
 
 ---@class util.foldcursor.Segment a ` ... ` of the fold line and what it hides
@@ -277,6 +283,8 @@ local function open_end(win, buf, start, stop, cells)
   api.nvim_win_set_cursor(win, { stop, math.max(#line - 1, 0) })
 end
 
+-- placing the caret ---------------------------------------------------------------
+
 -- Vim's own cursor sits in the fold line's first column whatever the
 -- caret does; while the caret is drawn it's a beam in the line's colour.
 local shown_as ---@type string? 'guicursor' before the cursor was hidden
@@ -334,6 +342,8 @@ local function place(win, buf, start, stop, cells, target, curswant)
   pcall(api.nvim__redraw, { win = win, range = { start - 1, stop }, valid = false })
 end
 
+-- motions -------------------------------------------------------------------------
+
 --- Whether 'whichwrap' lets the key cross a line boundary.
 local function wraps(key)
   return vim.o.whichwrap:find(key, 1, true) ~= nil
@@ -372,9 +382,7 @@ local function word(win, buf, start, stop, cells, at, run)
   local folds = {} ---@type util.foldcursor.Drawn[]
   local origin = api.nvim_win_get_cursor(win)
   if start then
-    local f = drawn(buf, start, stop)
-    f.cells = cells
-    folds[1] = f
+    folds[1] = drawn(buf, start, stop, cells)
     local col = 0
     for i = 1, at - 1 do
       col = col + #cells[i].ch
@@ -502,7 +510,6 @@ end
 --- the nearest drawn character to its left if that falls in a ` ... `.
 --- Nothing opens.
 local function arrive()
-  trace("arrive: mode " .. api.nvim_get_mode().mode)
   if api.nvim_get_mode().mode ~= "n" then
     return
   end
@@ -549,6 +556,8 @@ local function caret_at_cursor(win, buf)
     place(win, buf, start, stop, cells, current_cell(win, buf, start, cells))
   end
 end
+
+-- editing -------------------------------------------------------------------------
 
 --- x / X / r on a caret: the character it stands for is deleted (the
 --- count of them to the right / left, within the drawn text of that
@@ -603,6 +612,8 @@ function M.edit(key)
     place(win, buf, start, stop, cells, target)
   end
 end
+
+-- insert and visual mode round trips ---------------------------------------------
 
 ---@class util.foldcursor.Reclose folds opened at the cursor for insert or visual mode, to close again after
 ---@field buf integer
@@ -713,6 +724,8 @@ local function insert_leave()
   end
 end
 
+-- api and setup ---------------------------------------------------------------------
+
 --- The caret for the cursor's position, when it's on a closed fold (after
 --- ,d closed one around it).
 function M.refresh()
@@ -732,6 +745,7 @@ function M.hidden()
 end
 
 function M.setup()
+  foldtext.caret = M.cell_at -- the fold line draws the caret
   vim.opt.foldopen:remove("hor") -- the caret walks the fold line instead
   api.nvim_set_hl(0, "FoldCursor", { reverse = true, default = true })
   local group = api.nvim_create_augroup("fold_cursor", { clear = true })

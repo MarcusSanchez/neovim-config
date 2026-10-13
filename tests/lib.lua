@@ -31,9 +31,10 @@ function M.suite(server, body, opts)
     end)
   end
   local FR = require("util.foldranges")
-  function t.fold(l)
+  function t.fold(l) -- what the ,d mapping does (config/keymaps.lua)
     vim.cmd(("normal! %dG"):format(l))
     FR.toggle()
+    require("util.foldcursor").refresh()
   end
   function t.span(l)
     return vim.fn.foldclosed(l) .. ".." .. vim.fn.foldclosedend(l)
