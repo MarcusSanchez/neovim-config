@@ -3,16 +3,7 @@
 -- tab.
 local M = {}
 
---- An unnamed, unmodified, empty scratch buffer: a placeholder, not a tab
---- worth keeping.
-local function placeholder(buf)
-  return vim.api.nvim_buf_is_valid(buf)
-    and vim.api.nvim_buf_get_name(buf) == ""
-    and vim.bo[buf].buftype == ""
-    and not vim.bo[buf].modified
-    and vim.api.nvim_buf_line_count(buf) == 1
-    and vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1] == ""
-end
+local placeholder = require("util.buffers").is_placeholder
 
 --- harpoon2's `default.select`, plus: when the jump leaves a placeholder
 --- buffer behind in no window, wipe it.

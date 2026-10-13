@@ -54,6 +54,18 @@ function M.form(buf, row, col)
   return form
 end
 
+--- The rhs for `gc` in visual mode (an expr mapping): on a charwise
+--- selection in a language with block comments, the block toggle; else
+--- the built-in comment operator (Neovim's own `gc`, a private module
+--- that may move between versions).
+function M.operator()
+  local pos = vim.fn.getpos("v")
+  if vim.fn.mode() == "v" and M.form(0, pos[2] - 1, pos[3] - 1) then
+    return "<Cmd>lua require('util.comment').block()<CR>"
+  end
+  return require("vim._comment").operator()
+end
+
 --- The selection (charwise visual mode is active) wrapped in the block
 --- comment, or unwrapped when it already is one.
 function M.block()

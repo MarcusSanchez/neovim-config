@@ -25,11 +25,14 @@ local function save(buf)
     local autoformat = vim.b[buf].autoformat
     vim.b[buf].autoformat = false
     -- silent!: a file changed on disk (E13/E211) shouldn't raise on a timer
-    pcall(vim.cmd, "silent! update")
+    vim.cmd("silent! update")
     vim.b[buf].autoformat = autoformat
   end)
 end
 
+--- Drop the pending save. (A timer that has fired but whose callback
+--- hasn't run yet can't be stopped; the save it then does is a no-op
+--- after the one TextChanged schedules.)
 ---@param buf integer
 local function cancel(buf)
   local timer = timers[buf]

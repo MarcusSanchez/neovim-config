@@ -93,9 +93,16 @@ function M.setup()
     group = group,
     pattern = { "/", "\\?" },
     callback = function()
-      if not vim.v.event.abort then
-        vim.schedule(reveal) -- the jump happens after this event
+      if vim.v.event.abort then
+        return
       end
+      local before = vim.api.nvim_win_get_cursor(0)
+      vim.schedule(function() -- the jump happens after this event
+        local after = vim.api.nvim_win_get_cursor(0)
+        if after[1] ~= before[1] or after[2] ~= before[2] then
+          reveal() -- a search that found nothing moved nothing: no visit
+        end
+      end)
     end,
   })
   vim.api.nvim_create_autocmd("CursorMoved", { group = group, callback = leave })

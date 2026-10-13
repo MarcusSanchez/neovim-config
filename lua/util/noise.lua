@@ -97,6 +97,9 @@ function M.file_lines(file)
   if b > 0 and vim.api.nvim_buf_is_loaded(b) then
     return vim.api.nvim_buf_get_lines(b, 0, -1, false)
   end
+  if vim.fn.filereadable(file) ~= 1 then
+    return {} -- a reference into a file since deleted: nothing to classify
+  end
   return vim.fn.readfile(file)
 end
 
@@ -141,17 +144,6 @@ function M.checker()
     local root = root_cache[file]
     return root and rust_in_test(root, src_cache[file], row, col or 0) or false
   end
-end
-
---- Is the code at file:row:col test/generated noise? One-shot form of
---- M.checker(); pass `lines` when the caller already has the file's lines.
----@param file string
----@param row? integer 1-based
----@param col? integer 0-based
----@param lines? string[]
----@return boolean
-function M.is_noise(file, row, col, lines)
-  return M.checker()(file, row, col, lines)
 end
 
 return M

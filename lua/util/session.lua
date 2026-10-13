@@ -1,6 +1,13 @@
--- Skip the dashboard when this directory has a session: `nvim` in a project
--- you've worked in before picks up where you left off (what the dashboard's
--- `s` key does, pressed for you). No session, dashboard as usual.
+-- Sessions (persistence.nvim), made to behave:
+--  * a bare `nvim` in a project you've worked in before restores its session
+--    instead of the dashboard (what the dashboard's `s` key does, pressed
+--    for you); no session, dashboard as usual;
+--  * quitting with no file open forgets the session, so the next bare
+--    `nvim` there starts fresh;
+--  * the explorer sidebar is kept out of the session file and reopened
+--    after a restore when it was open;
+--  * a restored window left on the empty start buffer shows the first
+--    listed file, filetype detected.
 local M = {}
 
 --- Would a bare `nvim` here show the dashboard? Same conditions snacks uses.
@@ -31,7 +38,9 @@ function M.has_session()
 end
 
 --- Is this start going to restore a session (bare `nvim`, session on disk)?
---- Decided once, early (plugin config time), so startup UI can act on it.
+--- Decided once, early (plugin config time), so startup UI can act on it;
+--- only `argc` is known for sure that early, so a start that then turns
+--- out not to be bare (text piped in) is left showing that text.
 function M.restoring()
   if M._restoring == nil then
     M._restoring = vim.fn.argc(-1) == 0 and M.has_session()
@@ -90,17 +99,11 @@ function M.setup()
     pattern = "PersistenceSavePre",
     callback = function()
       -- by now snacks has flagged its pickers closed but their windows are
-      -- still in the layout, so go by the windows: any non-floating window
-      -- showing a snacks buffer is the sidebar
-      local had = false
-      for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-        if
-          vim.api.nvim_win_get_config(win).relative == ""
-          and require("util.explorer").is_sidebar_buf(vim.api.nvim_win_get_buf(win))
-        then
-          had = true
-          pcall(vim.api.nvim_win_close, win, true)
-        end
+      -- still in the layout, so go by the windows
+      local wins = require("util.explorer").sidebar_wins()
+      local had = #wins > 0
+      for _, win in ipairs(wins) do
+        pcall(vim.api.nvim_win_close, win, true)
       end
       -- decided once per exit: the hook can run again (a retried quit) after
       -- the sidebar is already gone, and must not downgrade a 1 to a 0
@@ -124,14 +127,7 @@ function M.setup()
       -- letting Vim pick the replacement loaded the file without a
       -- filetype whenever the saved line number was past the file's new
       -- end — after a git reset, say.)
-      local function placeholder(b)
-        return vim.api.nvim_buf_is_loaded(b)
-          and vim.api.nvim_buf_get_name(b) == ""
-          and vim.bo[b].buftype == ""
-          and not vim.bo[b].modified
-          and vim.api.nvim_buf_line_count(b) == 1
-          and vim.api.nvim_buf_get_lines(b, 0, 1, false)[1] == ""
-      end
+      local placeholder = require("util.buffers").is_placeholder
       for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
         local cur = vim.api.nvim_win_get_buf(win)
         if placeholder(cur) and vim.api.nvim_win_get_config(win).relative == "" then

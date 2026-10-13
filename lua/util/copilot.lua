@@ -53,18 +53,17 @@ end
 
 function M.setup()
   vim.api.nvim_create_autocmd("User", {
+    group = vim.api.nvim_create_augroup("copilot_reaper", { clear = true }),
     pattern = "VeryLazy",
     once = true,
     callback = function()
-      M.reap_orphans(function(killed)
+      M.reap_orphans(function(killed) -- called from vim.schedule already
         if killed > 0 then
-          vim.schedule(function()
-            vim.notify(
-              ("Reaped %d orphaned Copilot server%s"):format(killed, killed == 1 and "" or "s"),
-              vim.log.levels.INFO,
-              { title = "Copilot" }
-            )
-          end)
+          vim.notify(
+            ("Reaped %d orphaned Copilot server%s"):format(killed, killed == 1 and "" or "s"),
+            vim.log.levels.INFO,
+            { title = "Copilot" }
+          )
         end
       end)
     end,

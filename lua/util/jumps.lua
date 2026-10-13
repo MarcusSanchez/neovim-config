@@ -62,7 +62,7 @@ local function frame()
   M.frames = M.frames + 1
   local ignored = vim.o.eventignore
   vim.o.eventignore = ignored == "" and "CursorMoved,WinScrolled" or (ignored .. ",CursorMoved,WinScrolled")
-  api.nvim_win_call(g.win, function()
+  pcall(api.nvim_win_call, g.win, function() -- whatever happens, the events come back
     vim.fn.winrestview({ topline = topline, lnum = lnum, col = g.to.col, leftcol = g.to.leftcol })
   end)
   vim.o.eventignore = ignored
@@ -78,7 +78,7 @@ function M.animated(keys)
   local count = vim.v.count
   vim.cmd("normal! " .. (count > 0 and count or "") .. keys)
   local to = vim.fn.winsaveview()
-  if to.topline == from.topline or vim.g.animate_jumps == false then
+  if to.topline == from.topline then
     return
   end
   -- back to the start for the first frame; the frames bring the view along

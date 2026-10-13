@@ -61,16 +61,18 @@ end
 local function closed_folds(win)
   local folds = {}
   vim.api.nvim_win_call(win, function()
-    local visiting = require("util.searchfolds").visiting(win)[1]
+    local visiting = require("util.searchfolds").visiting(win) -- outermost first
     local last, line = vim.fn.line("$"), 1
     while line <= last do
       local start = vim.fn.foldclosed(line)
       if start ~= -1 then
         folds[#folds + 1] = fold_entry(start, vim.fn.foldclosedend(line))
         line = vim.fn.foldclosedend(line) + 1
-      elseif visiting and line == visiting.start then
-        folds[#folds + 1] = fold_entry(visiting.start, visiting.stop)
-        line = visiting.stop + 1
+      elseif visiting[1] and line == visiting[1].start then
+        for _, v in ipairs(visiting) do -- the inner ones the search opened too
+          folds[#folds + 1] = fold_entry(v.start, v.stop)
+        end
+        line = visiting[1].stop + 1
       else
         line = line + 1
       end

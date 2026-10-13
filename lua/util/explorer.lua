@@ -1,5 +1,5 @@
 -- The file-explorer sidebar: open/focus/close helpers shared by the ,a/,c
--- keymaps, the :q-on-last-window autocmd, the session hooks and the tab bar.
+-- keymaps, the :q-on-last-window autocmd and the session hooks.
 -- Two backends behind one API, picked by vim.g.explorer:
 --   "snacks"    the snacks picker explorer (current)
 --   "neo-tree"  benched 2026-10-11 (lua/benched/neo-tree.lua says how to revive)
@@ -7,10 +7,32 @@ local M = {}
 
 M.backend = vim.g.explorer or "snacks"
 
+-- the sidebar's own filetypes: neo-tree's, and the snacks explorer's
+-- layout box, list and input (a snacks terminal or dashboard is not a
+-- sidebar; a picker's floats are filtered by their window)
+local sidebar_filetypes = {
+  ["neo-tree"] = true,
+  snacks_layout_box = true,
+  snacks_picker_list = true,
+  snacks_picker_input = true,
+}
+
 --- Is this buffer a sidebar buffer (either backend)?
 function M.is_sidebar_buf(buf)
-  local ft = vim.bo[buf].filetype
-  return ft == "neo-tree" or ft:find("^snacks_") ~= nil
+  return sidebar_filetypes[vim.bo[buf].filetype] == true
+end
+
+--- The sidebar's windows on the current tab: non-floating windows showing
+--- a sidebar buffer.
+---@return integer[]
+function M.sidebar_wins()
+  local wins = {}
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    if vim.api.nvim_win_get_config(win).relative == "" and M.is_sidebar_buf(vim.api.nvim_win_get_buf(win)) then
+      wins[#wins + 1] = win
+    end
+  end
+  return wins
 end
 
 local backends = {}
@@ -125,9 +147,14 @@ function M.real_window_count()
 end
 
 --- QuitPre handler: when :q closes the last real window, quit nvim entirely
---- instead of leaving the sidebar behind.
+--- instead of leaving the sidebar behind. A :q in the sidebar itself or in
+--- a float closes just that.
 function M.on_quit_pre()
   if not M.get() then
+    return
+  end
+  local cur = vim.api.nvim_get_current_win()
+  if vim.api.nvim_win_get_config(cur).relative ~= "" or M.is_sidebar_buf(vim.api.nvim_win_get_buf(cur)) then
     return
   end
   if M.real_window_count() <= 1 then

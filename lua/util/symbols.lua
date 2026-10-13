@@ -20,7 +20,7 @@ function M.search()
       -- servers fuzzy-match the query (rust-analyzer as a loose subsequence,
       -- so "open" also returns OptionEnv); only keep names that actually
       -- contain what was typed. A path query keeps its last segment.
-      local query = (ctx.filter.search or ""):match("[^:%.]*$") or ""
+      local query = (ctx.filter.search or ""):match("[^:%.]*$")
       if query ~= "" and not (item.name or ""):lower():find(query:lower(), 1, true) then
         return false
       end
