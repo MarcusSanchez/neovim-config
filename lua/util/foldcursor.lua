@@ -188,6 +188,8 @@ local function drawn(buf, start, stop, cells)
   return { start = start, stop = stop, text = table.concat(chars), cells = cells }
 end
 
+local place ---@type fun(win: integer, buf: integer, start: integer, stop: integer, cells: util.foldtext.Cell[], target: integer, curswant?: integer) defined below
+
 ---@class util.foldcursor.Segment a ` ... ` of the fold line and what it hides
 ---@field from integer first cell of the drawn run
 ---@field to integer last cell of it
@@ -266,6 +268,26 @@ local function open_segment(win, buf, start, stop, cells, target, dir)
     local line = vim.fn.getline(lnum)
     local col = dir > 0 and #line:match("^%s*") or math.max(#line - 1, 0)
     api.nvim_win_set_cursor(win, { lnum, col })
+    -- the line landed on is a closed fold itself: the caret, on its first
+    -- drawn non-blank (going in) or its last drawn character (coming back)
+    local fs = vim.fn.foldclosed(lnum)
+    if fs ~= -1 then
+      local fe = vim.fn.foldclosedend(lnum)
+      local inner = cells_of(buf, fs, fe)
+      local target
+      if dir > 0 then
+        target = 1
+        while inner[target] and inner[target].ch:match("^%s$") do
+          target = target + 1
+        end
+        target = nearest(inner, target, 1)
+      else
+        target = nearest(inner, #inner, -1)
+      end
+      if target then
+        place(win, buf, fs, fe, inner, target)
+      end
+    end
   end)
 end
 
@@ -326,7 +348,7 @@ end
 --- The caret onto cell `target`: the real cursor goes to the position it
 --- stands for, keeping `curswant` (the column a later `j`/`k` heads for)
 --- at the drawn column rather than that position's.
-local function place(win, buf, start, stop, cells, target, curswant)
+function place(win, buf, start, stop, cells, target, curswant)
   local cell = cells[target]
   trace(("place: cell %d at %d:%d"):format(target, cell.lnum, cell.col))
   api.nvim_win_set_cursor(win, { cell.lnum, cell.col })

@@ -45,7 +45,8 @@ lib.suite("gopls", function(t)
     if s == -1 then
       return "none"
     end
-    for _, c in ipairs(FT.render(FT.build(buf, s, vim.fn.foldclosedend(l)), FC.cell_at(win, buf, s))) do
+    local b = vim.api.nvim_get_current_buf()
+    for _, c in ipairs(FT.render(FT.build(b, s, vim.fn.foldclosedend(l)), FC.cell_at(win, b, s))) do
       if c[2] == "FoldCursor" then
         return c[1]
       end
@@ -328,6 +329,36 @@ lib.suite("gopls", function(t)
   t.check("the caret at the start brings the view fully back", vim.fn.winsaveview().leftcol, 0)
   vim.api.nvim_buf_set_lines(buf, 3, 4, false, { "" })
   t.ranges()
+  -- Shift-L into a fold whose content starts with a closed fold: the caret
+  -- lands on that fold line's first non-blank, not on column one
+  vim.fn.writefile({
+    "package main",
+    "",
+    "func outer() {",
+    "\tif true {",
+    '\t\tprintln("a")',
+    "\t}",
+    "}",
+  }, "nest.go")
+  vim.cmd("edit nest.go")
+  t.ranges()
+  local nb = vim.api.nvim_get_current_buf()
+  vim.cmd("normal! zR")
+  t.fold(5) -- the if
+  t.fold(3) -- the function, the if closed inside it
+  t.check(
+    "the function is folded with the if closed inside",
+    t.span(3) .. " " .. vim.fn.foldtextresult(3),
+    "3..7 func outer() { ... }"
+  )
+  key("<S-l>")
+  t.check("Shift-L opens the function", vim.fn.foldclosed(3), -1)
+  t.check("the if stays folded", t.span(4), "4..6")
+  t.check("the caret sits on the if line's first non-blank", cursor() .. " " .. caret(), "4:1 i")
+  vim.cmd("normal! zR")
+  vim.cmd("buffer sig.go")
+  vim.api.nvim_buf_delete(nb, { force = true })
+  vim.fn.delete("nest.go")
   -- 'whichwrap' has h and l: off either end of the fold line they go to
   -- the line above / below, and from those lines back onto the fold's
   -- last / first drawn character
