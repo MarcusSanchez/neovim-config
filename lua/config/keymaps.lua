@@ -24,19 +24,18 @@ end
 map("x", "<S-h>", "_", opts("Go to First Non-Blank Character"))
 map("x", "<S-l>", "$", opts("Go to End of Line"))
 -- on a closed fold these walk the drawn fold line (lua/util/foldcursor.lua)
-for key, desc in pairs({
-  h = "Left",
-  l = "Right",
-  ["^"] = "First Non-Blank Character",
-  ["_"] = "First Non-Blank Character",
-  ["$"] = "End of Line",
-  ["<S-h>"] = "Go to First Non-Blank Character",
-  ["<S-l>"] = "Go to End of Line",
+for lhs, step in pairs({
+  h = { "h", "Left" },
+  l = { "l", "Right" },
+  ["^"] = { "^", "Go to First Non-Blank Character" },
+  ["_"] = { "_", "Go to First Non-Blank Character" },
+  ["$"] = { "$", "Go to End of Line" },
+  ["<S-h>"] = { "_", "Go to First Non-Blank Character" },
+  ["<S-l>"] = { "$", "Go to End of Line" },
 }) do
-  local motion = key == "<S-h>" and "_" or key == "<S-l>" and "$" or key
-  map("n", key, function()
-    require("util.foldcursor").motion(motion)
-  end, opts(desc))
+  map("n", lhs, function()
+    require("util.foldcursor").motion(step[1])
+  end, opts(step[2]))
 end
 
 -- Jump half page up/down with Shift+J/K
@@ -111,17 +110,25 @@ map("i", "jj", leave_insert, { expr = true, desc = "Exit Insert Mode" })
 -- Line Manipulation
 --------------------------------------------------------------------------------
 
--- Shift+N collapses content (joins lines)
-map("n", "<S-N>", "J", opts("Join Lines"))
+-- Shift+N collapses content (joins lines; Shift+J is the half-page scroll)
+map({ "n", "x" }, "<S-N>", "J", opts("Join Lines"))
+
+-- Remove LazyVim's default Alt+j/k line-move mappings in every mode they're
+-- set (the reversed versions live on <S-A-j>/<S-A-k> below). Best-effort, in
+-- case a LazyVim update changes them — a hard del would abort this whole file.
+for _, mode in ipairs({ "n", "i", "v" }) do
+  pcall(del, mode, "<A-k>")
+  pcall(del, mode, "<A-j>")
+end
 
 -- Normal mode - move lines up and down (reversed)
 -- silent! keeps the move a no-op (instead of E16) at the buffer edges
-map("n", "<S-A-j>", "<cmd>execute 'silent! move .-' . (v:count1 + 1)<cr>==", { desc = "Move Line Up (reversed)" })
-map("n", "<S-A-k>", "<cmd>execute 'silent! move .+' . v:count1<cr>==", { desc = "Move Line Down (reversed)" })
+map("n", "<S-A-j>", "<cmd>execute 'silent! move .-' . (v:count1 + 1)<cr>==", opts("Move Line Up (reversed)"))
+map("n", "<S-A-k>", "<cmd>execute 'silent! move .+' . v:count1<cr>==", opts("Move Line Down (reversed)"))
 
 -- Insert mode - move lines up and down (reversed)
-map("i", "<S-A-j>", "<esc><cmd>silent! m .-2<cr>==gi", { desc = "Move Line Up (reversed)" })
-map("i", "<S-A-k>", "<esc><cmd>silent! m .+1<cr>==gi", { desc = "Move Line Down (reversed)" })
+map("i", "<S-A-j>", "<esc><cmd>silent! m .-2<cr>==gi", opts("Move Line Up (reversed)"))
+map("i", "<S-A-k>", "<esc><cmd>silent! m .+1<cr>==gi", opts("Move Line Down (reversed)"))
 
 -- Visual mode - move lines up and down (reversed)
 map(
@@ -152,7 +159,7 @@ map("n", "<S-Space>", "<leader><space>", { remap = true, desc = "Find Files (Roo
 -- (same picker as <leader>/)
 map("n", "gs", function()
   require("util.symbols").search()
-end, { desc = "Search Workspace Symbols" })
+end, opts("Search Workspace Symbols"))
 map("n", "g/", "<leader>/", { remap = true, desc = "Grep (Root Dir)" })
 
 --------------------------------------------------------------------------------
@@ -163,34 +170,36 @@ map("n", "g/", "<leader>/", { remap = true, desc = "Grep (Root Dir)" })
 map("n", ",q", "<leader>bd", { remap = true, desc = "Close Current Buffer" })
 
 -- let ,f format the current buffer
-map("n", ",f", ":w<CR>", { desc = "Format + Save Current Buffer" })
+map("n", ",f", ":w<CR>", opts("Format + Save Current Buffer"))
 
 -- snacks explorer sidebar (lua/util/explorer.lua; oil lives next to it on
 -- `-`/`,o`, harpoon on `,h…`, neo-tree is benched in lua/benched/). ,a opens
 -- it, focuses it when open, closes it when focused; ,c closes it.
 map("n", ",a", function()
   require("util.explorer").toggle()
-end, { desc = "Toggle/Focus Explorer (Root Dir)" })
+end, opts("Toggle/Focus Explorer (Root Dir)"))
 map("n", ",c", function()
   require("util.explorer").close()
-end, { desc = "Close Explorer" })
+end, opts("Close Explorer"))
 
 -- use ,w and ,e to cycle windows
-map("n", ",w", "<C-w>h", { desc = "Go to Left Window" })
-map("n", ",e", "<C-w>l", { desc = "Go to Right Window" })
-map("n", "<leader>j", "<C-w>k", { desc = "Go to Top Window" })
-map("n", "<leader>k", "<C-w>j", { desc = "Go to Bottom Window" })
+map("n", ",w", "<C-w>h", opts("Go to Left Window"))
+map("n", ",e", "<C-w>l", opts("Go to Right Window"))
+map("n", "<leader>j", "<C-w>k", opts("Go to Top Window"))
+map("n", "<leader>k", "<C-w>j", opts("Go to Bottom Window"))
 
 -- use Alt + (h/l) to go forward and back buffers
-map("n", "<A-h>", "<cmd>bprevious<cr>", { desc = "Previous Buffer" })
-map("n", "<A-l>", "<cmd>bnext<cr>", { desc = "Next Buffer" })
+map("n", "<A-h>", "<cmd>bprevious<cr>", opts("Previous Buffer"))
+map("n", "<A-l>", "<cmd>bnext<cr>", opts("Next Buffer"))
 
 --------------------------------------------------------------------------------
 -- Clipboard, Delete, and Yank Behavior
 --------------------------------------------------------------------------------
 
--- Backspace and Delete without yanking to clipboard
-map({ "n", "x" }, "<BS>", [["_dh]], opts("Backspace (No Yank)"))
+-- Backspace and Delete without yanking to clipboard (in visual mode the
+-- selection goes, nothing more)
+map("n", "<BS>", [["_dh]], opts("Backspace (No Yank)"))
+map("x", "<BS>", [["_d]], opts("Delete Selection (No Yank)"))
 map({ "n", "x" }, "<Del>", [["_<Del>]], opts("Delete Character (No Yank)"))
 
 -- Prevent 'd', 'D' from yanking
@@ -215,14 +224,11 @@ end, opts("Visual Mode"))
 -- gc on a selection within a line: a block comment around it, IntelliJ
 -- style (lua/util/comment.lua); linewise selections stay line comments
 map("x", "gc", function()
-  local pos = vim.fn.getpos("v")
-  if vim.fn.mode() == "v" and require("util.comment").form(0, pos[2] - 1, pos[3] - 1) then
-    return "<Cmd>lua require('util.comment').block()<CR>"
-  end
-  return require("vim._comment").operator()
+  return require("util.comment").operator()
 end, { expr = true, desc = "Toggle Comment (block within a line)" })
 
--- s in visual mode substitutes the selection without yanking
+-- s in visual mode substitutes the selection without yanking (this is the
+-- one mode flash's `s` doesn't get; flash keeps n and o)
 map("x", "s", [["_di]], opts("Substitute Selection (No Yank)"))
 
 --------------------------------------------------------------------------------
@@ -283,7 +289,7 @@ end
 map("n", ",d", function()
   require("util.foldranges").toggle()
   require("util.foldcursor").refresh() -- a fold closed around the cursor gets the caret
-end, { desc = "Toggle Fold Under Cursor" })
+end, opts("Toggle Fold Under Cursor"))
 
 -- ,r to rename symbol under cursor
 map("n", ",r", "<leader>cr", { remap = true, desc = "Rename Symbol Under Cursor" })
@@ -292,18 +298,13 @@ map("n", ",r", "<leader>cr", { remap = true, desc = "Rename Symbol Under Cursor"
 map("x", ",r", "<Esc>,r", { remap = true, desc = "Rename Symbol Under Cursor" })
 
 -- <leader>hc to inspect treesitter captures / highlights under cursor
-map("n", "<leader>hc", "<cmd>Inspect<CR>", { desc = "Inspect Highlights Under Cursor" })
+map("n", "<leader>hc", "<cmd>Inspect<CR>", opts("Inspect Highlights Under Cursor"))
 
 --------------------------------------------------------------------------------
 -- LSP & Diagnostics
 --------------------------------------------------------------------------------
 
--- Quick documentation with 'gk'
-vim.api.nvim_create_autocmd("LspAttach", {
-  callback = function(args)
-    map("n", "gk", vim.lsp.buf.hover, { buffer = args.buf, desc = "LSP Hover" })
-  end,
-})
+-- (gk hover is an LSP key in plugins/lsp.lua, next to the disabled K)
 
 -- <Esc> keeps LazyVim's behaviour (clear hlsearch, stop snippet) and also
 -- dismisses the gk hover / signature docs and the ge float (lua/util/popup.lua)
@@ -314,36 +315,17 @@ end, { expr = true, desc = "Escape, Clear hlsearch, Dismiss Popups" })
 -- ge opens the line's diagnostics in a float styled like the gk hover
 map("n", "ge", function()
   require("util.popup").diagnostics()
-end, { desc = "Show Diagnostics (Float)" })
+end, opts("Show Diagnostics (Float)"))
 
 -- make ,g open code actions
 map("n", ",g", "<leader>ca", { remap = true, desc = "Code Actions" })
 
 --------------------------------------------------------------------------------
--- Multicursor
---------------------------------------------------------------------------------
-
--- Remove LazyVim's default Alt+j/k line-move mappings in every mode they're
--- set (the reversed versions live on <S-A-j>/<S-A-k> above). Best-effort, in
--- case a LazyVim update changes them — a hard del would abort this whole file.
-for _, mode in ipairs({ "n", "i", "v" }) do
-  pcall(del, mode, "<A-k>")
-  pcall(del, mode, "<A-j>")
-end
-
-local mc = require("multicursor-nvim")
-map({ "n", "x" }, "<C-j>", function()
-  mc.lineAddCursor(-1, { skipEmpty = false })
-end, { desc = "Add Cursor Above" })
-map({ "n", "x" }, "<C-k>", function()
-  mc.lineAddCursor(1, { skipEmpty = false })
-end, { desc = "Add Cursor Below" })
-
---------------------------------------------------------------------------------
 -- Text Wrapping (tenaille.nvim)
 --------------------------------------------------------------------------------
 
--- Wrap the visual selection in a delimiter pair (setup lives in the spec)
+-- Wrap the visual selection in a delimiter pair (setup lives in the spec).
+-- `<` here replaces visual dedent, which lives on <S-Tab> above.
 local wrap = require("tenaille").wrap
 local delimiters = {
   ['"'] = { '"', '"' },

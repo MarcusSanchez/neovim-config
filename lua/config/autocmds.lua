@@ -1,4 +1,5 @@
--- Autocmds are loaded on the VeryLazy event. LazyVim's defaults:
+-- Autocmds are loaded at startup when files are given, on VeryLazy for a
+-- bare `nvim`. LazyVim's defaults:
 -- https://github.com/LazyVim/LazyVim/blob/main/lua/lazyvim/config/autocmds.lua
 -- Feature logic lives in lua/util/; this file only wires it to events.
 
@@ -11,16 +12,15 @@ end
 -- Diagnostics
 --------------------------------------------------------------------------------
 
--- protobuf: only errors get an underline too. NOTE: vim.diagnostic.config is
--- global, so once a .proto buffer has attached this applies everywhere for
--- the rest of the session.
+-- protobuf: only errors get an underline too — for buf's diagnostics
+-- only (the config is scoped to the client's namespace)
 autocmd("LspAttach", {
   group = augroup("proto_diagnostics"),
   pattern = "*.proto",
-  callback = function()
+  callback = function(args)
     vim.diagnostic.config({
       underline = { severity = { min = vim.diagnostic.severity.ERROR } },
-    })
+    }, vim.lsp.diagnostic.get_namespace(args.data.client_id))
   end,
 })
 

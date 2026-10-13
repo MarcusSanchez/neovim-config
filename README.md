@@ -2,8 +2,10 @@
 
 A [LazyVim](https://www.lazyvim.org) config. Catppuccin Mocha on a transparent
 background, colors tracking a GoLand scheme; j/k swapped; comma as a second
-leader. Go, Rust, TypeScript, Zig, Gleam and Nix via LazyVim extras
-(`lazyvim.json`); Protobuf via buf (`lua/plugins/proto.lua`).
+leader. Languages via LazyVim extras (`lazyvim.json`: Go, Rust,
+TypeScript, Zig, Gleam, C/C++, Python, Nix, JSON, YAML, TOML, Markdown,
+Docker, plus Copilot, ESLint, Tailwind); Protobuf via buf
+(`lua/plugins/proto.lua`).
 
 ## Layout
 
@@ -31,6 +33,8 @@ lua/util/                feature logic, one module per feature
   comment.lua            gc on a selection within a line: a block comment around it
   foldcursor.lua         a caret walks a closed fold's line; the real cursor follows
   harpoon.lua            a harpoon jump from an empty buffer replaces it instead of adding a tab
+  buffers.lua            what a placeholder buffer is (shared by harpoon and sessions)
+  copilot.lua            the Copilot server behind a watchdog, orphans reaped at startup
   session.lua            a bare `nvim` restores the directory's session instead of the dashboard
 lua/plugins/             one lazy.nvim spec per plugin (LazyVim merges them)
 lua/benched/             shelved specs (neo-tree) — not imported, see its README
