@@ -14,8 +14,12 @@ local M = {}
 
 ---@param server string the language server to wait for
 ---@param body fun(t: tests.Suite)
----@param opts? { treesitter: boolean } the language's folds are treesitter's (no server ranges)
+---@param opts? { treesitter?: boolean, timeout?: integer, deadline?: integer }
+--- treesitter: the language's folds are treesitter's (no server ranges);
+--- timeout: ms to wait for the server's ranges (15000); deadline: ms for
+--- the whole suite (120000)
 function M.suite(server, body, opts)
+  opts = opts or {}
   local logf = io.open(vim.fn.expand("%:p:h") .. "/result.log", "w")
   local t = {} ---@type tests.Suite
   function t.log(s)
@@ -51,20 +55,20 @@ function M.suite(server, body, opts)
   vim.defer_fn(function()
     t.log("TIMEOUT")
     vim.cmd("qall!")
-  end, 120000)
+  end, opts.deadline or 120000)
   vim.schedule(function()
     local ok, err = pcall(function()
       vim.api.nvim_exec_autocmds("User", { pattern = "VeryLazy" })
       vim.o.lines, vim.o.columns = 40, 120
-      vim.wait(30000, function()
+      vim.wait(opts.timeout or 30000, function()
         return #vim.lsp.get_clients({ bufnr = 0, name = server }) > 0
       end, 100)
-      if opts and opts.treesitter then
+      if opts.treesitter then
         t.wait(1500)
         t.check("folds are treesitter's (no server ranges)", FR.has(0), false)
         t.check("the fold expression is ours", vim.wo.foldexpr, "v:lua.require('util.foldranges').foldexpr()")
       else
-        vim.wait(15000, function()
+        vim.wait(opts.timeout or 15000, function()
           return FR.has(0)
         end, 50)
         t.wait(300)
