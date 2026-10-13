@@ -83,11 +83,12 @@ vim.schedule(function()
     check("at the jump's target", vim.fn.line("."), 100)
     -- a second jump during a glide lands the first, then glides anew
     vim.api.nvim_feedkeys("", "x", false) -- the queued l runs now
+    local from = vim.fn.winsaveview().topline -- where the scroll-margin hook left the view
     key("gg")
     check(
       "gg from the bottom glides",
       tostring(J.active()) .. " top=" .. vim.fn.winsaveview().topline,
-      "true top=" .. bottom:match("^(%d+)")
+      "true top=" .. from
     )
     key("G")
     check(
