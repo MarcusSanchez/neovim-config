@@ -1,14 +1,9 @@
 -- protobuf via buf: buf_ls attaches, reports buf lint, navigates across
 -- files; buf format runs on an explicit save. Opens acme/v1/user.proto in
 -- the proto fixture module (buf.yaml with STANDARD lint).
-local logf = io.open(vim.fn.getcwd() .. "/result.log", "w")
-local function log(s)
-  logf:write(s, "\n")
-  logf:flush()
-end
-local function check(name, got, want)
-  log(("%s %s: %s (want %s)"):format(got == want and "PASS" or "FAIL", name, tostring(got), tostring(want)))
-end
+local lib = dofile(debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") .. "/lib.lua")
+local t = lib.open(vim.fn.getcwd() .. "/result.log", "w")
+local log, check = t.log, t.check
 local function wait(ms)
   vim.wait(ms, function()
     return false
@@ -66,7 +61,6 @@ vim.schedule(function()
     wait(1500)
     local lines = vim.fn.readfile("acme/v1/user.proto")
     check(":w formats with buf", table.concat(lines, "\n"):find("message Extra {", 1, true) ~= nil, true)
-    log("OK")
   end)
   log(ok and "DONE" or ("ERROR: " .. tostring(err)))
   vim.cmd("qall!")

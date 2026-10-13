@@ -9,14 +9,8 @@ lib.suite("rust-analyzer", function(t)
   for _, c in ipairs({ { 1, 7, false }, { 7, 0, true }, { 8, 3, true }, { 11, 4, true }, { 14, 7, true } }) do
     res[#res + 1] = tostring(is_noise(f, c[1], c[2]) == c[3])
   end
-  t.log("noise checks all OK: " .. table.concat(res, ","))
-  local function client()
-    return vim.lsp.get_clients({ bufnr = 0, name = "rust-analyzer" })[1]
-  end
-  vim.wait(60000, function()
-    return client() ~= nil
-  end, 200)
-  local c = assert(client(), "rust-analyzer never attached")
+  t.check("noise checks", table.concat(res, ","), "true,true,true,true,true")
+  local c = assert(vim.lsp.get_clients({ bufnr = 0, name = "rust-analyzer" })[1], "rust-analyzer never attached")
   vim.wait(60000, function()
     local r = c:request_sync("workspace/symbol", { query = "foobar" }, 5000, 0)
     return r and r.result and #r.result > 0
@@ -97,23 +91,10 @@ lib.suite("rust-analyzer", function(t)
   vim.wait(20000, function()
     return #vim.lsp.semantic_tokens.get_at_pos(0, trow, tcol) > 0
   end, 250)
-  t.log(
-    ("%s type as path qualifier (`Dongle::open`) upright: %s (want false)"):format(
-      italic_at(trow, tcol) == false and "PASS" or "FAIL",
-      tostring(italic_at(trow, tcol))
-    )
-  )
-  t.log(
-    ("%s module qualifier (`dongle::Error`) italic: %s (want true)"):format(
-      italic_at(mrow, mcol) and "PASS" or "FAIL",
-      tostring(italic_at(mrow, mcol))
-    )
-  )
+  t.check("type as path qualifier (`Dongle::open`) upright", italic_at(trow, tcol), false)
+  t.check("module qualifier (`dongle::Error`) italic", italic_at(mrow, mcol), true)
   -- folds: rust-analyzer's ranges, normalised (util/foldranges.lua) so a
   -- fold hides its closing bracket and wrapped parameters keep `) -> R {`
-  local function range(l)
-    return vim.fn.foldclosed(l) .. ".." .. vim.fn.foldclosedend(l)
-  end
   vim.fn.writefile({
     "use std::{",
     "    collections::HashMap,",
@@ -188,60 +169,53 @@ lib.suite("rust-analyzer", function(t)
     "use std::fmt::Display;",
   }, dir .. "/src/probe.rs")
   vim.cmd("edit " .. dir .. "/src/probe.rs")
-  local FR = require("util.foldranges")
-  vim.wait(30000, function()
-    return FR.has(0)
-  end, 100)
-  vim.wait(500, function()
-    return false
-  end)
-  t.check("probe folds come from rust-analyzer", FR.has(0), true)
+  t.check("probe folds come from rust-analyzer", t.ranges(30000), true)
   -- a run of `use` items is rust-analyzer's imports fold: folded on open,
   -- reading `use ...`
-  t.check("a run of use items folds on open", range(70), "70..71")
+  t.check("a run of use items folds on open", t.span(70), "70..71")
   t.check("imports fold line", vim.fn.foldtextresult(70), "use ...")
   t.fold(27) -- `mac: *g,` in the struct literal inside the closure
-  t.check(",d in a struct literal inside a closure folds it, closer included", range(27), "26..29")
+  t.check(",d in a struct literal inside a closure folds it, closer included", t.span(27), "26..29")
   t.check("its fold line", vim.fn.foldtextresult(26), "            .map(|g| State { ... })")
   vim.cmd("normal! zR")
   t.fold(18)
-  t.check(",d on a wrapped signature folds the parameters through `) -> R {`", range(18), "18..22")
+  t.check(",d on a wrapped signature folds the parameters through `) -> R {`", t.span(18), "18..22")
   t.check("parameters fold line", vim.fn.foldtextresult(18), "    fn send( ... ) -> Result<(), fmt::Error> {")
   t.check("the body stays open under it", vim.fn.foldclosed(23), -1)
   t.fold(51) -- `Ok(())`, in the body and in nothing smaller
-  t.check(",d in the body while the parameters are folded: the whole function", range(51), "18..52")
+  t.check(",d in the body while the parameters are folded: the whole function", t.span(51), "18..52")
   t.check("whole-function fold line", vim.fn.foldtextresult(18), "    fn send( ... ) -> Result<(), fmt::Error> { ... }")
   vim.cmd("normal! zR")
   t.fold(51)
-  t.check(",d in the body alone folds the body from `) -> R {`", range(51), "22..52")
+  t.check(",d in the body alone folds the body from `) -> R {`", t.span(51), "22..52")
   t.check("body fold line", vim.fn.foldtextresult(22), "    ) -> Result<(), fmt::Error> { ... }")
   t.check("the parameters stay open above it", vim.fn.foldclosed(18), -1)
   vim.cmd("normal! zR")
   t.fold(32)
-  t.check("an if branch folds through its `} else {` line", range(32), "31..33")
+  t.check("an if branch folds through its `} else {` line", t.span(32), "31..33")
   t.check("if-branch fold line", vim.fn.foldtextresult(31), "        if channel > 0 { ... } else {")
   t.check("the else body stays open under it", vim.fn.foldclosed(34), -1)
   t.fold(34)
-  t.check(",d in the else while the if is folded: the whole chain", range(34), "31..35")
+  t.check(",d in the else while the if is folded: the whole chain", t.span(34), "31..35")
   t.check("whole-chain fold line", vim.fn.foldtextresult(31), "        if channel > 0 { ... } else { ... }")
   vim.cmd("normal! zR")
   t.fold(34)
-  t.check(",d in the else alone folds the else branch", range(34), "33..35")
+  t.check(",d in the else alone folds the else branch", t.span(34), "33..35")
   t.check("else fold line", vim.fn.foldtextresult(33), "        } else { ... }")
   t.check("the if body stays open above it", vim.fn.foldclosed(32), -1)
   t.fold(32)
-  t.check(",d in the if while the else is folded: the whole chain", range(32), "31..35")
+  t.check(",d in the if while the else is folded: the whole chain", t.span(32), "31..35")
   vim.cmd("normal! zR")
   t.fold(43)
-  t.check("wrapped macro arguments fold through `);`", range(43), "42..46")
+  t.check("wrapped macro arguments fold through `);`", t.span(43), "42..46")
   t.check("macro fold line", vim.fn.foldtextresult(42), "        println!( ... );")
   vim.cmd("normal! zR")
   t.fold(62) -- inside a condition wrapped over three lines before its `{`
-  t.check(",d in a wrapped condition folds the condition through its `{`", range(62), "61..64")
+  t.check(",d in a wrapped condition folds the condition through its `{`", t.span(62), "61..64")
   t.check("condition fold line", vim.fn.foldtextresult(61), "    if x ... {")
   t.check("the body stays open under it", vim.fn.foldclosed(65), -1)
   t.fold(65)
-  t.check(",d in the body while the condition is folded: the whole if", range(65), "61..66")
+  t.check(",d in the body while the condition is folded: the whole if", t.span(65), "61..66")
   t.check(
     "whole-if fold line shows the condition elided, then the body",
     vim.fn.foldtextresult(61),
@@ -249,9 +223,11 @@ lib.suite("rust-analyzer", function(t)
   )
   vim.cmd("normal! zR")
   t.fold(65)
-  t.check(",d in the body alone folds the body from its `{`", range(65), "64..66")
+  t.check(",d in the body alone folds the body from its `{`", t.span(65), "64..66")
   t.check("body fold line", vim.fn.foldtextresult(64), "    { ... }")
   t.check("the condition stays open above it", vim.fn.foldclosed(62), -1)
 
   vim.cmd("normal! zR")
+  vim.cmd("buffer src/lib.rs")
+  vim.fn.delete(dir .. "/src/probe.rs")
 end, { timeout = 90000, deadline = 150000 })

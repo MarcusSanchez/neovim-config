@@ -3,14 +3,9 @@
 -- quits. run.sh then prepends lines (everything shifts) and edits a line
 -- inside block three. Pass 2 expects block one closed at its new place,
 -- block three open (its text changed), block two untouched.
-local logf = io.open(vim.fn.getcwd() .. "/result.log", vim.env.FOLD_PASS == "1" and "w" or "a")
-local function log(s)
-  logf:write(s, "\n")
-  logf:flush()
-end
-local function check(name, got, want)
-  log(("%s %s: %s (want %s)"):format(got == want and "PASS" or "FAIL", name, tostring(got), tostring(want)))
-end
+local lib = dofile(debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") .. "/lib.lua")
+local t = lib.open(vim.fn.getcwd() .. "/result.log", vim.env.FOLD_PASS == "1" and "w" or "a")
+local log, check = t.log, t.check
 vim.defer_fn(function()
   log("TIMEOUT")
   vim.cmd("qall!")
@@ -36,7 +31,6 @@ vim.schedule(function()
     check("pass 2: block two still open", vim.fn.foldclosed(block(2)), -1)
     check("pass 2: block three open (edited, not re-folded)", vim.fn.foldclosed(block(3)), -1)
     check("pass 2: prepended lines unfolded", vim.fn.foldclosed(1), -1)
-    log("OK")
   end)
   log(ok and "DONE" or ("ERROR: " .. tostring(err)))
   vim.cmd("qall!")

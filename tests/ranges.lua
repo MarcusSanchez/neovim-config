@@ -4,14 +4,9 @@
 -- (`}`, `});`, `}, log)`), wrapped parameters keep their `) -> R {` and the
 -- body folds with the whole function, `} else {` stays visible with the
 -- else branch its own fold. No server needed.
-local logf = io.open(vim.fn.getcwd() .. "/result.log", "w")
-local function log(s)
-  logf:write(s, "\n")
-  logf:flush()
-end
-local function check(name, got, want)
-  log(("%s %s: %s (want %s)"):format(got == want and "PASS" or "FAIL", name, tostring(got), tostring(want)))
-end
+local lib = dofile(debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") .. "/lib.lua")
+local t = lib.open(vim.fn.getcwd() .. "/result.log", "w")
+local log, check = t.log, t.check
 vim.defer_fn(function()
   log("TIMEOUT")
   vim.cmd("qall!")

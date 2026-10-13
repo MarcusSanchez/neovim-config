@@ -3,14 +3,9 @@
 -- is running under the server, and a planted orphan (run.sh starts a fake
 -- server reparented to launchd) gets reaped. run.sh then SIGKILLs this nvim
 -- and checks the real server is gone.
-local logf = io.open(vim.fn.getcwd() .. "/result.log", "w")
-local function log(s)
-  logf:write(s, "\n")
-  logf:flush()
-end
-local function check(name, got, want)
-  log(("%s %s: %s (want %s)"):format(got == want and "PASS" or "FAIL", name, tostring(got), tostring(want)))
-end
+local lib = dofile(debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") .. "/lib.lua")
+local t = lib.open(vim.fn.getcwd() .. "/result.log", "w")
+local log, check = t.log, t.check
 vim.defer_fn(function()
   log("TIMEOUT")
   vim.cmd("qall!")
@@ -54,11 +49,8 @@ vim.schedule(function()
         true
       )
     end
-    log("OK")
   end)
   log(ok and "DONE" or ("ERROR: " .. tostring(err)))
-  -- stay alive: run.sh SIGKILLs this nvim (by the pid written here, not the
-  -- subshell that launched it) to test the watchdog
-  vim.fn.writefile({ tostring(vim.fn.getpid()) }, "nvim.pid")
+  -- stay alive: run.sh SIGKILLs this nvim to test the watchdog
   vim.fn.writefile({ "ready" }, "ready")
 end)

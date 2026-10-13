@@ -17,15 +17,6 @@ lib.suite("gopls", function(t)
   local function notified(list, msg)
     return vim.tbl_contains(list, msg) and msg or ("not among: " .. table.concat(list, " / "))
   end
-  --- folds from gopls' ranges for the buffer just opened (util/foldranges.lua)
-  local function server_folds()
-    local FR = require("util.foldranges")
-    vim.wait(15000, function()
-      return FR.has(0)
-    end, 50)
-    t.wait(300)
-    return FR.has(0)
-  end
   vim.wait(30000, function()
     return vim.fn.maparg("gd", "n", false, true).callback ~= nil
   end, 100)
@@ -205,15 +196,8 @@ lib.suite("gopls", function(t)
   vim.fn.writefile(before, "main.go")
   -- folds come from gopls' ranges once they arrive (util/foldranges.lua),
   -- normalised so a fold hides its closing brace
-  local FR = require("util.foldranges")
-  t.check("the fold expression is ours", vim.wo.foldexpr, "v:lua.require('util.foldranges').foldexpr()")
-  t.check("folds come from gopls", server_folds(), true)
   t.fold(9)
-  t.check(
-    ",d on func main folds through its closing brace",
-    vim.fn.foldclosed(9) .. ".." .. vim.fn.foldclosedend(9),
-    "9..13"
-  )
+  t.check(",d on func main folds through its closing brace", t.span(9), "9..13")
   t.check("the } line is inside the fold", vim.fn.getline(13), "}")
   t.check("fold line reads like IntelliJ", vim.fn.foldtextresult(9), "func main() { ... }")
   -- the fold line keeps the open line's colours: rainbow brackets included
@@ -261,7 +245,7 @@ lib.suite("gopls", function(t)
   pcall(function()
     require("rainbow-delimiters.lib").attach(0)
   end)
-  server_folds()
+  t.ranges()
   t.fold(6)
   t.check("literal fold reads right", vim.fn.foldtextresult(6), "    x := g(1, func() int { ... })")
   chunks = nil
@@ -285,16 +269,12 @@ lib.suite("gopls", function(t)
   )
   vim.cmd("edit sig.go")
   local gb = vim.api.nvim_get_current_buf()
-  server_folds()
-  -- the parameter list is its own fold: zc on `func h(` folds just it,
+  t.ranges()
+  -- the parameter list is its own fold: ,d on `func h(` folds just it,
   -- through its closing `) int {` line (the body that opens there folds
   -- with the whole function: a line belongs to one fold)
   t.fold(3)
-  t.check(
-    ",d on the signature folds the parameters only",
-    vim.fn.foldclosed(3) .. ".." .. vim.fn.foldclosedend(3),
-    "3..6"
-  )
+  t.check(",d on the signature folds the parameters only", t.span(3), "3..6")
   t.check("parameters fold line", vim.fn.foldtextresult(3), "func h( ... ) int {")
   vim.wo.foldtext = "v:lua.__fold_probe()"
   vim.fn.foldtextresult(3)
@@ -314,20 +294,16 @@ lib.suite("gopls", function(t)
   t.check(",d again opens the parameters", vim.fn.foldclosed(3), -1)
   -- the body folds on its own from its `) int {` line, parameters open
   t.fold(7)
-  t.check(",d in the body folds the body only", vim.fn.foldclosed(7) .. ".." .. vim.fn.foldclosedend(7), "6..8")
+  t.check(",d in the body folds the body only", t.span(7), "6..8")
   t.check("body fold line", vim.fn.foldtextresult(6), ") int { ... }")
   t.check("the parameters stay open above it", vim.fn.foldclosed(3), -1)
   -- folding the parameters while the body is folded: the whole function
   t.fold(3)
-  t.check(
-    "parameters over a folded body: the whole function",
-    vim.fn.foldclosed(3) .. ".." .. vim.fn.foldclosedend(3),
-    "3..8"
-  )
+  t.check("parameters over a folded body: the whole function", t.span(3), "3..8")
   t.check("whole-function fold line", vim.fn.foldtextresult(3), "func h( ... ) int { ... }")
   -- opening it leaves the body folded
   t.fold(3)
-  t.check("opening the function keeps the body folded", vim.fn.foldclosed(6) .. ".." .. vim.fn.foldclosedend(6), "6..8")
+  t.check("opening the function keeps the body folded", t.span(6), "6..8")
   t.check("and the signature open", vim.fn.foldclosed(3), -1)
   vim.cmd("normal! zR")
   vim.cmd("buffer main.go")
@@ -341,13 +317,9 @@ lib.suite("gopls", function(t)
   )
   vim.cmd("edit rest.go")
   local rb = vim.api.nvim_get_current_buf()
-  server_folds()
+  t.ranges()
   t.fold(5)
-  t.check(
-    ",d inside a composite literal folds through `}, log)`",
-    vim.fn.foldclosed(5) .. ".." .. vim.fn.foldclosedend(5),
-    "4..6"
-  )
+  t.check(",d inside a composite literal folds through `}, log)`", t.span(5), "4..6")
   t.check("its fold line", vim.fn.foldtextresult(4), "    sender, err := mail.New(mail.Config{ ... }, log)")
   vim.cmd("normal! zR")
   vim.cmd("buffer main.go")
@@ -360,13 +332,9 @@ lib.suite("gopls", function(t)
   )
   vim.cmd("edit args.go")
   local ab = vim.api.nvim_get_current_buf()
-  server_folds()
+  t.ranges()
   t.fold(6)
-  t.check(
-    ",d inside wrapped arguments folds them through `)`",
-    vim.fn.foldclosed(6) .. ".." .. vim.fn.foldclosedend(6),
-    "4..7"
-  )
+  t.check(",d inside wrapped arguments folds them through `)`", t.span(6), "4..7")
   t.check("argument fold line", vim.fn.foldtextresult(4), "    srv := server.New( ... )")
   vim.cmd("normal! zR")
   vim.cmd("buffer main.go")
@@ -379,8 +347,8 @@ lib.suite("gopls", function(t)
   )
   vim.cmd("edit imp.go")
   local ib = vim.api.nvim_get_current_buf()
-  server_folds()
-  t.check("imports fold on open", vim.fn.foldclosed(4) .. ".." .. vim.fn.foldclosedend(4), "3..6")
+  t.ranges()
+  t.check("imports fold on open", t.span(4), "3..6")
   t.check("imports fold line", vim.fn.foldtextresult(3), "import ( ... )")
   t.check("the rest of the file is open", vim.fn.foldclosed(8), -1)
   -- a fold that appears after an edit must come out open: Vim creates it
@@ -391,7 +359,7 @@ lib.suite("gopls", function(t)
   end, 50)
   t.wait(300)
   t.check("a region added by an edit is open", vim.fn.foldclosed(9), -1)
-  t.check("the imports stay folded", vim.fn.foldclosed(4) .. ".." .. vim.fn.foldclosedend(4), "3..6")
+  t.check("the imports stay folded", t.span(4), "3..6")
   vim.cmd("normal! zR")
   vim.cmd("buffer main.go")
   vim.api.nvim_buf_delete(ib, { force = true })
@@ -415,7 +383,7 @@ lib.suite("gopls", function(t)
   }, "ret.go")
   vim.cmd("edit ret.go")
   local eb = vim.api.nvim_get_current_buf()
-  server_folds()
+  t.ranges()
   t.fold(5)
   t.check(
     "a folded `return err` check is a one-liner",
@@ -448,9 +416,9 @@ lib.suite("gopls", function(t)
   vim.fn.writefile({ "package main", "", "/*", "Package doc", "spanning lines", "*/", "func f() {}" }, "blk.go")
   vim.cmd("edit blk.go")
   local kb = vim.api.nvim_get_current_buf()
-  server_folds()
+  t.ranges()
   t.fold(4)
-  t.check("a block comment folds through its closer", vim.fn.foldclosed(4) .. ".." .. vim.fn.foldclosedend(4), "3..6")
+  t.check("a block comment folds through its closer", t.span(4), "3..6")
   t.check("block comment fold line", vim.fn.foldtextresult(3), "/* ... */")
   vim.cmd("normal! zR")
   vim.cmd("buffer main.go")
@@ -463,7 +431,7 @@ lib.suite("gopls", function(t)
   )
   vim.cmd("edit str.go")
   local sb = vim.api.nvim_get_current_buf()
-  server_folds()
+  t.ranges()
   t.fold(3)
   t.check("folded raw string shows its closing quote", vim.fn.foldtextresult(3), "var q = ` ... `")
   chunks = nil

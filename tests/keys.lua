@@ -1,13 +1,8 @@
 -- j/k are swapped in this config; every place vim or a plugin spells
 -- "down" as j / "up" as k must follow. Opens long.txt.
-local logf = io.open(vim.fn.expand("%:p:h") .. "/result.log", "w")
-local function log(s)
-  logf:write(s, "\n")
-  logf:flush()
-end
-local function check(name, got, want)
-  log(("%s %s: %s (want %s)"):format(got == want and "PASS" or "FAIL", name, tostring(got), tostring(want)))
-end
+local lib = dofile(debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") .. "/lib.lua")
+local t = lib.open(vim.fn.expand("%:p:h") .. "/result.log", "w")
+local log, check = t.log, t.check
 local function rhs(mode, lhs)
   local m = vim.fn.maparg(lhs, mode, false, true)
   return m.rhs or (m.callback and "<callback>") or nil
@@ -207,7 +202,6 @@ vim.schedule(function()
     -- undotree
     require("lazy").load({ plugins = { "undotree" } })
     check("undotree custom map defined", vim.fn.exists("*g:Undotree_CustomMap"), 1)
-    log("OK")
   end)
   log(ok and "DONE" or ("ERROR: " .. tostring(err)))
   vim.cmd("qall!")

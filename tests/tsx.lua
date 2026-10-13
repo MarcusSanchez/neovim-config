@@ -98,5 +98,4 @@ lib.suite("vtsls", function(t)
   vim.fn.foldtextresult(37)
   vim.wo.foldtext = ft
   t.check("the <a> fold line has no Folded fallback either", folded_fallbacks(), "")
-  t.log("OK")
 end, { timeout = 90000 })

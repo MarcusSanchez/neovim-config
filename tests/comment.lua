@@ -1,14 +1,9 @@
 -- gc on a selection within a line wraps it in a block comment
 -- (lua/util/comment.lua); linewise and gcc stay line comments; languages
 -- without block comments fall back to the line comment.
-local logf = io.open(vim.fn.getcwd() .. "/result.log", "w")
-local function log(s)
-  logf:write(s, "\n")
-  logf:flush()
-end
-local function check(name, got, want)
-  log(("%s %s: %s (want %s)"):format(got == want and "PASS" or "FAIL", name, tostring(got), tostring(want)))
-end
+local lib = dofile(debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") .. "/lib.lua")
+local t = lib.open(vim.fn.getcwd() .. "/result.log", "w")
+local log, check = t.log, t.check
 vim.defer_fn(function()
   log("TIMEOUT")
   vim.cmd("qall!")

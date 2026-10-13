@@ -2,14 +2,9 @@
 -- one, nothing happens (the dashboard's turn). Two sessions in the go
 -- fixture dir: pass 1 (SESSION_PASS=1) opens main.go and main_test.go and
 -- saves a session; pass 2 starts bare and expects both buffers back.
-local logf = io.open(vim.fn.getcwd() .. "/result.log", vim.env.SESSION_PASS == "1" and "w" or "a")
-local function log(s)
-  logf:write(s, "\n")
-  logf:flush()
-end
-local function check(name, got, want)
-  log(("%s %s: %s (want %s)"):format(got == want and "PASS" or "FAIL", name, tostring(got), tostring(want)))
-end
+local lib = dofile(debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") .. "/lib.lua")
+local t = lib.open(vim.fn.getcwd() .. "/result.log", vim.env.SESSION_PASS == "1" and "w" or "a")
+local log, check = t.log, t.check
 vim.defer_fn(function()
   log("TIMEOUT")
   vim.cmd("qall!")
@@ -125,9 +120,10 @@ vim.schedule(function()
     local last = r.highlights[#r.highlights]
     check("pass 2: tabline offset above the sidebar uses the bar's fill", last and last.group, "BufferLineFill")
     -- quit with no file open: run.sh then expects the session file gone
+    -- (its path from util/session itself, so the check can't go stale)
+    vim.fn.writefile({ require("util.session").file() or "" }, "session.path")
     vim.cmd("%bwipeout!")
     check("pass 2: no file buffers left before quitting", vim.api.nvim_buf_get_name(0), "")
-    log("OK")
   end)
   log(ok and "DONE" or ("ERROR: " .. tostring(err)))
   vim.cmd("qall!")

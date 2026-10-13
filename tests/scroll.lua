@@ -1,14 +1,9 @@
 -- scrolloff past the end of the buffer, with and without folds. Opens
 -- long.txt (100 lines) in a 20-row window with scrolloff=4: the cursor must
 -- never sit on the bottom 4 rows, and the view must only ever move forward.
-local logf = io.open(vim.fn.expand("%:p:h") .. "/result.log", "w")
-local function log(s)
-  logf:write(s, "\n")
-  logf:flush()
-end
-local function check(name, got, want)
-  log(("%s %s: %s (want %s)"):format(got == want and "PASS" or "FAIL", name, tostring(got), tostring(want)))
-end
+local lib = dofile(debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") .. "/lib.lua")
+local t = lib.open(vim.fn.expand("%:p:h") .. "/result.log", "w")
+local log, check = t.log, t.check
 local function fire()
   vim.api.nvim_exec_autocmds("CursorMoved", { buffer = 0 })
 end
@@ -83,7 +78,6 @@ vim.schedule(function()
     go("gg")
     go("G")
     check("wrapped last line: cursor row <= 16", row() <= 16, true)
-    log("OK")
   end)
   log(ok and "DONE" or ("ERROR: " .. tostring(err)))
   vim.cmd("qall!")

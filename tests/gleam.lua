@@ -33,7 +33,7 @@ lib.suite("gleam", function(t)
   t.check("parameters fold line", vim.fn.foldtextresult(30), "pub fn insert( ... ) -> Tree(Int) {")
   t.fold(31) -- open them again
   t.fold(33)
-  t.check("the body folds from the `) -> Tree(Int) {` line", t.span(35), "33..45")
+  t.check("the body folds from the `) -> Tree(Int) {` line", t.span(33), "33..45")
   t.check("body fold line", vim.fn.foldtextresult(33), ") -> Tree(Int) { ... }")
   t.check("the parameters stay open above it", vim.fn.foldclosed(30), -1)
   t.fold(31)
