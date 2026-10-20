@@ -9,7 +9,7 @@ from typing import (
 # a comment
 # spanning lines
 class Tree:
-    """Doc string
+    """ Doc string
     spanning lines.
     """
 

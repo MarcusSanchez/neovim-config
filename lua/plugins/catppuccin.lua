@@ -53,6 +53,8 @@ return {
             -- SnacksPicker* group links down to these four, so overriding the
             -- roots covers the input, list, preview and box windows too.
             SnacksPicker = { fg = colors.text, bg = "NONE" },
+            -- …except the input box, which links to NormalFloat on its own
+            SnacksPickerInput = { fg = colors.text, bg = "NONE" },
             SnacksPickerBorder = { fg = colors.blue, bg = "NONE" },
             SnacksPickerTitle = { fg = colors.subtext0, bg = "NONE" },
             SnacksPickerFooter = { fg = colors.subtext0, bg = "NONE" },
