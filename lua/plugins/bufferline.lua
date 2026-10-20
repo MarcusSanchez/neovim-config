@@ -1,29 +1,8 @@
 -- Buffer tabs: Alt+h/l cycle buffers, the tabline shows what's open;
--- harpoon (plugins/harpoon.lua) pins slots alongside. The row is
--- underlined edge to edge in the window separator's colour — the thin
--- grey strip between the sidebar and the buffer — so the bar is edged
--- the same way (a tabline is one row, so the line is an underline on
--- every group the bar draws with).
-
---- Every group underlined in the window separator's colour, on top of
---- the theme's groups (catppuccin's, set by LazyVim) — bufferline calls
---- this with its defaults whenever it sets its highlights, colorscheme
---- changes included.
-local function underlined(theme)
-  return function(defaults) -- bufferline's whole default config
-    local hl = type(theme) == "function" and theme(defaults) or vim.deepcopy(theme or {})
-    local sp = vim.api.nvim_get_hl(0, { name = "WinSeparator", link = false }).fg
-    for name in pairs(defaults.highlights) do
-      hl[name] = vim.tbl_extend("force", hl[name] or {}, { underline = true, sp = sp })
-    end
-    return hl
-  end
-end
-
+-- harpoon (plugins/harpoon.lua) pins slots alongside.
 return {
   "akinsho/bufferline.nvim",
   opts = function(_, opts)
-    opts.highlights = underlined(opts.highlights)
     -- LazyVim reserves the tabline above the snacks explorer (an "offset")
     -- but gives it no highlight, so bufferline guesses one from the
     -- explorer window's winhighlight: SnacksNormal, whose background is
