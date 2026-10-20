@@ -199,6 +199,17 @@ vim.schedule(function()
     vim.api.nvim_buf_delete(real, { force = true })
     vim.fn.delete("search.txt")
     require("harpoon"):list():clear()
+    -- the tab bar is underlined edge to edge in the sidebar border's colour
+    require("lazy").load({ plugins = { "bufferline.nvim" } })
+    vim.wait(2000, function()
+      return vim.api.nvim_get_hl(0, { name = "BufferLineFill", link = false }).underline == true
+    end, 50)
+    local fill = vim.api.nvim_get_hl(0, { name = "BufferLineFill", link = false })
+    local border = vim.api.nvim_get_hl(0, { name = "SnacksPickerBorder", link = false })
+    check("tab bar fill is underlined", fill.underline, true)
+    check("in the sidebar border's colour", fill.sp, border.fg)
+    local sel = vim.api.nvim_get_hl(0, { name = "BufferLineBufferSelected", link = false })
+    check("the selected tab too (the line is continuous)", sel.underline == true and sel.sp == border.fg, true)
     -- undotree
     require("lazy").load({ plugins = { "undotree" } })
     check("undotree custom map defined", vim.fn.exists("*g:Undotree_CustomMap"), 1)
