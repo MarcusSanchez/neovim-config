@@ -1,6 +1,7 @@
 -- Bubbles-style statusline modeled on the catppuccin/nvim README screenshot:
 -- rounded mode pill + progress/location on the left, solid bar with diagnostic
--- dots in the middle, then LSP indicator and filename/cwd pills on the right.
+-- dots in the middle, then the attached language servers' names and
+-- filename/cwd pills on the right.
 -- opts is a function so it fully replaces LazyVim's default lualine config
 -- instead of merging with it.
 --
@@ -56,7 +57,7 @@ return {
           -- outer (screen-side) edge stays straight; only the inner edge is rounded
           { "mode", icon = "\u{e62b}", separator = { right = cap_right }, padding = { left = 1, right = 2 } },
         },
-        lualine_b = { "progress", { "location", separator = { right = cap_right } } },
+        lualine_b = { "branch", "progress", { "location", separator = { right = cap_right } } },
         lualine_c = {
           "%=",
           {
@@ -66,11 +67,16 @@ return {
         },
         lualine_x = {
           {
+            -- the language servers attached to the buffer, by name; copilot
+            -- is an LSP client too but not one worth announcing
             function()
-              if #vim.lsp.get_clients({ bufnr = 0 }) > 0 then
-                return "\u{f048b} Lsp"
+              local names = {}
+              for _, client in ipairs(vim.lsp.get_clients({ bufnr = 0 })) do
+                if client.name ~= "copilot" then
+                  names[#names + 1] = client.name
+                end
               end
-              return ""
+              return #names > 0 and ("\u{f048b} " .. table.concat(names, " ")) or ""
             end,
             color = { fg = palette.overlay1 },
           },
