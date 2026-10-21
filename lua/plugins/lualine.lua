@@ -57,7 +57,18 @@ return {
           -- outer (screen-side) edge stays straight; only the inner edge is rounded
           { "mode", icon = "\u{e62b}", separator = { right = cap_right }, padding = { left = 1, right = 2 } },
         },
-        lualine_b = { "branch", "progress", { "location", separator = { right = cap_right } } },
+        lualine_b = {
+          -- the branch only when it's worth knowing: off main (or master)
+          {
+            "branch",
+            cond = function()
+              local branch = vim.b.gitsigns_head or ""
+              return branch ~= "" and branch ~= "main" and branch ~= "master"
+            end,
+          },
+          "progress",
+          { "location", separator = { right = cap_right } },
+        },
         lualine_c = {
           "%=",
           {
