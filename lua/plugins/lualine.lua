@@ -61,6 +61,7 @@ return {
           -- the branch only when it's worth knowing: off main (or master)
           {
             "branch",
+            color = { fg = palette.peach },
             cond = function()
               local branch = vim.b.gitsigns_head or ""
               return branch ~= "" and branch ~= "main" and branch ~= "master"
