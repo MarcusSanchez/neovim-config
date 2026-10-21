@@ -811,6 +811,13 @@ function M.refresh()
   caret_at_cursor(api.nvim_get_current_win(), api.nvim_get_current_buf())
 end
 
+--- A jump (flash's) to buffer position (lnum, col) on a closed fold's
+--- line: the caret onto the cell standing for it, the fold kept closed.
+function M.jump(win, lnum, col)
+  api.nvim_win_set_cursor(win, { lnum, col })
+  caret_at_cursor(win, api.nvim_win_get_buf(win))
+end
+
 --- The caret's record for a window, for tests: nil, or where it was
 --- placed and the changedtick then (validated by cell_at()).
 function M.state(win)

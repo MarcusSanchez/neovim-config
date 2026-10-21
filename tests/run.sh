@@ -13,7 +13,7 @@
 # code, and cargo/gopls scratch output stays out of the tree.
 set -u
 here=$(cd "$(dirname "$0")" && pwd)
-suites="go caret rust tsx zig gleam c cpp lua sh json yaml toml markdown nix python protofold session copilot proto scroll keys comment ranges folds"
+suites="go caret flash rust tsx zig gleam c cpp lua sh json yaml toml markdown nix python protofold session copilot proto scroll keys comment ranges folds"
 want=${1:-all}
 if [[ $want != all ]] && ! grep -qw -- "$want" <<< "$suites"; then
   echo "usage: tests/run.sh [all | $(echo $suites | tr ' ' '|')]" >&2; exit 2
@@ -53,6 +53,7 @@ run() { # name, cwd, file to open, lua script, result log [, keep]
 
 [[ $want == all || $want == go ]] && run go "$work/go" main.go "$here/go.lua" "$work/go/result.log"
 [[ $want == all || $want == caret ]] && run caret "$work/go" main.go "$here/caret.lua" "$work/go/result.log"
+[[ $want == all || $want == flash ]] && run flash "$work/go" main.go "$here/flash.lua" "$work/go/result.log"
 [[ $want == all || $want == rust ]] && run rust "$work/rust" src/lib.rs "$here/rust.lua" "$work/rust/src/result.log"
 [[ $want == all || $want == tsx ]] && run tsx "$work/ts" page.tsx "$here/tsx.lua" "$work/ts/result.log"
 [[ $want == all || $want == zig ]] && run zig "$work/zig" src/main.zig "$here/zig.lua" "$work/zig/src/result.log"

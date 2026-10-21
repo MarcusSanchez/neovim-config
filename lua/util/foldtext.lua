@@ -15,6 +15,12 @@ local M = {}
 ---@type fun(win: integer, buf: integer, start: integer): integer?
 M.caret = nil
 
+--- Set to a function returning labels to draw over a fold line's cells
+--- (`{ [cell] = { text, highlight } }`, a cell one past the end allowed):
+--- flash's jump labels (util/flashfolds.lua).
+---@type (fun(win: integer, buf: integer, start: integer): table<integer, string[]>?)?
+M.labels = nil
+
 ---@class util.foldtext.Chunk
 ---@field [1] string text as displayed (tabs expanded)
 ---@field [2] string highlight group
@@ -607,12 +613,21 @@ end
 ---@param chunks util.foldtext.Chunk[]
 ---@param cursor integer?
 ---@param leftcol integer?
-function M.render(chunks, cursor, leftcol)
-  local out, seen = {}, 0
+function M.render(chunks, cursor, leftcol, labels)
   local skip = leftcol or 0
-  if skip > 0 then
-    cursor = cursor and cursor > skip and cursor - skip or nil
+  -- what to draw differently, by cell (past the scrolled-off ones): a
+  -- label's text and highlight, the caret's highlight over the cell's own
+  local marks = {} ---@type table<integer, { text: string?, hl: string }>
+  for cell, l in pairs(labels or {}) do
+    if cell > skip then
+      marks[cell - skip] = { text = l[1], hl = l[2] }
+    end
   end
+  if cursor and cursor > skip then
+    local m = marks[cursor - skip]
+    marks[cursor - skip] = { text = m and m.text, hl = "FoldCursor" }
+  end
+  local out, seen = {}, 0
   for _, c in ipairs(chunks) do
     local text = c[1]
     if skip > 0 then
@@ -626,23 +641,40 @@ function M.render(chunks, cursor, leftcol)
       end
     end
     local n = vim.fn.strchars(text)
-    if text == "" then
-      -- scrolled away
-    elseif cursor and cursor > seen and cursor <= seen + n then
-      local at = cursor - seen - 1 -- 0-based char index within the chunk
-      local before, caret, after =
-        vim.fn.strcharpart(text, 0, at), vim.fn.strcharpart(text, at, 1), vim.fn.strcharpart(text, at + 1)
-      if before ~= "" then
-        out[#out + 1] = { before, c[2] }
+    local marked = false
+    for cell = seen + 1, seen + n do
+      if marks[cell] then
+        marked = true
+        break
       end
-      out[#out + 1] = { caret, "FoldCursor" }
-      if after ~= "" then
-        out[#out + 1] = { after, c[2] }
+    end
+    if not marked then
+      if text ~= "" then
+        out[#out + 1] = { text, c[2] }
       end
     else
-      out[#out + 1] = { text, c[2] }
+      local run = "" -- the chunk's unmarked characters, kept together
+      for i = 0, n - 1 do
+        local ch, m = vim.fn.strcharpart(text, i, 1), marks[seen + i + 1]
+        if m then
+          if run ~= "" then
+            out[#out + 1] = { run, c[2] }
+            run = ""
+          end
+          out[#out + 1] = { m.text or ch, m.hl }
+        else
+          run = run .. ch
+        end
+      end
+      if run ~= "" then
+        out[#out + 1] = { run, c[2] }
+      end
     end
     seen = seen + n
+  end
+  local past = marks[seen + 1] -- a label after the line's last character
+  if past and past.text then
+    out[#out + 1] = { past.text, past.hl }
   end
   return out
 end
@@ -653,7 +685,12 @@ end
 function M.text()
   local buf, win = vim.api.nvim_get_current_buf(), vim.api.nvim_get_current_win()
   local chunks = M.build(buf, vim.v.foldstart, vim.v.foldend)
-  return M.render(chunks, M.caret and M.caret(win, buf, vim.v.foldstart) or nil, vim.fn.winsaveview().leftcol)
+  return M.render(
+    chunks,
+    M.caret and M.caret(win, buf, vim.v.foldstart) or nil,
+    vim.fn.winsaveview().leftcol,
+    M.labels and M.labels(win, buf, vim.v.foldstart) or nil
+  )
 end
 
 return M
