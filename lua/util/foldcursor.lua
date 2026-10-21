@@ -7,8 +7,10 @@
 -- the real cursor is placed on the buffer position that character stands
 -- for (the fold's last line for `Result`), so hover, diagnostics and
 -- go-to-definition act on what the caret is on. Stepping onto the ` ... `
--- opens the fold where the hidden text begins. The caret is drawn by
--- util/foldtext.lua; Vim's own cursor stays in the first column.
+-- opens the fold where the hidden text begins; a word motion across it
+-- opens the fold and goes on into the text, as JetBrains' do. The caret
+-- is drawn by util/foldtext.lua; Vim's own cursor stays in the first
+-- column.
 local M = {}
 local api = vim.api
 
@@ -417,16 +419,20 @@ end
 --- cell `at`) or from an open line (none of those): run over the buffer
 --- as drawn — every closed fold it lands in is its one drawn line, so a
 --- motion from below a folded function onto it lands on the fold line's
---- last word, with the caret, and never inside the fold.
-local function word(win, buf, start, stop, cells, at, run)
+--- last word, with the caret. Crossing a ` ... ` on the way (landing on
+--- it or past it) opens what it hides, and the motion runs again from
+--- where it started, into the revealed text. `depth` counts those reruns.
+local function word(win, buf, start, stop, cells, at, run, depth)
   local folds = {} ---@type util.foldcursor.Drawn[]
-  local origin = api.nvim_win_get_cursor(win)
+  local real = api.nvim_win_get_cursor(win) -- the buffer position it starts from
+  local origin = real -- …in the drawn buffer
   if start then
     folds[1] = drawn(buf, start, stop, cells)
     local col = 0
     for i = 1, at - 1 do
       col = col + #cells[i].ch
     end
+    real = { cells[at].lnum, cells[at].col }
     origin = { start, col }
   end
   for _ = 1, 8 do
@@ -447,21 +453,44 @@ local function word(win, buf, start, stop, cells, at, run)
     end
     if landed then
       local target = vim.fn.charidx(landed.text, col) + 1
-      if visible(landed.cells[target]) then
-        place(win, buf, landed.start, landed.stop, landed.cells, target)
-      else
-        -- onto a ` ... `: from the right of it when the caret was on this
-        -- fold's line past it, or the motion came from below the fold
-        local dir = 1
-        if start == landed.start then
-          dir = target >= at and 1 or -1
-        elseif origin[1] > landed.stop then
-          dir = -1
-        end
-        api.nvim_win_set_cursor(win, { landed.start, 0 })
-        open_segment(win, buf, landed.start, landed.stop, landed.cells, target, dir)
+      -- the motion's path over the drawn line: from the caret's cell when
+      -- it started on this fold line, else from beyond the end it came in
+      -- by; the first hidden cell on the way to the target (the target
+      -- itself included) is a ` ... ` crossed
+      local from = 0
+      if start == landed.start then
+        from = at
+      elseif real[1] > landed.stop then
+        from = #landed.cells + 1
       end
-      return
+      local dir = target >= from and 1 or -1
+      local crossed
+      for i = from + dir, target, dir do
+        if landed.cells[i] and not visible(landed.cells[i]) then
+          crossed = i
+          break
+        end
+      end
+      if not crossed then
+        place(win, buf, landed.start, landed.stop, landed.cells, target)
+        return
+      end
+      api.nvim_win_set_cursor(win, { landed.start, 0 })
+      open_segment(win, buf, landed.start, landed.stop, landed.cells, crossed, dir)
+      if (depth or 0) >= 4 then
+        return
+      end
+      -- again from where it started, which may now be on another closed
+      -- fold's line (a sibling run closed back up); a fresh caret there
+      states[win] = nil
+      api.nvim_win_set_cursor(win, real)
+      local fs = vim.fn.foldclosed(real[1])
+      if fs == -1 then
+        return word(win, buf, nil, nil, nil, nil, run, (depth or 0) + 1)
+      end
+      local fe = vim.fn.foldclosedend(real[1])
+      local cs = cells_of(buf, fs, fe)
+      return word(win, buf, fs, fe, cs, current_cell(win, buf, fs, cs), run, (depth or 0) + 1)
     end
     local closed = vim.fn.foldclosed(line)
     if closed == -1 then
