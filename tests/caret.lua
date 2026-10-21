@@ -1,8 +1,8 @@
 -- The caret on a closed fold (lua/util/foldcursor.lua): h/l/^/_/$ and the
 -- config's word motions walk the drawn fold line, the real cursor follows
--- to the buffer position each character stands for, stepping onto or a
--- word motion across the ` ... ` opens the fold. On the Go fixture with
--- gopls.
+-- to the buffer position each character stands for, stepping onto the
+-- ` ... ` opens the fold, as does one of Vim's WORD motions across it;
+-- the config's word motions skip over it. On the Go fixture with gopls.
 local lib = dofile(debug.getinfo(1, "S").source:sub(2):match("^(.*)/[^/]*$") .. "/lib.lua")
 lib.suite("gopls", function(t)
   local FR, FT, FC = require("util.foldranges"), require("util.foldtext"), require("util.foldcursor")
@@ -79,18 +79,23 @@ lib.suite("gopls", function(t)
   t.check("hover/diagnostics see the caret's position", p.position.line .. ":" .. p.position.character, "7:8")
   key("w")
   t.check("w again: `int`", cursor() .. " " .. caret(), "8:3 i")
-  key("w") -- across the ` ... `: the parameters open and w goes on into them
-  t.check("w across the dots opens the fold", vim.fn.foldclosed(5), -1)
-  t.check("and lands on the previous word start inside, `int` of `b int,`", cursor(), "7:3")
-  t.fold(6)
-  vim.api.nvim_win_set_cursor(win, { 5, 5 }) -- `h`
-  key("b") -- next word end, across the dots the other way
-  t.check("b across the dots opens the fold", vim.fn.foldclosed(5), -1)
-  t.check("and lands on the next word end inside, `a`", cursor(), "6:1")
-  t.fold(6)
-  vim.api.nvim_win_set_cursor(win, { 8, 3 }) -- `int`
+  key("w")
+  t.check("w over the ` ... `: skipped, `h` on the first line", cursor() .. " " .. caret(), "5:5 h")
+  t.check("the fold stays closed", vim.fn.foldclosed(5), 5)
   key("b") -- next word end
   t.check("b: next word end, `t` of int", cursor() .. " " .. caret(), "8:5 t")
+  -- Vim's own WORD motions open a ` ... ` they cross and go on inside
+  vim.api.nvim_win_set_cursor(win, { 8, 0 }) -- `)`
+  key("W") -- previous WORD start: `h(` is past the dots
+  t.check("W across the dots opens the fold", vim.fn.foldclosed(5), -1)
+  t.check("and lands on the previous WORD start inside, `int,` of `b int,`", cursor(), "7:3")
+  t.fold(6)
+  vim.api.nvim_win_set_cursor(win, { 5, 5 }) -- `h`
+  key("E") -- next WORD start: the dots themselves
+  t.check("E onto the dots opens the fold", vim.fn.foldclosed(5), -1)
+  t.check("and lands on the next WORD start inside, `a`", cursor(), "6:1")
+  t.fold(6)
+  vim.api.nvim_win_set_cursor(win, { 8, 3 }) -- `int`
   key("B") -- next WORD end
   t.check("B: next WORD end, the `,` of `int,`", cursor() .. " " .. caret(), "8:6 ,")
   key("<S-h>")
@@ -192,24 +197,32 @@ lib.suite("gopls", function(t)
   vim.api.nvim_win_set_cursor(win, { 10, 0 }) -- the `}`
   key("e") -- next word start: nothing left on the line, `func` two lines down
   t.check("e past the fold's line: the next word in the buffer", cursor() .. " " .. vim.fn.foldclosed(5), "12:0 5")
-  key("w") -- previous word start: back across the body's ` ... }`
-  t.check(
-    "w back across the body's dots: the body opens, parameters folded",
-    vim.fn.foldclosed(9) .. " " .. t.span(6),
-    "-1 5..8"
-  )
-  t.check("on the body's last word start, the `x`", cursor(), "9:27")
-  -- a motion from an open line lands on a fold line's word short of the
-  -- dots with the caret, never inside the fold
-  vim.cmd("normal! zR")
-  t.fold(6)
-  vim.api.nvim_win_set_cursor(win, { 9, 1 }) -- `return`
-  key("w") -- previous word start: `error` on the fold line
+  key("w") -- previous word start: back onto the fold line, its last word
+  t.check("w back onto the fold: its last word", cursor() .. " " .. caret(), "8:8 e")
+  -- and from an open line a motion never lands inside a closed fold: it
+  -- lands on the fold's line
+  vim.api.nvim_win_set_cursor(win, { 12, 5 }) -- `g`
+  key("w") -- previous word start: `func`, then `error` on the fold line
+  key("w")
   t.check(
     "w from below a closed fold: onto its line",
     cursor() .. " " .. caret() .. " " .. vim.fn.foldclosed(5),
     "8:8 e 5"
   )
+  -- a WORD motion from below crosses the body's ` ... }` into the body
+  vim.api.nvim_win_set_cursor(win, { 11, 0 }) -- the blank line after the function
+  key("W") -- previous WORD start: the `}`, then across the dots
+  t.check("W from below: the fold line's `}`", cursor() .. " " .. caret(), "10:0 }")
+  key("W")
+  t.check(
+    "W across the body's dots: the body opens, parameters folded",
+    vim.fn.foldclosed(9) .. " " .. t.span(6),
+    "-1 5..8"
+  )
+  t.check("on the body's last WORD start", cursor(), "9:15")
+  vim.cmd("normal! zR")
+  t.fold(6)
+  t.fold(9)
   vim.api.nvim_win_set_cursor(win, { 3, 0 })
   key("b") -- next word end: `import`, `errors`, then the fold line's `func`
   key("b")

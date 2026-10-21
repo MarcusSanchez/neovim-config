@@ -235,7 +235,8 @@ local word_motions = {
   b = { [[\w\+\>]], "e", "Next Word End (skip punctuation)" },
 }
 -- In normal mode they go through the fold caret: on a closed fold the
--- same search runs over the drawn fold line (lua/util/foldcursor.lua).
+-- same search runs over the drawn fold line, skipping over its hidden
+-- text (lua/util/foldcursor.lua).
 for lhs, motion in pairs(word_motions) do
   local function run()
     vim.fn.search(motion[1], motion[2])
@@ -246,7 +247,9 @@ for lhs, motion in pairs(word_motions) do
   end, opts(motion[3]))
 end
 
--- Uppercase WORD movements (through the fold caret in normal mode too)
+-- Uppercase WORD movements: Vim's own, and through the fold caret in
+-- normal mode — these open a fold whose ` ... ` they cross and go on
+-- inside it, the way IntelliJ moves by word over a folded region
 for lhs, motion in pairs({
   W = { "B", "Previous WORD Start" },
   E = { "W", "Next WORD Start" },
@@ -254,7 +257,7 @@ for lhs, motion in pairs({
 }) do
   map("x", lhs, motion[1], opts(motion[2]))
   map("n", lhs, function()
-    require("util.foldcursor").motion(motion[1])
+    require("util.foldcursor").motion(motion[1], nil, true)
   end, opts(motion[2]))
 end
 

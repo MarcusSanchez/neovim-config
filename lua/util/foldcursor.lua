@@ -7,10 +7,10 @@
 -- the real cursor is placed on the buffer position that character stands
 -- for (the fold's last line for `Result`), so hover, diagnostics and
 -- go-to-definition act on what the caret is on. Stepping onto the ` ... `
--- opens the fold where the hidden text begins; a word motion across it
--- opens the fold and goes on into the text, as JetBrains' do. The caret
--- is drawn by util/foldtext.lua; Vim's own cursor stays in the first
--- column.
+-- opens the fold where the hidden text begins; Vim's own word motions
+-- across it open the fold and go on into the text, as JetBrains' do,
+-- while the config's search-based ones skip over it. The caret is drawn
+-- by util/foldtext.lua; Vim's own cursor stays in the first column.
 local M = {}
 local api = vim.api
 
@@ -419,10 +419,12 @@ end
 --- cell `at`) or from an open line (none of those): run over the buffer
 --- as drawn — every closed fold it lands in is its one drawn line, so a
 --- motion from below a folded function onto it lands on the fold line's
---- last word, with the caret. Crossing a ` ... ` on the way (landing on
---- it or past it) opens what it hides, and the motion runs again from
---- where it started, into the revealed text. `depth` counts those reruns.
-local function word(win, buf, start, stop, cells, at, run, depth)
+--- last word, with the caret. With `cross`, a ` ... ` on the way (landed
+--- on or passed) opens what it hides, and the motion runs again from
+--- where it started, into the revealed text; without, the hidden text
+--- is skipped over, and only landing on the dots opens them. `depth`
+--- counts the reruns.
+local function word(win, buf, start, stop, cells, at, run, cross, depth)
   local folds = {} ---@type util.foldcursor.Drawn[]
   local real = api.nvim_win_get_cursor(win) -- the buffer position it starts from
   local origin = real -- …in the drawn buffer
@@ -465,17 +467,23 @@ local function word(win, buf, start, stop, cells, at, run, depth)
       end
       local dir = target >= from and 1 or -1
       local crossed
-      for i = from + dir, target, dir do
-        if landed.cells[i] and not visible(landed.cells[i]) then
-          crossed = i
-          break
+      if cross then
+        for i = from + dir, target, dir do
+          if landed.cells[i] and not visible(landed.cells[i]) then
+            crossed = i
+            break
+          end
         end
       end
+      api.nvim_win_set_cursor(win, { landed.start, 0 })
       if not crossed then
-        place(win, buf, landed.start, landed.stop, landed.cells, target)
+        if visible(landed.cells[target]) then
+          place(win, buf, landed.start, landed.stop, landed.cells, target)
+        else
+          open_segment(win, buf, landed.start, landed.stop, landed.cells, target, dir)
+        end
         return
       end
-      api.nvim_win_set_cursor(win, { landed.start, 0 })
       open_segment(win, buf, landed.start, landed.stop, landed.cells, crossed, dir)
       if (depth or 0) >= 4 then
         return
@@ -486,11 +494,11 @@ local function word(win, buf, start, stop, cells, at, run, depth)
       api.nvim_win_set_cursor(win, real)
       local fs = vim.fn.foldclosed(real[1])
       if fs == -1 then
-        return word(win, buf, nil, nil, nil, nil, run, (depth or 0) + 1)
+        return word(win, buf, nil, nil, nil, nil, run, cross, (depth or 0) + 1)
       end
       local fe = vim.fn.foldclosedend(real[1])
       local cs = cells_of(buf, fs, fe)
-      return word(win, buf, fs, fe, cs, current_cell(win, buf, fs, cs), run, (depth or 0) + 1)
+      return word(win, buf, fs, fe, cs, current_cell(win, buf, fs, cs), run, cross, (depth or 0) + 1)
     end
     local closed = vim.fn.foldclosed(line)
     if closed == -1 then
@@ -504,10 +512,12 @@ end
 --- Run a motion with the pending count: as it is unless the cursor is on
 --- a closed fold, where it walks the fold line. `h` `l` `^` `_` `$` step
 --- the line's cells; any other key is a word motion, run by `run` (Vim's
---- own `normal!` motion without one) over the drawn line.
+--- own `normal!` motion without one) over the drawn line — crossing a
+--- ` ... ` opens it with `cross`, skips over it without.
 ---@param key string
 ---@param run? fun() performs the motion in the current window
-function M.motion(key, run)
+---@param cross? boolean a ` ... ` the motion passes opens, the motion going on inside
+function M.motion(key, run, cross)
   local count = vim.v.count
   run = run or function()
     vim.cmd("normal! " .. (count > 0 and count or "") .. key)
@@ -526,7 +536,7 @@ function M.motion(key, run)
         land(win, buf, c[1], key == "h" and -1 or 1)
       end
     else
-      word(win, buf, nil, nil, nil, nil, run)
+      word(win, buf, nil, nil, nil, nil, run, cross)
     end
     return
   end
@@ -560,7 +570,7 @@ function M.motion(key, run)
     end
     target = nearest(cells, target, 1)
   else
-    word(win, buf, start, stop, cells, at, run)
+    word(win, buf, start, stop, cells, at, run, cross)
     return
   end
   if not target then
