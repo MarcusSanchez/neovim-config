@@ -262,6 +262,56 @@ for lhs, motion in pairs({
 end
 
 --------------------------------------------------------------------------------
+-- Multiple Cursors (Neovim's own, 0.13+; lua/util/multicursor.lua)
+--------------------------------------------------------------------------------
+
+if vim.fn.has("nvim-0.13") == 1 then
+  local function mc()
+    return require("util.multicursor")
+  end
+  -- Leave a cursor and move on to the next/previous match of the word under
+  -- the cursor or of the selection: one Alt-Shift family (l next, n
+  -- previous, as n/N search; s skip the next, b skip back; h in the layer
+  -- below lets the last one go). Off <leader>s, LazyVim's search prefix.
+  -- Vim's own Q, zq, [C ]C, CTRL-L and gQ work alongside.
+  map({ "n", "x" }, "<M-S-l>", function()
+    mc().add(1)
+  end, opts("Add Cursor at Next Match"))
+  map({ "n", "x" }, "<M-S-n>", function()
+    mc().add(-1)
+  end, opts("Add Cursor at Previous Match"))
+  map({ "n", "x" }, "<M-S-s>", function()
+    mc().skip(1)
+  end, opts("Skip to Next Match"))
+  map({ "n", "x" }, "<M-S-b>", function()
+    mc().skip(-1)
+  end, opts("Skip to Previous Match"))
+  map({ "n", "x" }, "<M-S-h>", function()
+    mc().undo()
+  end, opts("Undo Last Cursor"))
+  -- a cursor on the line above/below (<C-j> above, <C-k> below: j/k swapped)
+  map({ "n", "x" }, "<C-j>", function()
+    mc().line(-1)
+  end, opts("Add Cursor Above"))
+  map({ "n", "x" }, "<C-k>", function()
+    mc().line(1)
+  end, opts("Add Cursor Below"))
+  map({ "n", "x" }, "<leader><up>", function()
+    mc().line(-1, true)
+  end, opts("Skip Cursor Above"))
+  map({ "n", "x" }, "<leader><down>", function()
+    mc().line(1, true)
+  end, opts("Skip Cursor Below"))
+  -- while cursors stand, the arrows walk them
+  map({ "n", "x" }, "<left>", function()
+    return mc().active() and "[C" or "<left>"
+  end, { expr = true, desc = "Previous Cursor" })
+  map({ "n", "x" }, "<right>", function()
+    return mc().active() and "]C" or "<right>"
+  end, { expr = true, desc = "Next Cursor" })
+end
+
+--------------------------------------------------------------------------------
 -- Miscellaneous Utility Keymaps
 --------------------------------------------------------------------------------
 
@@ -301,10 +351,12 @@ map("n", "<leader>hc", "<cmd>Inspect<CR>", opts("Inspect Highlights Under Cursor
 -- (gk hover is an LSP key in plugins/lsp.lua, next to the disabled K)
 
 -- <Esc> keeps LazyVim's behaviour (clear hlsearch, stop snippet) and also
--- dismisses the gk hover / signature docs and the ge float (lua/util/popup.lua)
+-- dismisses the gk hover / signature docs and the ge float (lua/util/popup.lua),
+-- and clears the multiple cursors when there are any
 map("n", "<Esc>", function()
-  return require("util.popup").escape()
-end, { expr = true, desc = "Escape, Clear hlsearch, Dismiss Popups" })
+  local cursors = vim.fn.has("nvim-0.13") == 1 and require("util.multicursor").active()
+  return (cursors and "<Cmd>lua require('util.multicursor').clear()<CR>" or "") .. require("util.popup").escape()
+end, { expr = true, desc = "Escape, Clear hlsearch, Dismiss Popups and Cursors" })
 
 -- ge opens the line's diagnostics in a float styled like the gk hover
 map("n", "ge", function()
