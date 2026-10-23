@@ -20,6 +20,25 @@ end
 -- Navigation
 --------------------------------------------------------------------------------
 
+-- The fold caret's keys below are Lua mappings, which Neovim's multiple
+-- cursors can't replay (|multicursor| cascades resolved keys only). So
+-- while cursors stand and the primary isn't on a closed fold, each falls
+-- through to the plain key and every cursor moves or edits together
+-- (lua/util/multicursor.lua); otherwise the caret's Lua runs.
+local function with_cursors()
+  return vim.fn.has("nvim-0.13") == 1
+    and require("util.multicursor").active()
+    and vim.fn.foldclosed(vim.fn.line(".")) == -1
+end
+local function caret_or(plain, lua) -- an expr rhs
+  return function()
+    if with_cursors() then
+      return plain
+    end
+    return "<Cmd>lua require('util.foldcursor')." .. lua .. "<CR>"
+  end
+end
+
 -- Jump to start/end of line with Shift+H/L
 map("x", "<S-h>", "_", opts("Go to First Non-Blank Character"))
 map("x", "<S-l>", "$", opts("Go to End of Line"))
@@ -33,9 +52,7 @@ for lhs, step in pairs({
   ["<S-h>"] = { "_", "Go to First Non-Blank Character" },
   ["<S-l>"] = { "$", "Go to End of Line" },
 }) do
-  map("n", lhs, function()
-    require("util.foldcursor").motion(step[1])
-  end, opts(step[2]))
+  map("n", lhs, caret_or(step[1], ("motion(%q)"):format(step[1])), { expr = true, desc = step[2] })
 end
 
 -- Jump half page up/down with Shift+J/K
@@ -200,13 +217,12 @@ map("x", "P", [["_dP]], opts("Paste Over Selection (No Yank)"))
 -- on a caret (a closed fold's line) x/X/r edit the character under it with
 -- the fold closed, and v opens the fold to select from it (lua/util/foldcursor.lua)
 for _, key in ipairs({ "x", "X", "r" }) do
-  map("n", key, function()
-    require("util.foldcursor").edit(key)
-  end, opts(({ x = "Delete Character", X = "Delete Character Before", r = "Replace Character" })[key]))
+  map("n", key, caret_or(key, ("edit(%q)"):format(key)), {
+    expr = true,
+    desc = ({ x = "Delete Character", X = "Delete Character Before", r = "Replace Character" })[key],
+  })
 end
-map("n", "v", function()
-  require("util.foldcursor").visual()
-end, opts("Visual Mode"))
+map("n", "v", caret_or("v", "visual()"), { expr = true, desc = "Visual Mode" })
 
 -- gc on a selection within a line: a block comment around it, IntelliJ
 -- style (lua/util/comment.lua); linewise selections stay line comments
@@ -236,13 +252,17 @@ local word_motions = {
 }
 -- In normal mode they go through the fold caret: on a closed fold the
 -- same search runs over the drawn fold line, skipping over its hidden
--- text (lua/util/foldcursor.lua).
+-- text (lua/util/foldcursor.lua). With multiple cursors standing they
+-- run at each cursor in turn (there's no plain key to fall through to).
 for lhs, motion in pairs(word_motions) do
   local function run()
     vim.fn.search(motion[1], motion[2])
   end
   map("x", lhs, run, opts(motion[3]))
   map("n", lhs, function()
+    if with_cursors() then
+      return require("util.multicursor").each(run)
+    end
     require("util.foldcursor").motion(lhs, run)
   end, opts(motion[3]))
 end
@@ -256,9 +276,7 @@ for lhs, motion in pairs({
   B = { "E", "Next WORD End" },
 }) do
   map("x", lhs, motion[1], opts(motion[2]))
-  map("n", lhs, function()
-    require("util.foldcursor").motion(motion[1], nil, true)
-  end, opts(motion[2]))
+  map("n", lhs, caret_or(motion[1], ("motion(%q, nil, true)"):format(motion[1])), { expr = true, desc = motion[2] })
 end
 
 --------------------------------------------------------------------------------

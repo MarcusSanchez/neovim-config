@@ -6,7 +6,8 @@
 -- and step to the line above/below. The cursors are Vim's: extmarks in the
 -- "nvim.multicursor" namespace that replay the primary cursor's edits, so
 -- its own keys — Q, q= follow mode, [C ]C, CTRL-L, gQ, g CTRL-A — compose
--- with these. Placing one here is a plain "1Q".
+-- with these. Placing one here is a plain "1Q"; 'follow' mode goes on
+-- after, so the cursors move together, as the plugin's did.
 local M = {}
 local api = vim.api
 
@@ -95,6 +96,17 @@ local function to_match_start(pat)
   end
 end
 
+--- The cursors move with the primary — but not while these functions
+--- move it about: in 'follow' mode the primary landing on a cursor trades
+--- places with it (as `]C` does), which would scramble the set as a
+--- search passes over them. So off first, on again once done.
+local function unfollow()
+  vim.bo.follow = false
+end
+local function follow()
+  vim.bo.follow = true
+end
+
 --- A cursor at the primary's position (Vim's "1Q"), remembered for `undo`.
 local function place(buf)
   local cur = api.nvim_win_get_cursor(0)
@@ -135,6 +147,7 @@ function M.add(dir)
     return
   end
   local buf = api.nvim_get_current_buf()
+  unfollow()
   if visual then
     to_selection_start()
   else
@@ -144,6 +157,7 @@ function M.add(dir)
   vim.v.hlsearch = 1
   place(buf)
   to_match(buf, pat, dir)
+  follow()
   if visual then
     reselect()
   end
@@ -156,6 +170,7 @@ function M.skip(dir)
     return
   end
   local buf = api.nvim_get_current_buf()
+  unfollow()
   if visual then
     to_selection_start()
   else
@@ -164,6 +179,7 @@ function M.skip(dir)
   vim.fn.setreg("/", pat)
   vim.v.hlsearch = 1
   to_match(buf, pat, dir)
+  follow()
   if visual then
     reselect()
   end
@@ -174,6 +190,7 @@ end
 function M.undo()
   local buf = api.nvim_get_current_buf()
   local visual = in_visual()
+  unfollow()
   local target ---@type integer[]? 0-based position
   while #placed > 0 do
     local last = table.remove(placed)
@@ -199,6 +216,7 @@ function M.undo()
     vim.cmd("normal! \27")
   end
   api.nvim_win_set_cursor(0, { target[1] + 1, target[2] })
+  follow()
   if visual then
     reselect()
   end
@@ -208,6 +226,7 @@ end
 --- [count] times; with `skip`, just step.
 function M.line(dir, skip)
   local buf = api.nvim_get_current_buf()
+  unfollow()
   if in_visual() then
     vim.cmd("normal! \27")
   end
@@ -217,6 +236,40 @@ function M.line(dir, skip)
     end
     vim.cmd("normal! " .. (dir < 0 and "k" or "j"))
   end
+  follow()
+end
+
+--- Run `move` (a motion of the config's own, in Lua — which Neovim can't
+--- replay at the other cursors, only resolved keys cascade) at every
+--- cursor, each moving to where it lands, then at the primary. Cursors
+--- landing on the same spot merge.
+function M.each(move)
+  local buf = api.nvim_get_current_buf()
+  unfollow()
+  local primary = api.nvim_win_get_cursor(0)
+  local view = vim.fn.winsaveview()
+  local taken = {} ---@type table<string, boolean>
+  for _, m in ipairs(M.cursors(buf)) do
+    api.nvim_win_set_cursor(0, { m[2] + 1, m[3] })
+    move()
+    local c = api.nvim_win_get_cursor(0)
+    local key = c[1] .. ":" .. c[2]
+    if taken[key] then
+      api.nvim_buf_del_extmark(buf, ns(), m[1])
+    else
+      taken[key] = true
+      api.nvim_buf_set_extmark(buf, ns(), c[1] - 1, c[2], { id = m[1] })
+    end
+  end
+  api.nvim_win_set_cursor(0, primary)
+  vim.fn.winrestview(view)
+  move()
+  local c = api.nvim_win_get_cursor(0)
+  local onto = cursor_at(buf, c[1], c[2])
+  if onto then
+    api.nvim_buf_del_extmark(buf, ns(), onto) -- the primary is that cursor now
+  end
+  follow()
 end
 
 --- No cursors in the buffer (Vim's CTRL-L does the same).
