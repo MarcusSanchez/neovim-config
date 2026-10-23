@@ -20,25 +20,6 @@ end
 -- Navigation
 --------------------------------------------------------------------------------
 
--- The fold caret's keys below are Lua mappings, which Neovim's multiple
--- cursors can't replay (|multicursor| cascades resolved keys only). So
--- while cursors stand and the primary isn't on a closed fold, each falls
--- through to the plain key and every cursor moves or edits together
--- (lua/util/multicursor.lua); otherwise the caret's Lua runs.
-local function with_cursors()
-  return vim.fn.has("nvim-0.13") == 1
-    and require("util.multicursor").active()
-    and vim.fn.foldclosed(vim.fn.line(".")) == -1
-end
-local function caret_or(plain, lua) -- an expr rhs
-  return function()
-    if with_cursors() then
-      return plain
-    end
-    return "<Cmd>lua require('util.foldcursor')." .. lua .. "<CR>"
-  end
-end
-
 -- Jump to start/end of line with Shift+H/L
 map("x", "<S-h>", "_", opts("Go to First Non-Blank Character"))
 map("x", "<S-l>", "$", opts("Go to End of Line"))
@@ -52,7 +33,9 @@ for lhs, step in pairs({
   ["<S-h>"] = { "_", "Go to First Non-Blank Character" },
   ["<S-l>"] = { "$", "Go to End of Line" },
 }) do
-  map("n", lhs, caret_or(step[1], ("motion(%q)"):format(step[1])), { expr = true, desc = step[2] })
+  map("n", lhs, function()
+    require("util.foldcursor").motion(step[1])
+  end, opts(step[2]))
 end
 
 -- Jump half page up/down with Shift+J/K
@@ -217,12 +200,13 @@ map("x", "P", [["_dP]], opts("Paste Over Selection (No Yank)"))
 -- on a caret (a closed fold's line) x/X/r edit the character under it with
 -- the fold closed, and v opens the fold to select from it (lua/util/foldcursor.lua)
 for _, key in ipairs({ "x", "X", "r" }) do
-  map("n", key, caret_or(key, ("edit(%q)"):format(key)), {
-    expr = true,
-    desc = ({ x = "Delete Character", X = "Delete Character Before", r = "Replace Character" })[key],
-  })
+  map("n", key, function()
+    require("util.foldcursor").edit(key)
+  end, opts(({ x = "Delete Character", X = "Delete Character Before", r = "Replace Character" })[key]))
 end
-map("n", "v", caret_or("v", "visual()"), { expr = true, desc = "Visual Mode" })
+map("n", "v", function()
+  require("util.foldcursor").visual()
+end, opts("Visual Mode"))
 
 -- gc on a selection within a line: a block comment around it, IntelliJ
 -- style (lua/util/comment.lua); linewise selections stay line comments
@@ -252,17 +236,13 @@ local word_motions = {
 }
 -- In normal mode they go through the fold caret: on a closed fold the
 -- same search runs over the drawn fold line, skipping over its hidden
--- text (lua/util/foldcursor.lua). With multiple cursors standing they
--- run at each cursor in turn (there's no plain key to fall through to).
+-- text (lua/util/foldcursor.lua).
 for lhs, motion in pairs(word_motions) do
   local function run()
     vim.fn.search(motion[1], motion[2])
   end
   map("x", lhs, run, opts(motion[3]))
   map("n", lhs, function()
-    if with_cursors() then
-      return require("util.multicursor").each(run)
-    end
     require("util.foldcursor").motion(lhs, run)
   end, opts(motion[3]))
 end
@@ -276,57 +256,9 @@ for lhs, motion in pairs({
   B = { "E", "Next WORD End" },
 }) do
   map("x", lhs, motion[1], opts(motion[2]))
-  map("n", lhs, caret_or(motion[1], ("motion(%q, nil, true)"):format(motion[1])), { expr = true, desc = motion[2] })
-end
-
---------------------------------------------------------------------------------
--- Multiple Cursors (Neovim's own, 0.13+; lua/util/multicursor.lua)
---------------------------------------------------------------------------------
-
-if vim.fn.has("nvim-0.13") == 1 then
-  local function mc()
-    return require("util.multicursor")
-  end
-  -- Leave a cursor and move on to the next/previous match of the word under
-  -- the cursor or of the selection: one Alt-Shift family (l next, n
-  -- previous, as n/N search; s skip the next, b skip back; h in the layer
-  -- below lets the last one go). Off <leader>s, LazyVim's search prefix.
-  -- Vim's own Q, zq, [C ]C, CTRL-L and gQ work alongside.
-  map({ "n", "x" }, "<M-S-l>", function()
-    mc().add(1)
-  end, opts("Add Cursor at Next Match"))
-  map({ "n", "x" }, "<M-S-n>", function()
-    mc().add(-1)
-  end, opts("Add Cursor at Previous Match"))
-  map({ "n", "x" }, "<M-S-s>", function()
-    mc().skip(1)
-  end, opts("Skip to Next Match"))
-  map({ "n", "x" }, "<M-S-b>", function()
-    mc().skip(-1)
-  end, opts("Skip to Previous Match"))
-  map({ "n", "x" }, "<M-S-h>", function()
-    mc().undo()
-  end, opts("Undo Last Cursor"))
-  -- a cursor on the line above/below (<C-j> above, <C-k> below: j/k swapped)
-  map({ "n", "x" }, "<C-j>", function()
-    mc().line(-1)
-  end, opts("Add Cursor Above"))
-  map({ "n", "x" }, "<C-k>", function()
-    mc().line(1)
-  end, opts("Add Cursor Below"))
-  map({ "n", "x" }, "<leader><up>", function()
-    mc().line(-1, true)
-  end, opts("Skip Cursor Above"))
-  map({ "n", "x" }, "<leader><down>", function()
-    mc().line(1, true)
-  end, opts("Skip Cursor Below"))
-  -- while cursors stand, the arrows walk them
-  map({ "n", "x" }, "<left>", function()
-    return mc().active() and "[C" or "<left>"
-  end, { expr = true, desc = "Previous Cursor" })
-  map({ "n", "x" }, "<right>", function()
-    return mc().active() and "]C" or "<right>"
-  end, { expr = true, desc = "Next Cursor" })
+  map("n", lhs, function()
+    require("util.foldcursor").motion(motion[1], nil, true)
+  end, opts(motion[2]))
 end
 
 --------------------------------------------------------------------------------
@@ -369,12 +301,10 @@ map("n", "<leader>hc", "<cmd>Inspect<CR>", opts("Inspect Highlights Under Cursor
 -- (gk hover is an LSP key in plugins/lsp.lua, next to the disabled K)
 
 -- <Esc> keeps LazyVim's behaviour (clear hlsearch, stop snippet) and also
--- dismisses the gk hover / signature docs and the ge float (lua/util/popup.lua),
--- and clears the multiple cursors when there are any
+-- dismisses the gk hover / signature docs and the ge float (lua/util/popup.lua)
 map("n", "<Esc>", function()
-  local cursors = vim.fn.has("nvim-0.13") == 1 and require("util.multicursor").active()
-  return (cursors and "<Cmd>lua require('util.multicursor').clear()<CR>" or "") .. require("util.popup").escape()
-end, { expr = true, desc = "Escape, Clear hlsearch, Dismiss Popups and Cursors" })
+  return require("util.popup").escape()
+end, { expr = true, desc = "Escape, Clear hlsearch, Dismiss Popups" })
 
 -- ge opens the line's diagnostics in a float styled like the gk hover
 map("n", "ge", function()
