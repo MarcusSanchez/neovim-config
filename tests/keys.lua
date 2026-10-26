@@ -206,6 +206,34 @@ vim.schedule(function()
     end, 50)
     local fill = vim.api.nvim_get_hl(0, { name = "BufferLineFill", link = false })
     check("tab bar fill is not underlined", fill.underline, nil)
+    -- the completion menu is styled like the other popups (plugins/blink.lua)
+    require("lazy").load({ plugins = { "blink.cmp" } })
+    local blink = require("blink.cmp.config").completion
+    check("completion menu: rounded border", blink.menu.border, "rounded")
+    check(
+      "in the cursor popup's colours",
+      blink.menu.winhighlight:match("^Normal:CursorPopup,FloatBorder:CursorPopupBorder") ~= nil,
+      true
+    )
+    check(
+      "documentation window too",
+      blink.documentation.window.border .. " " .. blink.documentation.window.winhighlight:match("^Normal:CursorPopup"),
+      "rounded Normal:CursorPopup"
+    )
+    check("signature help too", require("blink.cmp.config").signature.window.border, "rounded")
+    check(
+      "rows: icon, label and description, kind",
+      vim.inspect(blink.menu.draw.columns({ mode = "default" })):gsub("%s+", " "),
+      '{ { "kind_icon" }, { "label", "label_description", gap = 1 }, { "kind" } }'
+    )
+    local sel = vim.api.nvim_get_hl(0, { name = "BlinkCmpMenuSelection", link = false })
+    check("the selection is the cursor line", sel.bg, vim.api.nvim_get_hl(0, { name = "CursorLine", link = false }).bg)
+    local match = vim.api.nvim_get_hl(0, { name = "BlinkCmpLabelMatch", link = false })
+    check(
+      "matched characters in the pickers' blue",
+      match.fg,
+      vim.api.nvim_get_hl(0, { name = "SnacksPickerMatch", link = false }).fg
+    )
     -- undotree
     require("lazy").load({ plugins = { "undotree" } })
     check("undotree custom map defined", vim.fn.exists("*g:Undotree_CustomMap"), 1)

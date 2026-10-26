@@ -65,6 +65,16 @@ return {
             CursorPopup = { fg = colors.text, bg = "NONE" },
             CursorPopupBorder = { fg = colors.blue, bg = "NONE" },
 
+            -- the completion menu (plugins/blink.lua) in the same popup: the
+            -- selection is the cursor line as in the picker lists, matched
+            -- characters blue as the pickers' are, details dimmed
+            BlinkCmpMenuSelection = { link = "CursorLine" },
+            BlinkCmpLabelMatch = { fg = colors.blue },
+            BlinkCmpLabelDescription = { fg = colors.overlay1 },
+            BlinkCmpLabelDetail = { fg = colors.overlay1 },
+            BlinkCmpSource = { fg = colors.overlay1 },
+            BlinkCmpDocSeparator = { fg = colors.blue, bg = "NONE" },
+
             -- golang
             ["@lsp.typemod.variable.defaultLibrary.go"] = { fg = colors.peach },
             -- shadowed variables get a color instead of the info squiggle
