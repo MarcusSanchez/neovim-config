@@ -38,3 +38,11 @@ vim.opt.foldexpr = "v:lua.require('util.foldranges').foldexpr()"
 vim.opt.sessionoptions:remove("folds")
 -- closed folds read `func main() { ... }` (lua/util/foldtext.lua)
 vim.opt.foldtext = "v:lua.require('util.foldtext').text()"
+
+-- No swap files: the file on disk is the truth, always. A swap file's two
+-- jobs — recovering unsaved text after a crash, warning that another
+-- editor has the file open — are covered by persistent undo and saving
+-- often, and the warning meant a notification per buffer at every
+-- session restore while another Neovim had the project open. (A swap
+-- file met anyway is taken as "edit": config/autocmds.lua.)
+vim.opt.swapfile = false

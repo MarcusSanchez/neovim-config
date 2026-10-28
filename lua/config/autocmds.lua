@@ -9,6 +9,22 @@ local function augroup(name)
 end
 
 --------------------------------------------------------------------------------
+-- Files
+--------------------------------------------------------------------------------
+
+-- Swap files are off (config/options.lua); should one turn up regardless
+-- (a buffer with 'swapfile' set locally, a stale file from before), take
+-- the file on disk without a word. Neovim's own handler would ask, or
+-- notify "W325: Ignoring swapfile" for one owned by a running process.
+pcall(vim.api.nvim_del_augroup_by_name, "nvim.swapfile")
+autocmd("SwapExists", {
+  group = augroup("swapfile"),
+  callback = function()
+    vim.v.swapchoice = "e"
+  end,
+})
+
+--------------------------------------------------------------------------------
 -- Diagnostics
 --------------------------------------------------------------------------------
 

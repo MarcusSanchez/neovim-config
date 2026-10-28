@@ -234,6 +234,10 @@ vim.schedule(function()
       match.fg,
       vim.api.nvim_get_hl(0, { name = "SnacksPickerMatch", link = false }).fg
     )
+    -- no swap files; one met anyway is edited through without a word
+    check("swap files are off", vim.o.swapfile, false)
+    check("Neovim's swapfile prompt/notification handler is gone", vim.fn.exists("#nvim.swapfile#SwapExists"), 0)
+    check("ours takes the file on disk", vim.fn.exists("#marcus_swapfile#SwapExists"), 1)
     -- undotree
     require("lazy").load({ plugins = { "undotree" } })
     check("undotree custom map defined", vim.fn.exists("*g:Undotree_CustomMap"), 1)
