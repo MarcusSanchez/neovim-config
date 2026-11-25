@@ -68,6 +68,48 @@ return {
           -- without the "i" flag the title would carry for it permanently
           ignored = true,
           toggles = { ignored = false },
+          -- Dotfiles stay hidden except the project config you edit, which
+          -- shows even when git-ignored (snacks' include wins over the
+          -- hidden and ignored filters). Tool state — .git, .idea, .zed,
+          -- .direnv, .devenv, .next, .zig-cache, .DS_Store — stays out.
+          -- A leading "/" makes each glob a whole name (".env" alone would
+          -- match "x.env"); a folder brings everything inside it along.
+          -- Typing to filter runs fd, which knows nothing of this list.
+          include = {
+            -- git
+            "/.gitignore",
+            "/.gitattributes",
+            "/.gitmodules",
+            "/.gitkeep",
+            -- environment
+            "/.env",
+            "/.env.*",
+            "/.envrc",
+            -- CI
+            "/.github",
+            -- formatting and linting
+            "/.editorconfig",
+            "/.prettierrc",
+            "/.prettierrc.*",
+            "/.prettierignore",
+            "/.eslintrc",
+            "/.eslintrc.*",
+            "/.styluaignore",
+            "/.golangci.yml",
+            "/.golangci.yaml",
+            "/.clang-format",
+            "/.clang-tidy",
+            "/.clangd",
+            -- packaging and tooling
+            "/.npmrc",
+            "/.nvmrc",
+            "/.dockerignore",
+            "/.cargo",
+            "/.sops.yaml",
+            -- Claude Code project config
+            "/.claude",
+            "/.mcp.json",
+          },
           actions = {
             -- <Esc> hands focus back to the editor instead of closing the
             -- explorer. picker.main is the last real (non-picker) file window.

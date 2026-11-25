@@ -238,6 +238,18 @@ vim.schedule(function()
     local explorer = require("snacks.picker.config").get({ source = "explorer" })
     check("explorer shows ignored files", explorer.ignored, true)
     check("without the i flag in its title", explorer.toggles.ignored, false)
+    -- dotfiles: hidden except the whitelist, which wins even when git-ignored
+    local shows = require("snacks.explorer.tree").filter(nil, explorer)
+    local function seen(path, ignored)
+      return shows({ path = path, hidden = vim.fs.basename(path):sub(1, 1) == ".", ignored = ignored })
+    end
+    check("whitelisted dotfile shows", seen("/r/.gitignore"), true)
+    check("one that is also git-ignored shows", seen("/r/.env", true), true)
+    check("at any depth, with variants", seen("/r/web/.env.local", true), true)
+    check("a whitelisted folder shows", seen("/r/.github"), true)
+    check("tool state stays hidden", seen("/r/.git") or seen("/r/.idea") or seen("/r/.direnv", true), false)
+    check("a name merely ending like one isn't matched", seen("/r/.envx"), false)
+    check("plain files unaffected", seen("/r/main.go"), true)
     -- no swap files; one met anyway is edited through without a word
     check("swap files are off", vim.o.swapfile, false)
     check("Neovim's swapfile prompt/notification handler is gone", vim.fn.exists("#nvim.swapfile#SwapExists"), 0)
