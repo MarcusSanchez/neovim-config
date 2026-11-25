@@ -234,6 +234,8 @@ vim.schedule(function()
       match.fg,
       vim.api.nvim_get_hl(0, { name = "SnacksPickerMatch", link = false }).fg
     )
+    -- the explorer lists git-ignored files
+    check("explorer shows ignored files", require("snacks.picker.config").get({ source = "explorer" }).ignored, true)
     -- no swap files; one met anyway is edited through without a word
     check("swap files are off", vim.o.swapfile, false)
     check("Neovim's swapfile prompt/notification handler is gone", vim.fn.exists("#nvim.swapfile#SwapExists"), 0)

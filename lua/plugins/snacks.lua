@@ -63,6 +63,9 @@ return {
         explorer = {
           -- show the explorer as a sidebar on the right
           layout = { layout = { position = "right" } },
+          -- git-ignored files and folders are listed too (build output,
+          -- vendored deps, .env): the tree shows what's really there
+          ignored = true,
           actions = {
             -- <Esc> hands focus back to the editor instead of closing the
             -- explorer. picker.main is the last real (non-picker) file window.
